@@ -173,6 +173,7 @@ public static class ProjectSetup
         AssetDatabase.FindAssets("t:" + typeof(T).Name).Select(g => AssetDatabase.LoadAssetAtPath<T>(AssetDatabase.GUIDToAssetPath(g))).FirstOrDefault(x => x != null);
 
     static void Set(SerializedObject so, string prop, bool v) { var p = so.FindProperty(prop); if (p != null) p.boolValue = v; else Debug.LogWarning("[setup] no property " + prop); }
-    static void Set(SerializedObject so, string prop, int v) { var p = so.FindProperty(prop); if (p != null) { if (p.propertyType == SerializedPropertyType.Enum) p.enumValueIndex = v; else p.intValue = v; } else Debug.LogWarning("[setup] no property " + prop); }
+    // intValue is the enum's underlying value; enumValueIndex is its position in the names list (MsaaQuality._4x = index 2, value 4 — the index write left MSAA Disabled)
+    static void Set(SerializedObject so, string prop, int v) { var p = so.FindProperty(prop); if (p != null) p.intValue = v; else Debug.LogWarning("[setup] no property " + prop); }
     static void SetFloat(SerializedObject so, string prop, float v) { var p = so.FindProperty(prop); if (p != null) p.floatValue = v; else Debug.LogWarning("[setup] no property " + prop); }
 }

@@ -85,7 +85,7 @@ public static class SceneSetup
         var seat = kart.GetComponentsInChildren<Transform>().First(t => t.name == "DriverSeat");
         driver.transform.SetParent(seat, false);
         var pose = driver.GetComponent<KartCup.BlockyDriverPose>();
-        new SerializedObject(pose).FindProperty("kartBody").objectReferenceValue = rb;
+        SetRef(pose, "kartBody", rb);
         var wheels = kart.GetComponentsInChildren<Transform>().Where(t => t.name.StartsWith("wheel")).ToArray();
         var drive = kart.AddComponent<KartCup.DemoDrive>();
         var so = new SerializedObject(drive);
@@ -117,7 +117,7 @@ public static class SceneSetup
         var cam = camGo.AddComponent<Camera>(); cam.fieldOfView = 56; cam.nearClipPlane = 0.3f; cam.farClipPlane = 320; cam.clearFlags = CameraClearFlags.Skybox;
         camGo.AddComponent<AudioListener>();
         camGo.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>();
-        var follow = camGo.AddComponent<KartCup.ChaseCam>(); new SerializedObject(follow).FindProperty("target").objectReferenceValue = kart.transform;
+        var follow = camGo.AddComponent<KartCup.ChaseCam>(); SetRef(follow, "target", kart.transform);
         camGo.AddComponent<KartCup.CameraFeel>();
 
         // ---- systems ----
@@ -139,12 +139,12 @@ public static class SceneSetup
         var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
         var fps = MakeText(safe.transform, "Fps", font, 34, TextAnchor.UpperLeft, new Vector2(0, 1), new Vector2(24, -16), new Vector2(1400, 50));
-        var fc = boot.AddComponent<KartCup.FpsCounter>(); new SerializedObject(fc).FindProperty("label").objectReferenceValue = fps;
+        var fc = boot.AddComponent<KartCup.FpsCounter>(); SetRef(fc, "label", fps);
         var status = MakeText(safe.transform, "Status", font, 34, TextAnchor.LowerLeft, new Vector2(0, 0), new Vector2(24, 90), new Vector2(1400, 50));
         status.text = "Not connected";
         var btn = MakeButton(safe.transform, "Connect", font, "Use installed wallet", new Vector2(0, 0), new Vector2(24, 16), new Vector2(520, 64));
         UnityEditor.Events.UnityEventTools.AddPersistentListener(btn.onClick, wallet.Login);
-        var relay = status.gameObject.AddComponent<KartCup.TextRelay>(); new SerializedObject(relay).FindProperty("label").objectReferenceValue = status;
+        var relay = status.gameObject.AddComponent<KartCup.TextRelay>(); SetRef(relay, "label", status);
         // wire onStatus → relay.Set via SerializedProperty (persistent listener with a dynamic string arg)
         UnityEditor.Events.UnityEventTools.AddPersistentListener((UnityEngine.Events.UnityEvent<string>)wallet.GetType().GetField("onStatus", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(wallet), relay.Set);
 
@@ -190,6 +190,12 @@ public static class SceneSetup
         m.RecalculateBounds();
         AssetDatabase.CreateAsset(m, Art + "Models/Props/RingRoad.asset");
         return m;
+    }
+
+    /// A SerializedObject edit is a no-op until Apply — without this the refs silently stayed null (NRE in FpsCounter, ChaseCam never followed).
+    static void SetRef(Object target, string field, Object value)
+    {
+        var so = new SerializedObject(target); so.FindProperty(field).objectReferenceValue = value; so.ApplyModifiedPropertiesWithoutUndo();
     }
 
     static Text MakeText(Transform parent, string name, Font font, int size, TextAnchor anchor, Vector2 anchorPt, Vector2 offset, Vector2 sizeDelta)

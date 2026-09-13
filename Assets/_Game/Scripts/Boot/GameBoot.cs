@@ -21,7 +21,7 @@ namespace KartCup
             Debug.Log($"[boot] {SystemInfo.deviceModel} · {SystemInfo.graphicsDeviceType} · " +
                       $"msaaAutoResolve={SystemInfo.supportsMultisampleAutoResolve} · " +
                       $"screen={Screen.width}x{Screen.height} @ {Screen.currentResolution.refreshRateRatio.value:F0}Hz · " +
-                      $"dpi={Screen.dpi:F0} · msaa={QualitySettings.antiAliasing}");
+                      $"dpi={Screen.dpi:F0} · msaa={(UnityEngine.Rendering.Universal.UniversalRenderPipeline.asset ? UnityEngine.Rendering.Universal.UniversalRenderPipeline.asset.msaaSampleCount : 0)}");   // URP owns MSAA; QualitySettings.antiAliasing reads 0
         }
     }
 }

@@ -39,6 +39,11 @@ class BuildSettingsGuard : IPreprocessBuildWithReport
         Check(File.ReadAllText("ProjectSettings/ProjectSettings.asset").Contains("resolutionScalingMode: 1"), "Resolution Scaling Mode must be Fixed DPI");
         Check(!EditorUserBuildSettings.development || report.summary.options.HasFlag(BuildOptions.Development), "Development Build state inconsistent");
 
+        // A MonoBehaviour class whose file has a different name gets an in-memory MonoScript that is embedded into the scene
+        // (--- !u!115). Loads fine in the editor; the player aborts with "level0 is corrupted [Position out of bounds]".
+        foreach (var s in EditorBuildSettings.scenes.Where(s => s.enabled))
+            Check(!File.ReadAllText(s.path).Contains("\n--- !u!115 "), $"{s.path} embeds a MonoScript: some MonoBehaviour in it lives in a file not named after its class — split the file and rebuild the scene");
+
 #if ENABLE_LEGACY_INPUT_MANAGER && !ENABLE_INPUT_SYSTEM
         errors.Add("Active Input Handling must be Input System Package (New); set InputManager.enableStandardInput=false on UKR's prefab instead of 'Both'");
 #endif

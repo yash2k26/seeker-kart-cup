@@ -1,16 +1,8 @@
 using UnityEngine;
 
-/// tiny helpers the gate scene needs
 namespace KartCup
 {
-    public sealed class Spin : MonoBehaviour { void Update() => transform.Rotate(0, 90f * Time.deltaTime, 0, Space.World); }
-
-    public sealed class TextRelay : MonoBehaviour
-    {
-        [SerializeField] UnityEngine.UI.Text label;
-        public void Set(string s) { if (label) label.text = s; }
-    }
-
+    /// Gate-scene helper: damped follow camera. UKR's KartCameraSwitcher replaces this in the real race scene.
     public sealed class ChaseCam : MonoBehaviour
     {
         [SerializeField] Transform target; [SerializeField] float distance = 5.2f, height = 2.1f, damp = 6f, lookHeight = 0.9f;
