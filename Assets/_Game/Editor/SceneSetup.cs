@@ -124,11 +124,11 @@ public static class SceneSetup
         var boot = new GameObject("Boot"); boot.AddComponent<KartCup.GameBoot>(); boot.AddComponent<KartCup.HitStop>();
         var web3 = new GameObject("Web3").AddComponent<Web3>();
         web3.rpcCluster = RpcCluster.MainNet;
-        web3.customRpc = "https://api.mainnet-beta.solana.com";     // TODO: your Worker's /rpc once the domain exists
+        web3.customRpc = "https://kartcup.bharadwaj465.workers.dev/rpc";     // TODO: your Worker's /rpc once the domain exists
         web3.solanaWalletAdapterOptions ??= new SolanaWalletAdapterOptions();
         web3.solanaWalletAdapterOptions.solanaMobileWalletAdapterOptions ??= new SolanaMobileWalletAdapterOptions();
         var mwa = web3.solanaWalletAdapterOptions.solanaMobileWalletAdapterOptions;
-        mwa.identityUri = "https://kart.example.com/"; mwa.iconUri = "/icon.png"; mwa.name = "Seeker Kart Cup"; mwa.keepConnectionAlive = true;
+        mwa.identityUri = "https://kartcup.bharadwaj465.workers.dev/"; mwa.iconUri = "/icon.png"; mwa.name = "Seeker Kart Cup"; mwa.keepConnectionAlive = true;
         var wallet = new GameObject("WalletFlow").AddComponent<KartCup.WalletFlow>();
 
         // ---- UI (legacy uGUI Text; TMP resources come with the real HUD) ----

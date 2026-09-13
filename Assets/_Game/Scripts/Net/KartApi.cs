@@ -10,7 +10,7 @@ namespace KartCup
     /// Thin client for the Cloudflare Worker. Awaitable-based (Unity 6), zero-dependency JSON via Newtonsoft (ships with the Solana SDK).
     public static class KartApi
     {
-        public static string BaseUrl = "https://kart.example.com";   // TODO: set from a ScriptableObject/config; must be https
+        public static string BaseUrl = "https://kartcup.bharadwaj465.workers.dev";   // TODO: set from a ScriptableObject/config; must be https
         const string kSession = "kc.session";
         const string kDevice = "kc.device";
 
