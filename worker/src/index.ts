@@ -62,7 +62,10 @@ export default {
 
     const key = `${req.method} ${url.pathname}`;
     const handler = routes[key];
-    if (!handler) return env.ASSETS.fetch(req); // icon.png, index, 404s
+    if (!handler) {   // icon.png, index; the assets binding throws on a miss (observed as a 1101), so a miss is a plain 404
+      if (req.method !== 'GET') return bad('not found', 404);
+      try { return await env.ASSETS.fetch(req); } catch { return bad('not found', 404); }
+    }
 
     try {
       const wallet = await readSession(env, req.headers.get('authorization'));
