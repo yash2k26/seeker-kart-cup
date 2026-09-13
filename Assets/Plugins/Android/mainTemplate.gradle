@@ -4,6 +4,15 @@ apply from: '../shared/common.gradle'
 **APPLY_PLUGINS**
 
 dependencies {
+
+    // [Solana.Unity-SDK] Dependencies
+    implementation 'androidx.browser:browser:1.8.0'
+    implementation 'androidx.core:core:1.13.1'
+    implementation 'androidx.versionedparcelable:versionedparcelable:1.2.1'
+    implementation 'com.google.guava:guava:33.5.0-android'
+    implementation 'com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava'
+    // [Solana.Unity-SDK] End Dependencies
+
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 **DEPS**}
 
@@ -42,3 +51,14 @@ android {
 **IL_CPP_BUILD_SETUP**
 **SOURCE_BUILD_SETUP**
 **EXTERNAL_SOURCES**
+
+// [Solana.Unity-SDK] Conflict Resolution
+configurations.all {
+    exclude group: 'com.google.guava', module: 'listenablefuture'
+    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+    resolutionStrategy {
+        force 'androidx.core:core:1.13.1'
+    }
+}
+// [Solana.Unity-SDK] End Conflict Resolution
