@@ -1,6 +1,5 @@
 {
   "dependencies": {
-    "com.solana.unity_sdk": "https://github.com/magicblock-labs/Solana.Unity-SDK.git#bd0d30f6",
     "com.kyrylokuzyk.primetween": "1.4.11",
     "com.unity.ai.navigation": "2.0.14",
     "com.unity.ide.rider": "3.1.0",
@@ -51,6 +50,12 @@
     "com.unity.modules.xr": "1.0.0"
   },
   "scopedRegistries": [
-    { "name": "npm", "url": "https://registry.npmjs.org", "scopes": ["com.kyrylokuzyk"] }
+    {
+      "name": "npm",
+      "url": "https://registry.npmjs.org",
+      "scopes": [
+        "com.kyrylokuzyk"
+      ]
+    }
   ]
 }
