@@ -127,3 +127,11 @@ InitTestScene*.unity*
 *.raw
 *.snap
 Builds/
+
+# Photon Fusion SDK (import from photonengine.com; PhotonAppSettings.asset holds the AppId — never commit it)
+Assets/Photon/**
+!Assets/Photon/
+!Assets/Photon/Fusion/
+!Assets/Photon/Fusion/Resources/
+!Assets/Photon/Fusion/Resources/NetworkProjectConfig.fusion
+!Assets/Photon/Fusion/Resources/NetworkProjectConfig.fusion.meta

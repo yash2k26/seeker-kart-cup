@@ -6,7 +6,7 @@ Unofficial parody. Not affiliated with or endorsed by any person or company depi
 ## Build from source
 
 - Unity **6000.3.24f1** (Hub: Android Build Support + OpenJDK + Android SDK & NDK Tools). Open the project; it targets Android, IL2CPP, ARM64, GameActivity.
-- Two paid Asset Store packages are **not** in this repo (their EULAs forbid redistribution): Ultimate Kart Racing → `Assets/Big Frameworks/`, Cartoon FX Remaster → `Assets/JMO Assets/`. Import them from the Asset Store; everything else is here.
+- Two third-party packages are **not** in this repo (their licences forbid redistribution): Cartoon FX Remaster FREE → `Assets/JMO Assets/` (Asset Store), Photon Fusion 2.1 → `Assets/Photon/` (photonengine.com SDK page; paste your own Fusion AppId in Tools → Fusion → Fusion Hub). Everything else, including the MIT kart physics, is here.
 - Headless, reproducible steps (all also in the **Build** menu):
   - `Unity -batchmode -projectPath . -executeMethod ProjectSetup.Apply -quit` — every Player/URP/Quality setting
   - `… -executeMethod ContentSetup.Build -quit` — materials, driver and kart prefabs
@@ -19,7 +19,9 @@ Unofficial parody. Not affiliated with or endorsed by any person or company depi
 
 | Layer | Origin | Licence | In repo? |
 |---|---|---|---|
-| Kart physics, race manager, items, AI, menus | Ultimate Kart Racing 1.0.7 (Big Frameworks) — a fork of Powerslide Kart Physics (MIT) | Asset Store EULA | No (gitignored) |
+| Kart physics (drift, jump, 3 boost modes), 4 example items, waypoint AI | Powerslide Kart Physics (Justin Couch, MIT) — `Assets/ThirdParty/PowerslideKartPhysics` | MIT | Yes |
+| Race manager, character stats, online rooms, lobby | **written for this hackathon** on top of Powerslide + Photon Fusion 2 Shared Mode | MIT | Yes |
+| Online transport | Photon Fusion 2.1 SDK (Exit Games) | Photon licence, Free 100 CCU plan | No (gitignored; import from photonengine.com and paste your own AppId in Fusion Hub) |
 | Particle FX | Cartoon FX Remaster FREE (Jean Moreno) | Asset Store EULA | No (gitignored) |
 | Karts, props, item box, sky, UI sprites, SFX | Kenney (Car Kit, Toy Car Kit, Pirate/Nature/Watercraft kits, Skyboxes, UI Pack, Mobile Controls, audio packs) | CC0 | Yes, `Assets/_Game/Art`, `Assets/_Game/Audio` |
 | Driver bodies | Kenney Blocky Characters 2.0 | CC0 | Yes |
