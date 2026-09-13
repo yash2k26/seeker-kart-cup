@@ -40,6 +40,7 @@ namespace KartCup
                 {
                     await Web3.Instance.LoginWalletAdapter();
                     Profile = await KartApi.Me();
+                    Status(Profile.skrName ?? Short(Profile.wallet));   // label otherwise stays "Not connected" after a silent reconnect
                     onLoggedIn?.Invoke(Profile);
                     KartApi.Event("wallet_reconnect");
                 }

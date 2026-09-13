@@ -798,7 +798,9 @@ namespace Solana.Unity.SDK
         /// </summary>
         public async Task HandleApplicationFocus(bool hasFocus)
         {
-            if (!hasFocus || !_walletOptions.keepConnectionAlive || Account != null || _loginInProgress)
+            // KartCup patch: LoginWithSignIn runs under OpGate without setting _loginInProgress, so focus returning from the
+            // wallet mid-sign-in used to fire ReconnectWallet → OperationInFlightException logged as an error every login.
+            if (!hasFocus || !_walletOptions.keepConnectionAlive || Account != null || _loginInProgress || OpGate.CurrentCount == 0)
             {
                 return;
             }

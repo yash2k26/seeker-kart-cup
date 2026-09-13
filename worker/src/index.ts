@@ -1,6 +1,6 @@
 // Seeker Kart Cup backend — one Worker, one D1. See research/14 for the reasoning behind every route.
 import { challenge, verify, readSession } from './auth';
-import { raceStart, raceFinish, raceClaim, leaderboard, me, deleteMe, event } from './race';
+import { raceStart, raceFinish, raceClaim, leaderboard, me, deleteMe, event, demoUnlock } from './race';
 import { rpcProxy, txConfirm, purchaseVerify } from './chain';
 
 export interface Env {
@@ -15,6 +15,7 @@ export interface Env {
   PRICES_JSON: string;
   HELIUS_URL: string;
   SESSION_HMAC_KEY: string;
+  DEMO_CODE?: string;   // secret; reviewer/demo unlock of the SGT cosmetics (no Seeker on hand)
 }
 
 type Handler = (req: Request, env: Env, ctx: ExecutionContext, wallet: string | null) => Promise<Response>;
@@ -33,6 +34,7 @@ const routes: Record<string, Handler> = {
   'GET /v1/me': me,
   'DELETE /v1/me': deleteMe,
   'POST /v1/event': event,
+  'POST /v1/demo/unlock': demoUnlock,
 };
 
 const CORS = {

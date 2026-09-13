@@ -82,6 +82,17 @@ export async function raceClaim(req: Request, env: Env, _ctx: ExecutionContext, 
   return json({ claimed: true, isPersonalBest: isPb, memo: isPb ? `kc:pb:${tok.r}` : null });
 }
 
+/** POST /v1/demo/unlock { code } (session) — reviewer/demo code grants the SGT-gated cosmetics on a non-Seeker phone.
+ *  Rows are `source = 'demo'`; refreshProfile never deletes unlocks, so they survive later logins. */
+export async function demoUnlock(req: Request, env: Env, _ctx: ExecutionContext, wallet: string | null) {
+  if (!wallet) return bad('unauthorized', 401);
+  const { code } = await req.json<any>().catch(() => ({}));
+  if (!env.DEMO_CODE || typeof code !== 'string' || code.trim().toUpperCase() !== env.DEMO_CODE.toUpperCase()) return bad('bad code', 403);
+  await env.DB.batch(['kart.seeker_edition', 'badge.seeker'].map(sku =>
+    env.DB.prepare("INSERT OR IGNORE INTO unlocks (wallet, sku, source, created_at) VALUES (?1, ?2, 'demo', ?3)").bind(wallet, sku, now())));
+  return json(await getProfile(env, wallet));
+}
+
 /** GET /v1/leaderboard?track=beach&around=<wallet> */
 export async function leaderboard(req: Request, env: Env) {
   const url = new URL(req.url);
@@ -89,7 +100,8 @@ export async function leaderboard(req: Request, env: Env) {
   if (!TRACKS[track]) return bad('unknown track');
   const rows = await env.DB.prepare(`
     SELECT r.wallet, COALESCE(p.skr_name, substr(r.wallet,1,4) || '…' || substr(r.wallet,-4)) AS name,
-           p.is_seeker AS isSeeker, MIN(r.total_ms) AS bestMs, r.memo_sig AS memoSig
+           (p.is_seeker OR EXISTS (SELECT 1 FROM unlocks u WHERE u.wallet = r.wallet AND u.sku = 'badge.seeker')) AS isSeeker,
+           MIN(r.total_ms) AS bestMs, r.memo_sig AS memoSig
     FROM results r JOIN players p USING (wallet)
     WHERE r.track_id = ?1 AND r.wallet IS NOT NULL
     GROUP BY r.wallet ORDER BY bestMs LIMIT 50`).bind(track).all();

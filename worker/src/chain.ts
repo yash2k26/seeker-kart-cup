@@ -83,7 +83,8 @@ export async function refreshProfile(env: Env, wallet: string) {
 export async function getProfile(env: Env, wallet: string) {
   const p = await env.DB.prepare('SELECT wallet, skr_name, is_seeker FROM players WHERE wallet = ?1').bind(wallet).first<any>();
   const unlocks = await env.DB.prepare('SELECT sku FROM unlocks WHERE wallet = ?1').bind(wallet).all<{ sku: string }>();
-  return { wallet, skrName: p?.skr_name ?? null, isSeeker: !!p?.is_seeker, unlocks: unlocks.results.map(u => u.sku) };
+  const skus = unlocks.results.map(u => u.sku);
+  return { wallet, skrName: p?.skr_name ?? null, isSeeker: !!p?.is_seeker || skus.includes('badge.seeker'), unlocks: skus };   // badge via SGT or demo code
 }
 
 // ---- landed-transaction verification (replay-proof via tx_log PRIMARY KEY) ----
