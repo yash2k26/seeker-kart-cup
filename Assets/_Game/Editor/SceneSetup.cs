@@ -62,13 +62,13 @@ public static class SceneSetup
         var rnd = new System.Random(7);
         for (int i = 0; i < 60; i++)
         {
-            float a = i / 60f * Mathf.PI * 2f, r = (i % 2 == 0) ? 31f + (float)rnd.NextDouble() * 6f : 12f + (float)rnd.NextDouble() * 3f;
-            Place(dressing.transform, Art + $"Models/Props/Pirate/{palms[i % palms.Length]}.fbx", pirate, new Vector3(Mathf.Sin(a) * r, 0, Mathf.Cos(a) * r), (float)rnd.NextDouble() * 360f, 1.6f + (float)rnd.NextDouble() * 0.6f);
+            float a = i / 60f * Mathf.PI * 2f, r = (i % 2 == 0) ? 30f + (float)rnd.NextDouble() * 8f : 9f + (float)rnd.NextDouble() * 5f;
+            Place(dressing.transform, Art + $"Models/Props/Pirate/{palms[i % palms.Length]}.fbx", pirate, new Vector3(Mathf.Sin(a) * r, 0, Mathf.Cos(a) * r), (float)rnd.NextDouble() * 360f, 0.85f + (float)rnd.NextDouble() * 0.45f);
         }
         for (int i = 0; i < 24; i++)
         {
             float a = (i + 0.5f) / 24f * Mathf.PI * 2f, r = 40f + (float)rnd.NextDouble() * 12f;
-            Place(dressing.transform, Art + $"Models/Props/Pirate/{rocks[i % rocks.Length]}.fbx", pirate, new Vector3(Mathf.Sin(a) * r, 0, Mathf.Cos(a) * r), (float)rnd.NextDouble() * 360f, 1.5f + (float)rnd.NextDouble() * 1.5f);
+            Place(dressing.transform, Art + $"Models/Props/Pirate/{rocks[i % rocks.Length]}.fbx", pirate, new Vector3(Mathf.Sin(a) * r, 0, Mathf.Cos(a) * r), (float)rnd.NextDouble() * 360f, 1.0f + (float)rnd.NextDouble() * 0.9f);
         }
         for (int i = 0; i < 8; i++) { float a = i / 8f * Mathf.PI * 2f; Place(dressing.transform, Art + "Models/Props/ToyCar/item-box.fbx", toycar, new Vector3(Mathf.Sin(a) * 22.5f, 0.9f, Mathf.Cos(a) * 22.5f), 0, 1.4f).AddComponent<KartCup.Spin>(); }
         for (int i = 0; i < 6; i++) { float a = i / 6f * Mathf.PI * 2f + 0.3f; Place(dressing.transform, Art + "Models/Props/Watercraft/buoy.fbx", craft, new Vector3(Mathf.Sin(a) * 95f, -0.2f, Mathf.Cos(a) * 95f), 0, 1.5f); }
@@ -114,7 +114,7 @@ public static class SceneSetup
 
         // ---- camera: chase, vertical FOV 62 ----
         var camGo = new GameObject("Main Camera"); camGo.tag = "MainCamera";
-        var cam = camGo.AddComponent<Camera>(); cam.fieldOfView = 62; cam.nearClipPlane = 0.3f; cam.farClipPlane = 320; cam.clearFlags = CameraClearFlags.Skybox;
+        var cam = camGo.AddComponent<Camera>(); cam.fieldOfView = 56; cam.nearClipPlane = 0.3f; cam.farClipPlane = 320; cam.clearFlags = CameraClearFlags.Skybox;
         camGo.AddComponent<AudioListener>();
         camGo.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>();
         var follow = camGo.AddComponent<KartCup.ChaseCam>(); new SerializedObject(follow).FindProperty("target").objectReferenceValue = kart.transform;

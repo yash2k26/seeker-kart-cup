@@ -13,7 +13,7 @@ namespace KartCup
 
     public sealed class ChaseCam : MonoBehaviour
     {
-        [SerializeField] Transform target; [SerializeField] float distance = 6.5f, height = 2.6f, damp = 6f, lookHeight = 0.8f;
+        [SerializeField] Transform target; [SerializeField] float distance = 5.2f, height = 2.1f, damp = 6f, lookHeight = 0.9f;
         void LateUpdate()
         {
             if (!target) return;

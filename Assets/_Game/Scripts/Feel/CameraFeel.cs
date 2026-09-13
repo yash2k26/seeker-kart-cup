@@ -9,7 +9,7 @@ namespace KartCup
         public static CameraFeel Instance { get; private set; }
 
         [Header("FOV")]
-        [SerializeField] float baseFov = 62f;
+        [SerializeField] float baseFov = 56f;
         [SerializeField] float boostAdd = 7f;
         [SerializeField] float speedAdd = 3f;
         [SerializeField] float lerpSpeed = 8f;
