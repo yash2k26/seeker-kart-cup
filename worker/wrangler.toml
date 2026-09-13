@@ -1,0 +1,23 @@
+name = "kartcup"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Static files: /icon.png /privacy /terms (public/). Worker handles everything else.
+[assets]
+directory = "./public"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "kartcup"
+database_id = "REPLACE_AFTER_wrangler_d1_create"
+
+[vars]
+APP_DOMAIN = "kart.example.com"          # TODO: your domain (also the MWA identityUri host)
+PACKAGE_NAME = "com.fensory.kartcup"      # TODO: must equal the APK package name
+CERT_SHA256 = "9E:EA:EE:E5:53:EF:C0:08:32:69:5E:7D:E7:2B:29:75:AA:AA:0B:88:15:EF:93:AB:4A:6C:44:88:C5:48:5C:07"                          # TODO: apksigner --print-certs SHA-256, colon-separated; comma-separate several
+SKR_MINT = "SKRbvo6Gf7GondiT3BbTfuRDPqLWei4j2Qy2NPGZhW3"
+TREASURY_OWNER = ""                       # TODO: treasury wallet (owner), not the ATA
+TREASURY_ATA = ""                         # TODO: treasury's SKR associated token account, pre-created once
+PRICES_JSON = "{\"paint.sunset\":\"1000000\"}"   # base units, 6 decimals: 1000000 = 1 SKR
+# secrets (wrangler secret put): HELIUS_URL, SESSION_HMAC_KEY

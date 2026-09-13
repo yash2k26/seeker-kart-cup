@@ -1,0 +1,14 @@
+<linker>
+  <!-- Newtonsoft + Solana.Unity-SDK deserialize through reflection; keep them whole under IL2CPP stripping (SDK issue #257) -->
+  <assembly fullname="Newtonsoft.Json" preserve="all"/>
+  <assembly fullname="Solana.Unity.Rpc" preserve="all"/>
+  <assembly fullname="Solana.Unity.Wallet" preserve="all"/>
+  <assembly fullname="Solana.Unity.Programs" preserve="all"/>
+  <assembly fullname="Solana.Unity.Extensions" preserve="all"/>
+  <assembly fullname="Solana.Unity.KeyStore" preserve="all"/>
+  <assembly fullname="Chaos.NaCl" preserve="all"/>
+  <assembly fullname="BouncyCastle.Cryptography" preserve="all"/>
+  <assembly fullname="websocket-sharp-latest" preserve="all"/>
+  <assembly fullname="NativeWebSocket" preserve="all"/>
+  <assembly fullname="com.solana.unity_sdk" preserve="all"/>
+</linker>

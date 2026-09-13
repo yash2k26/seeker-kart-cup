@@ -1,0 +1,21 @@
+{
+  "name": "kartcup-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "db:local": "wrangler d1 migrations apply kartcup --local",
+    "db:remote": "wrangler d1 migrations apply kartcup --remote"
+  },
+  "dependencies": {
+    "@onsol/tldparser": "0.6.7",
+    "@solana/web3.js": "^1.98.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5",
+    "typescript": "^5",
+    "wrangler": "^4"
+  }
+}
