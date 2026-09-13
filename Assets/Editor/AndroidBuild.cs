@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.Build.Profile;
 using UnityEditor.Build.Reporting;
@@ -19,10 +20,6 @@ public static class AndroidBuild
     [MenuItem("Build/Android Release")]
     public static void Release()
     {
-        var profile = AssetDatabase.LoadAssetAtPath<BuildProfile>(kRelease)
-            ?? throw new Exception($"Build profile not found: {kRelease}");
-        BuildProfile.SetActiveBuildProfile(profile);
-
         EditorUserBuildSettings.buildAppBundle = false;            // dApp Store takes an APK, never an AAB
         ApplySigning();
         int code = BumpVersionCode();
@@ -31,12 +28,30 @@ public static class AndroidBuild
         Directory.CreateDirectory(dir);
         string apk = Path.Combine(dir, $"kartcup-{PlayerSettings.bundleVersion}-{code}.apk");
 
-        var report = BuildPipeline.BuildPlayer(new BuildPlayerWithProfileOptions
+        BuildReport report;
+        var profile = AssetDatabase.LoadAssetAtPath<BuildProfile>(kRelease);
+        if (profile != null)
         {
-            buildProfile     = profile,
-            locationPathName = apk,
-            options          = BuildOptions.CompressWithLz4HC
-        });
+            BuildProfile.SetActiveBuildProfile(profile);
+            report = BuildPipeline.BuildPlayer(new BuildPlayerWithProfileOptions
+            {
+                buildProfile     = profile,
+                locationPathName = apk,
+                options          = BuildOptions.CompressWithLz4HC
+            });
+        }
+        else
+        {
+            // ponytail: no profile asset yet — build from the scene list with the global Player Settings.
+            report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+            {
+                target = BuildTarget.Android,
+                targetGroup = BuildTargetGroup.Android,
+                scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray(),
+                locationPathName = apk,
+                options = BuildOptions.CompressWithLz4HC
+            });
+        }
 
         var s = report.summary;
         Debug.Log($"[build] {s.result} {s.totalSize / 1048576f:F1} MB in {s.totalTime} -> {apk}");

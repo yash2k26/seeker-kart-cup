@@ -15,7 +15,7 @@ namespace KartCup
         [SerializeField] Rigidbody rb;
         [SerializeField] float topSpeed = 30f;        // UKR Kart.maxSpeed
         [SerializeField] MonoBehaviour ukrInputManager;   // drag UKR's InputManager (only for the player kart)
-        [SerializeField] UnityEvent onPlayerHit;
+        [SerializeField] UnityEvent onPlayerHit = new();
 
         FieldInfo steerField; object steerOwner;
 

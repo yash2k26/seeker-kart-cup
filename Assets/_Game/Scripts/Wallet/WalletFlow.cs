@@ -22,8 +22,8 @@ namespace KartCup
         [SerializeField] string skrMint = "SKRbvo6Gf7GondiT3BbTfuRDPqLWei4j2Qy2NPGZhW3";
         [SerializeField] string treasuryOwner = "";           // TODO: treasury wallet (owner); its SKR ATA is pre-created once
         [SerializeField] long minLamportsForTx = 1_000_000;   // rent floor is ~650k after SIMD-0437; Seed Vault injects ComputeBudget ixs
-        [SerializeField] UnityEvent<string> onStatus;         // UI text
-        [SerializeField] UnityEvent<KartApi.Profile> onLoggedIn;
+        [SerializeField] UnityEvent<string> onStatus = new();         // UI text
+        [SerializeField] UnityEvent<KartApi.Profile> onLoggedIn = new();
 
         public KartApi.Profile Profile { get; private set; }
         public bool Busy { get; private set; }

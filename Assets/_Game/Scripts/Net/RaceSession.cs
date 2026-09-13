@@ -11,7 +11,7 @@ namespace KartCup
         public static RaceSession Instance { get; private set; }
 
         [SerializeField] string trackId = "beach";
-        [SerializeField] UnityEvent<bool> onResultSubmitted;   // isPersonalBest
+        [SerializeField] UnityEvent<bool> onResultSubmitted = new();   // isPersonalBest
 
         public string RaceId { get; private set; }
         public string RaceToken { get; private set; }
