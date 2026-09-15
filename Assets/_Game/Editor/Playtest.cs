@@ -13,7 +13,7 @@ public static class Playtest
 {
     static double start;
     static int shot;
-    static readonly double[] shotTimes = { 4, 9, 16, 26 };
+    static readonly double[] shotTimes = { 5, 12, 22, 34 };
 
     [MenuItem("Build/Playtest 30s")]
     public static void Run()
@@ -43,7 +43,7 @@ public static class Playtest
             Report(t);
             shot++;
         }
-        if (t < 30) return;
+        if (t < 38) return;
 
         EditorApplication.update -= Tick;
         Report(t);
@@ -68,6 +68,15 @@ public static class Playtest
     {
         var cam = Camera.main;
         if (cam == null) return;
+        // Screen-space-overlay canvases never land in a RenderTexture: borrow the camera for the shot.
+        foreach (var canvas in Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None))
+        {
+            if (canvas.renderMode != RenderMode.ScreenSpaceOverlay) continue;
+            canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            canvas.worldCamera = cam;
+            canvas.planeDistance = 1f;
+        }
+        Canvas.ForceUpdateCanvases();
         int w = 1780, h = 800;
         var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 };
         var prevTarget = cam.targetTexture;

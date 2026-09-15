@@ -6,7 +6,7 @@ using UnityEngine;
 // Bump k_Version when you change a rule -> Unity reimports everything this touches.
 public sealed class GameAssetImportRules : AssetPostprocessor
 {
-    const uint k_Version = 1;
+    const uint k_Version = 2;
     public override uint GetVersion() => k_Version;
 
     const string Root = "Assets/_Game/";
@@ -36,6 +36,16 @@ public sealed class GameAssetImportRules : AssetPostprocessor
             t.mipmapEnabled = true;
             ps.maxTextureSize = 256;
             ps.format = TextureImporterFormat.RGBA32;      // no block compression on gradient (AO) columns
+        }
+        else if (In("Art/Textures/UI/Kit"))
+        {
+            // Kenney's UI kit is drawn with rounded corners: a uniform 9-slice border keeps them crisp at any size.
+            t.textureType = TextureImporterType.Sprite;
+            t.spriteImportMode = SpriteImportMode.Single;
+            t.spriteBorder = new Vector4(24, 24, 24, 24);
+            t.mipmapEnabled = false;
+            ps.maxTextureSize = 512;
+            ps.format = TextureImporterFormat.ASTC_4x4;
         }
         else if (In("Art/Textures/UI"))
         {
@@ -90,9 +100,15 @@ public sealed class GameAssetImportRules : AssetPostprocessor
         // One shared material per colormap, authored by hand. Never import FBX materials.
         m.materialImportMode = ModelImporterMaterialImportMode.None;
 
-        bool rigged = In("Art/Models/Characters");   // Blocky Characters: rigid nodes + the `drive` clip
-        m.animationType = rigged ? ModelImporterAnimationType.Generic : ModelImporterAnimationType.None;
+        // Kenney's Mini Characters (Art/Models/Drivers) are skinned and carry ~30 takes including "drive" and "sit".
+        // Legacy keeps those playable by name with a plain Animation component — no controller asset per character.
+        bool drivers = In("Art/Models/Drivers");
+        bool rigged = drivers || In("Art/Models/Characters");
+        m.animationType = drivers ? ModelImporterAnimationType.Legacy
+                        : rigged ? ModelImporterAnimationType.Generic
+                        : ModelImporterAnimationType.None;
         m.importAnimation = rigged;
+        if (drivers) m.animationCompression = ModelImporterAnimationCompression.KeyframeReduction;
         m.optimizeGameObjects = false;               // keep torso/arm-left/arm-right/head addressable
     }
 

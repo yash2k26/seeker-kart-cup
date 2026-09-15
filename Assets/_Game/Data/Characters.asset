@@ -13,9 +13,11 @@ MonoBehaviour:
   m_Name: Characters
   m_EditorClassIdentifier: Assembly-CSharp::KartCup.CharacterDatabase
   characters:
-  - {fileID: 11400000, guid: 5edb16072c1174a1cae7ee3a7f37f476, type: 2}
-  - {fileID: 11400000, guid: e24fe1b989f4143f69fc23a57313153a, type: 2}
-  - {fileID: 11400000, guid: 3609ad86cdada4cc59b5a9b8c15c03cf, type: 2}
-  - {fileID: 11400000, guid: fb7df5156e3e34254b27ea618551429e, type: 2}
-  - {fileID: 11400000, guid: 34917bb3aab5946b985799c441d45921, type: 2}
-  - {fileID: 11400000, guid: e017f91f1fcdf4281b33f25a84232306, type: 2}
+  - {fileID: 11400000, guid: 9517e806e46d54bc9a0742cfb63c046d, type: 2}
+  - {fileID: 11400000, guid: 0c39270737ce344a5b3338fb4f8087fd, type: 2}
+  - {fileID: 11400000, guid: 00921d5c5b3014646858a083ef2f6053, type: 2}
+  - {fileID: 11400000, guid: a864facd3616e4cce80e3d647cc3364d, type: 2}
+  - {fileID: 11400000, guid: e63bc814a434e4b38a378c0b622b9ad1, type: 2}
+  - {fileID: 11400000, guid: 48fdbe541041849d1a074cf7aca275da, type: 2}
+  - {fileID: 11400000, guid: 7eb28516d809f4c0d8df8734b5f73a9e, type: 2}
+  - {fileID: 11400000, guid: 0b4afe67809274537a520e116115a4a8, type: 2}

@@ -1,13 +1,14 @@
 using PowerslideKartPhysics;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace KartCup
 {
-    /// Lap, position, clock, countdown and the boost meter. Legacy uGUI Text: TMP comes with the art pass.
+    /// Lap, position, clock, countdown and the boost meter, in the same type and palette as the menus.
     public sealed class RaceHud : MonoBehaviour
     {
-        [SerializeField] Text lapLabel, positionLabel, timeLabel, bigLabel, itemLabel;
+        [SerializeField] TMP_Text lapLabel, positionLabel, timeLabel, bigLabel, itemLabel;
         [SerializeField] Image boostFill;
         [SerializeField] float bigLabelSeconds = 0.9f;
 

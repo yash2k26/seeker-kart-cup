@@ -50,41 +50,60 @@ public static class ContentSetup
         blob.GetComponent<MeshRenderer>().sharedMaterial = blobMat;
         SavePrefab(blob, Prefabs + "World/BlobShadow.prefab");
 
-        // ---- driver prefabs: Blocky body + head mesh swap ----
+        // ---- driver prefabs: Kenney Mini Characters, skinned and holding their own "drive" pose ----
+        var driverMat = ColormapMat(unlit, "MiniChar", Art + "Textures/Colormaps/minichar_colormap.png");
         var drivers = new[] {
-            ("Wizard",     "a", "head_wizard"),      // Toly caricature; name-swap flag lives in DriverRoster
-            ("NodeRunner", "b", "head_noderunner"),  // Mert
-            ("Builder",    "c", "head_builder"),     // Akshay BD
-            ("Generic",    "d", "head_generic"),
+            ("Nodey",  "character-male-a"),
+            ("Bitsy",  "character-female-a"),
+            ("Chunk",  "character-male-b"),
+            ("Pip",    "character-female-b"),
+            ("Bolt",   "character-male-c"),
+            ("Tank",   "character-male-d"),
+            ("Runa",   "character-female-c"),
+            ("Vee",    "character-female-d"),
         };
-        foreach (var (name, body, head) in drivers)
+        foreach (var (name, model) in drivers)
         {
-            var fbx = AssetDatabase.LoadAssetAtPath<GameObject>(Art + $"Models/Characters/character-{body}.fbx");
-            var headMesh = AssetDatabase.LoadAssetAtPath<GameObject>(Art + $"Models/Heads/{head}.fbx")?.GetComponentInChildren<MeshFilter>()?.sharedMesh;
-            if (fbx == null || headMesh == null) { Debug.LogWarning($"[content] missing body/head for {name}"); continue; }
+            var fbx = AssetDatabase.LoadAssetAtPath<GameObject>(Art + $"Models/Drivers/{model}.fbx");
+            if (fbx == null) { Debug.LogWarning($"[content] missing driver model {model}"); continue; }
             var go = (GameObject)PrefabUtility.InstantiatePrefab(fbx);
             PrefabUtility.UnpackPrefabInstance(go, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
             go.name = "Driver_" + name;
-            foreach (var r in go.GetComponentsInChildren<MeshRenderer>()) r.sharedMaterial = bodyMats["abcdef".IndexOf(body)];
-            var headT = Find(go.transform, "head");
-            var headMf = headT.GetComponent<MeshFilter>(); headMf.sharedMesh = headMesh;
-            headT.GetComponent<MeshRenderer>().sharedMaterial = headMat;
-            foreach (var anim in go.GetComponentsInChildren<Animator>()) Object.DestroyImmediate(anim);   // we pose the nodes ourselves
+            foreach (var r in go.GetComponentsInChildren<Renderer>()) r.sharedMaterial = driverMat;
+
+            // The FBX ships every take; the driver only ever needs the seated one, played on loop.
+            var drive = AssetDatabase.LoadAllAssetsAtPath(Art + $"Models/Drivers/{model}.fbx")
+                .OfType<AnimationClip>().FirstOrDefault(c => c.name == "drive")
+                ?? AssetDatabase.LoadAllAssetsAtPath(Art + $"Models/Drivers/{model}.fbx")
+                .OfType<AnimationClip>().FirstOrDefault(c => c.name == "sit");
+            var anim = go.GetComponent<Animation>() ?? go.AddComponent<Animation>();
+            if (drive != null)
+            {
+                var loop = Object.Instantiate(drive);
+                loop.name = "drive";
+                loop.wrapMode = WrapMode.Loop;
+                loop.legacy = true;
+                AssetDatabase.CreateAsset(loop, Prefabs + $"Drivers/{name}_drive.anim");
+                anim.AddClip(loop, "drive");
+                anim.clip = loop;
+            }
+            anim.playAutomatically = true;
+            anim.cullingType = AnimationCullingType.BasedOnRenderers;
+
             var pose = go.AddComponent<KartCup.BlockyDriverPose>();
             var so = new SerializedObject(pose);
             so.FindProperty("torso").objectReferenceValue = Find(go.transform, "torso");
             so.FindProperty("armLeft").objectReferenceValue = Find(go.transform, "arm-left");
             so.FindProperty("armRight").objectReferenceValue = Find(go.transform, "arm-right");
-            so.FindProperty("head").objectReferenceValue = headT;
+            so.FindProperty("head").objectReferenceValue = Find(go.transform, "head");
             so.ApplyModifiedPropertiesWithoutUndo();
-            ApplyDrivePose(go.transform);
             SavePrefab(go, Prefabs + $"Drivers/Driver_{name}.prefab");
         }
 
         // our driver's standing height, so each kart's placeholder can scale it to fit that kart
         float driverHeight = 0f, driverWidth = 0f;
         {
-            var sample = AssetDatabase.LoadAssetAtPath<GameObject>(Prefabs + "Drivers/Driver_Generic.prefab");
+            var sample = AssetDatabase.LoadAssetAtPath<GameObject>(Prefabs + "Drivers/Driver_Nodey.prefab");
             if (sample != null)
             {
                 var probe = (GameObject)PrefabUtility.InstantiatePrefab(sample);
@@ -116,7 +135,8 @@ public static class ContentSetup
                 var placeholder = new Bounds(seated.position, Vector3.zero);
                 foreach (var rend in seated.GetComponentsInChildren<Renderer>()) placeholder.Encapsulate(rend.bounds);
                 if (placeholder.size.y > 0.01f && driverHeight > 0.01f)
-                    seatScale = Mathf.Min(placeholder.size.y / driverHeight, placeholder.size.x / Mathf.Max(driverWidth, 0.01f));
+                    seatScale = Mathf.Clamp(Mathf.Min(placeholder.size.y / driverHeight,
+                                                      placeholder.size.x / Mathf.Max(driverWidth, 0.01f)), 0.6f, 1.05f);
                 Object.DestroyImmediate(seated.gameObject);
             }
             var seat = new GameObject("DriverSeat").transform; seat.SetParent(go.transform, false);

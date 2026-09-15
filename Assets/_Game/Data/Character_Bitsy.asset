@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::KartCup.CharacterDef
   displayName: Bitsy
   kartId: ooli
-  driverId: Builder
+  driverId: Bitsy
   tint: {r: 1, g: 1, b: 1, a: 1}
   speed: 0
   accel: 2

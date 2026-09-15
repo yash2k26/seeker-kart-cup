@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::KartCup.CharacterDef
   displayName: Pip
   kartId: oopi
-  driverId: Generic
+  driverId: Pip
   tint: {r: 1, g: 1, b: 1, a: 1}
   speed: -1
   accel: 1

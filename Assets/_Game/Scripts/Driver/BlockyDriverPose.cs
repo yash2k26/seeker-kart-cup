@@ -9,7 +9,8 @@ namespace KartCup
     {
         [SerializeField] Transform torso, armLeft, armRight, head;
         [SerializeField] Rigidbody kartBody;
-        [SerializeField] float armSteerDeg = 35f, torsoRollDeg = 12f, headYawDeg = 25f, smooth = 12f;
+        [SerializeField] float armSteerDeg = 22f, torsoRollDeg = 10f, headYawDeg = 22f, smooth = 12f;
+        [SerializeField] bool animated = true;        // a seated clip drives the base pose
 
         [Range(-1, 1)] public float Steer;            // set by KartHooks from UKR's input
         float steerS, rollS, yawS, hitT, winT;
@@ -21,6 +22,13 @@ namespace KartCup
             tRest = torso.localRotation; alRest = armLeft.localRotation; arRest = armRight.localRotation; hRest = head.localRotation;
         }
 
+        void LateUpdateRestFromClip()
+        {
+            // The seated clip writes these every frame before LateUpdate; treat whatever it wrote as the rest pose
+            // and add our steering/lean on top, so the animation and the procedural layer compose instead of fight.
+            tRest = torso.localRotation; alRest = armLeft.localRotation; arRest = armRight.localRotation; hRest = head.localRotation;
+        }
+
         /// Spawned karts bind at runtime; the editor-built prefabs keep their serialized reference.
         public void Bind(Rigidbody body) => kartBody = body;
 
@@ -29,6 +37,7 @@ namespace KartCup
 
         void LateUpdate()
         {
+            if (animated) LateUpdateRestFromClip();
             float dt = Time.deltaTime, a = 1f - Mathf.Exp(-smooth * dt);
             Vector3 vel = kartBody ? kartBody.linearVelocity : Vector3.zero;
             Vector3 local = kartBody ? kartBody.transform.InverseTransformDirection(vel) : Vector3.zero;
