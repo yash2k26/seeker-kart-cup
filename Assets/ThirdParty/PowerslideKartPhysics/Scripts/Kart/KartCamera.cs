@@ -35,6 +35,9 @@ namespace PowerslideKartPhysics
         float castDist = 0.0f;
         Vector3 smoothVel = Vector3.zero;
         public float smoothRate = 10f;
+        // KartCup: the stock camera looks straight ahead from `initialHeight`, so raising it to see further drops the
+        // kart off the bottom of the screen. Aim at a point just above the kart instead.
+        public float lookAtHeight = 0.0f;
         public bool rollWithKart = true;
         public float rollSmoothRate = 2.0f;
         float upDirBlend = 1.0f;
@@ -151,6 +154,13 @@ namespace PowerslideKartPhysics
             // Set final position and rotation of camera
             targetPos = tempRot.position + (highPoint - tempRot.position) * castDist;
             targetRot = Quaternion.LookRotation(tempRot.rotation * Vector3.forward * (lookBack ? -1.0f : 1.0f), tempRot.rotation * Vector3.up);
+
+            if (lookAtHeight > 0.0f && !lookBack) {
+                Vector3 aim = smoothObj.position + Vector3.up * lookAtHeight - targetPos;
+                if (aim.sqrMagnitude > 0.0001f) {
+                    targetRot = Quaternion.LookRotation(aim, tempRot.rotation * Vector3.up);
+                }
+            }
 
             transform.position = targetPos;
             transform.rotation = targetRot;

@@ -66,11 +66,26 @@ public static class KartSetup
             var visual = wheel.visualWheel != null ? wheel.visualWheel : wheel.transform.Find("Visual Mesh");
             bool front = wheel.name.Contains("F"), left = wheel.name.Contains("L");
             var src = artWheels[(front ? 2 : 0) + (left ? 0 : 1)];
+            // The rig spins a wheel whose axle runs along the visual's +Z; Kenney models theirs along +X, so the mesh
+            // goes on a child turned 90 degrees. Mirroring the left pair with a negative scale reversed the spin.
             var mf = visual.GetComponent<MeshFilter>();
-            mf.sharedMesh = src.GetComponent<MeshFilter>().sharedMesh;
-            visual.GetComponent<MeshRenderer>().sharedMaterials = src.GetComponent<MeshRenderer>().sharedMaterials;
-            visual.localScale = new Vector3(fit * (left ? -1 : 1), fit, fit);          // kit wheels face +x: mirror the left pair
+            mf.sharedMesh = null;
+            visual.GetComponent<MeshRenderer>().enabled = false;
+            visual.localScale = Vector3.one;
             visual.localPosition = Vector3.zero;
+
+            // GetComponent returns Unity's fake-null, which ?? happily accepts: check explicitly.
+            var spinner = visual.Find("Tyre");
+            if (spinner == null) spinner = new GameObject("Tyre").transform;
+            spinner.SetParent(visual, false);
+            spinner.localRotation = Quaternion.Euler(0, 90f, 0);
+            spinner.localScale = Vector3.one * fit;
+            var spinMesh = spinner.GetComponent<MeshFilter>();
+            if (spinMesh == null) spinMesh = spinner.gameObject.AddComponent<MeshFilter>();
+            var spinRenderer = spinner.GetComponent<MeshRenderer>();
+            if (spinRenderer == null) spinRenderer = spinner.gameObject.AddComponent<MeshRenderer>();
+            spinMesh.sharedMesh = src.GetComponent<MeshFilter>().sharedMesh;
+            spinRenderer.sharedMaterials = src.GetComponent<MeshRenderer>().sharedMaterials;
 
             var p = src.localPosition * fit;
             wheel.transform.localPosition = new Vector3(p.x, axleY, p.z);

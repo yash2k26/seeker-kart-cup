@@ -58,12 +58,13 @@ public static class TrackSetup
 
         var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
         var cam = camGo.AddComponent<Camera>();
-        cam.fieldOfView = 58; cam.nearClipPlane = 0.3f; cam.farClipPlane = 400; cam.clearFlags = CameraClearFlags.Skybox;
+        cam.fieldOfView = 62; cam.nearClipPlane = 0.3f; cam.farClipPlane = 400; cam.clearFlags = CameraClearFlags.Skybox;
         camGo.AddComponent<AudioListener>();
         camGo.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>();
         var kartCam = camGo.AddComponent<KartCamera>();
         kartCam.useLegacyInput = false;                    // it would poll legacy axes every frame otherwise
-        kartCam.initialDist = 9.5f; kartCam.initialHeight = 4.6f; kartCam.smoothRate = 9f;   // the rig is 3.75 m long: closer than this and the kart fills the phone screen
+        kartCam.initialDist = 8.8f; kartCam.initialHeight = 3.4f; kartCam.smoothRate = 9f;
+        kartCam.lookAtHeight = 1.5f;      // frame the kart in the lower third rather than staring at the horizon
         camGo.AddComponent<CameraFeel>();
         camGo.GetComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>().renderPostProcessing = true;
 
@@ -92,8 +93,9 @@ public static class TrackSetup
         new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
 
         EditorSceneManager.SaveScene(scene, ScenePath);
+        // Menu is the entry point, so the race always goes last in the build list.
         var scenes = EditorBuildSettings.scenes.Where(s => s.path != ScenePath).ToList();
-        scenes.Insert(0, new EditorBuildSettingsScene(ScenePath, true));
+        scenes.Add(new EditorBuildSettingsScene(ScenePath, true));
         EditorBuildSettings.scenes = scenes.ToArray();
         AssetDatabase.SaveAssets();
         Debug.Log($"[track] race scene built: {centre.Length} samples, {checkpoints.Length} checkpoints, {grid.Length} grid slots");
@@ -489,15 +491,15 @@ public static class TrackSetup
         safeRt.offsetMin = Vector2.zero; safeRt.offsetMax = Vector2.zero;
         safe.AddComponent<SafeArea>();
 
-        // steering: the whole screen is the drag area, the buttons sit on top of it
-        var steer = Rect("SteerArea", safe.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-        steer.gameObject.AddComponent<Image>().color = new Color(0, 0, 0, 0);
-        var steerArea = steer.gameObject.AddComponent<TouchSteerArea>();
-        new SerializedObject(steerArea).Do(s => s.FindProperty("input").objectReferenceValue = input);
+        // Steering is two arrows on the left thumb; the right thumb keeps drift, item and brake.
+        var steering = canvasGo.AddComponent<SteerButtons>();
+        new SerializedObject(steering).Do(s => s.FindProperty("input").objectReferenceValue = input);
 
-        Button("Drift", safe.transform, input, HoldButton.Control.Drift, "red_button_rectangle_depth_gradient", new Color(0.937f, 0.416f, 0.294f), new Vector2(1, 0), new Vector2(-70, 70), new Vector2(360, 200), "DRIFT", display);
-        Button("Item", safe.transform, input, HoldButton.Control.Item, "yellow_button_rectangle_depth_flat", new Color(0.957f, 0.773f, 0.404f), new Vector2(1, 0), new Vector2(-450, 70), new Vector2(240, 200), "ITEM", display);
-        Button("Brake", safe.transform, input, HoldButton.Control.Brake, "grey_button_rectangle_depth_flat", new Color(0.24f, 0.31f, 0.35f), new Vector2(0, 0), new Vector2(70, 70), new Vector2(260, 160), "BRAKE", display);
+        Button("SteerLeft", safe.transform, input, HoldButton.Control.SteerLeft, "grey_button_rectangle_depth_flat", new Color(0.24f, 0.31f, 0.35f), new Vector2(0, 0), new Vector2(60, 60), new Vector2(300, 230), "", display, steering, "arrow_basic_w");
+        Button("SteerRight", safe.transform, input, HoldButton.Control.SteerRight, "grey_button_rectangle_depth_flat", new Color(0.24f, 0.31f, 0.35f), new Vector2(0, 0), new Vector2(380, 60), new Vector2(300, 230), "", display, steering, "arrow_basic_e");
+        Button("Drift", safe.transform, input, HoldButton.Control.Drift, "red_button_rectangle_depth_gradient", new Color(0.937f, 0.416f, 0.294f), new Vector2(1, 0), new Vector2(-60, 60), new Vector2(340, 230), "DRIFT", display, steering);
+        Button("Item", safe.transform, input, HoldButton.Control.Item, "yellow_button_rectangle_depth_flat", new Color(0.957f, 0.773f, 0.404f), new Vector2(1, 0), new Vector2(-420, 60), new Vector2(240, 230), "ITEM", display, steering);
+        Button("Brake", safe.transform, input, HoldButton.Control.Brake, "grey_button_rectangle_depth_flat", new Color(0.24f, 0.31f, 0.35f), new Vector2(1, 0), new Vector2(-680, 60), new Vector2(220, 170), "BRAKE", display, steering);
 
         var position = Text("Position", safe.transform, display, "1st", 130, paper, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(48, -30), new Vector2(420, 150));
         var lap = Text("Lap", safe.transform, body, "LAP 1/2", 52, paper, TextAlignmentOptions.TopRight, new Vector2(1, 1), new Vector2(-48, -34), new Vector2(520, 70));
@@ -560,7 +562,7 @@ public static class TrackSetup
         dim.gameObject.SetActive(false);
     }
 
-    static void Button(string name, Transform parent, InputManager input, HoldButton.Control control, string sprite, Color tint, Vector2 anchor, Vector2 offset, Vector2 dims, string caption, TMP_FontAsset font)
+    static void Button(string name, Transform parent, InputManager input, HoldButton.Control control, string sprite, Color tint, Vector2 anchor, Vector2 offset, Vector2 dims, string caption, TMP_FontAsset font, SteerButtons steering = null, string icon = null)
     {
         var rt = Rect(name, parent, anchor, anchor, offset, dims);
         rt.pivot = anchor;
@@ -575,7 +577,18 @@ public static class TrackSetup
         so.FindProperty("control").enumValueIndex = (int)control;
         so.FindProperty("input").objectReferenceValue = input;
         so.FindProperty("fade").objectReferenceValue = group;
+        so.FindProperty("steering").objectReferenceValue = steering;
         so.ApplyModifiedPropertiesWithoutUndo();
+
+        if (icon != null)
+        {
+            var glyph = Rect(name + "Icon", rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(110, 110));
+            var img2 = glyph.gameObject.AddComponent<Image>();
+            img2.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(Art + $"Textures/UI/Kit/{icon}.png");
+            img2.color = new Color(1, 1, 1, 0.92f);
+            img2.raycastTarget = false;
+            return;
+        }
 
         var label = Text(name + "Text", rt, font, caption, 40, new Color(1, 1, 1, 0.92f), TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, dims);
         label.rectTransform.anchorMin = Vector2.zero; label.rectTransform.anchorMax = Vector2.one;
