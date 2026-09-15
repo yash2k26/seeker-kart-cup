@@ -6,7 +6,7 @@ using UnityEngine;
 // Bump k_Version when you change a rule -> Unity reimports everything this touches.
 public sealed class GameAssetImportRules : AssetPostprocessor
 {
-    const uint k_Version = 2;
+    const uint k_Version = 3;
     public override uint GetVersion() => k_Version;
 
     const string Root = "Assets/_Game/";
@@ -30,12 +30,16 @@ public sealed class GameAssetImportRules : AssetPostprocessor
 
         if (In("Art/Textures/Colormaps"))
         {
-            // Kenney palettes: 32px columns, UVs centred at 16px -> 256 is still within 3/255 of the original.
+            // These are palettes of solid colour bands, not pictures. Bilinear filtering, mipmaps and downscaling
+            // all blend neighbouring bands together, which is what made the karts and drivers look muddy and
+            // washed out. Point-sample them at native size and every UV lands on exactly the colour it was
+            // authored with.
             t.textureType = TextureImporterType.Default;
             t.alphaSource = TextureImporterAlphaSource.None;
-            t.mipmapEnabled = true;
-            ps.maxTextureSize = 256;
-            ps.format = TextureImporterFormat.RGBA32;      // no block compression on gradient (AO) columns
+            t.filterMode = FilterMode.Point;
+            t.mipmapEnabled = false;
+            ps.maxTextureSize = 1024;
+            ps.format = TextureImporterFormat.RGBA32;      // no block compression on a palette
         }
         else if (In("Art/Textures/UI/Kit"))
         {

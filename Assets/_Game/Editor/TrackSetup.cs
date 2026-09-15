@@ -50,7 +50,7 @@ public static class TrackSetup
         var input = Instantiate(PKP + "Prefabs/Scene/Input Manager.prefab", "Input Manager").GetComponent<InputManager>();
         input.enableStandardInput = false;                 // Android runs the new Input System only; legacy axes would throw
         input.enableMobileInput = true;
-        input.mobileAutoAccel = 1f;                        // thumb steers, the kart drives itself — standard for phone racers
+        input.mobileAutoAccel = 0f;                        // you hold the gas; nothing moves on its own
         input.mobileDriftHoldSteer = 0.55f;
         EditorUtility.SetDirty(input);
 
@@ -63,8 +63,8 @@ public static class TrackSetup
         camGo.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>();
         var kartCam = camGo.AddComponent<KartCamera>();
         kartCam.useLegacyInput = false;                    // it would poll legacy axes every frame otherwise
-        kartCam.initialDist = 8.8f; kartCam.initialHeight = 3.4f; kartCam.smoothRate = 9f;
-        kartCam.lookAtHeight = 1.5f;      // frame the kart in the lower third rather than staring at the horizon
+        kartCam.initialDist = 7.6f; kartCam.initialHeight = 3.0f; kartCam.smoothRate = 9f;
+        kartCam.lookAtHeight = 1.3f;      // frame the kart in the lower third rather than staring at the horizon
         camGo.AddComponent<CameraFeel>();
         camGo.GetComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>().renderPostProcessing = true;
 
@@ -323,18 +323,8 @@ public static class TrackSetup
         float edge = HalfWidth + Kerb;
         int n = centre.Length;
 
-        // Start/finish gantry: the single prop that says "race track" before anything else does.
-        var gate = Place(root, Art + "Models/Props/ToyCar/gate-finish.fbx", toycar, centre[0], 0, 1f);
-        var gateLocal = new Bounds();
-        bool first = true;
-        foreach (var mf in gate.GetComponentsInChildren<MeshFilter>())       // local bounds: world bounds change with rotation
-        {
-            if (mf.sharedMesh == null) continue;
-            if (first) { gateLocal = mf.sharedMesh.bounds; first = false; } else gateLocal.Encapsulate(mf.sharedMesh.bounds);
-        }
-        float gateSpan = Mathf.Max(gateLocal.size.x, gateLocal.size.z, 0.01f);
-        gate.transform.localScale = Vector3.one * ((edge * 2.05f) / Mathf.Max(gateLocal.size.x, 0.01f));   // legs land just outside the kerbs
-        gate.transform.rotation = Quaternion.LookRotation(Forward(0), Vector3.up);
+        // No start gantry: Kenney's toy-scale arch has to be blown up ~13x to span the road, and its legs then
+        // fill the screen as you drive under it. The chequered band and the flags carry the start line instead.
 
         // Trackside: palms and rocks in clusters, clutter tight to the kerb, foliage patches breaking up the sand.
         for (int i = 0; i < n; i += 3)
@@ -497,9 +487,10 @@ public static class TrackSetup
 
         Button("SteerLeft", safe.transform, input, HoldButton.Control.SteerLeft, "grey_button_rectangle_depth_flat", new Color(0.24f, 0.31f, 0.35f), new Vector2(0, 0), new Vector2(60, 60), new Vector2(300, 230), "", display, steering, "arrow_basic_w");
         Button("SteerRight", safe.transform, input, HoldButton.Control.SteerRight, "grey_button_rectangle_depth_flat", new Color(0.24f, 0.31f, 0.35f), new Vector2(0, 0), new Vector2(380, 60), new Vector2(300, 230), "", display, steering, "arrow_basic_e");
-        Button("Drift", safe.transform, input, HoldButton.Control.Drift, "red_button_rectangle_depth_gradient", new Color(0.937f, 0.416f, 0.294f), new Vector2(1, 0), new Vector2(-60, 60), new Vector2(340, 230), "DRIFT", display, steering);
-        Button("Item", safe.transform, input, HoldButton.Control.Item, "yellow_button_rectangle_depth_flat", new Color(0.957f, 0.773f, 0.404f), new Vector2(1, 0), new Vector2(-420, 60), new Vector2(240, 230), "ITEM", display, steering);
-        Button("Brake", safe.transform, input, HoldButton.Control.Brake, "grey_button_rectangle_depth_flat", new Color(0.24f, 0.31f, 0.35f), new Vector2(1, 0), new Vector2(-680, 60), new Vector2(220, 170), "BRAKE", display, steering);
+        Button("Gas", safe.transform, input, HoldButton.Control.Accelerate, "green_button_rectangle_depth_gradient", new Color(0.353f, 0.706f, 0.404f), new Vector2(1, 0), new Vector2(-60, 60), new Vector2(340, 230), "GAS", display, steering);
+        Button("Drift", safe.transform, input, HoldButton.Control.Drift, "red_button_rectangle_depth_gradient", new Color(0.937f, 0.416f, 0.294f), new Vector2(1, 0), new Vector2(-420, 60), new Vector2(260, 230), "DRIFT", display, steering);
+        Button("Brake", safe.transform, input, HoldButton.Control.Brake, "grey_button_rectangle_depth_flat", new Color(0.24f, 0.31f, 0.35f), new Vector2(1, 0), new Vector2(-700, 60), new Vector2(220, 170), "BRAKE", display, steering);
+        Button("Item", safe.transform, input, HoldButton.Control.Item, "yellow_button_rectangle_depth_flat", new Color(0.957f, 0.773f, 0.404f), new Vector2(1, 0), new Vector2(-60, 310), new Vector2(340, 150), "ITEM", display, steering);
 
         var position = Text("Position", safe.transform, display, "1st", 130, paper, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(48, -30), new Vector2(420, 150));
         var lap = Text("Lap", safe.transform, body, "LAP 1/2", 52, paper, TextAlignmentOptions.TopRight, new Vector2(1, 1), new Vector2(-48, -34), new Vector2(520, 70));
