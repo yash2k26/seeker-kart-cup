@@ -47,10 +47,13 @@ class BuildSettingsGuard : IPreprocessBuildWithReport
 #if ENABLE_LEGACY_INPUT_MANAGER && !ENABLE_INPUT_SYSTEM
         errors.Add("Active Input Handling must be Input System Package (New); set InputManager.enableStandardInput=false on UKR's prefab instead of 'Both'");
 #endif
-        foreach (var t in new[] { "Walls", "Track", "reset", "Reset", "Character", "Kart", "Shield", "Wheel", "Left", "Right", "Look" })
-            Warn(UnityEditorInternal.InternalEditorUtility.tags.Contains(t), $"Missing tag '{t}' (UKR TagManager not imported?)");
-        foreach (var (i, n) in new[] { (8, "Karts"), (9, "Items"), (10, "Walls"), (11, "Kart Box Collider"), (12, "Shield") })
-            Warn(LayerMask.LayerToName(i) == n, $"Layer {i} should be '{n}' (UKR)");
+        // Forecast physics (Fusion Shared Mode) and Powerslide's own wheel casting both assume the default fixed step.
+        Check(UnityEngine.Physics.simulationMode == SimulationMode.FixedUpdate, "Physics Simulation Mode must be FixedUpdate");
+        Check(!File.Exists("Assets/Photon/PhotonLibs/WebSocket/websocket-sharp.dll"),
+              "Photon's WebGL websocket-sharp is back: it collides with the Solana SDK's websocket-sharp-latest (CS0433/CS0121). Delete Assets/Photon/PhotonLibs/WebSocket.");
+        Warn(!File.Exists("Assets/Photon/Fusion/Resources/PhotonAppSettings.asset") ||
+             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("git", "check-ignore -q Assets/Photon/Fusion/Resources/PhotonAppSettings.asset") { UseShellExecute = false }) is var p && p != null && p.WaitForExit(4000) && p.ExitCode == 0,
+             "PhotonAppSettings.asset is not gitignored — the Fusion AppId would be published.");
 
         foreach (var w in warnings) Debug.LogWarning("[BuildSettingsGuard] " + w);
         if (errors.Count > 0)

@@ -81,6 +81,22 @@ public static class ContentSetup
             SavePrefab(go, Prefabs + $"Drivers/Driver_{name}.prefab");
         }
 
+        // our driver's standing height, so each kart's placeholder can scale it to fit that kart
+        float driverHeight = 0f, driverWidth = 0f;
+        {
+            var sample = AssetDatabase.LoadAssetAtPath<GameObject>(Prefabs + "Drivers/Driver_Generic.prefab");
+            if (sample != null)
+            {
+                var probe = (GameObject)PrefabUtility.InstantiatePrefab(sample);
+                var bounds = new Bounds(probe.transform.position, Vector3.zero);
+                foreach (var r in probe.GetComponentsInChildren<Renderer>()) bounds.Encapsulate(r.bounds);
+                driverHeight = bounds.max.y;          // hips sit at y=0 after the re-pivot: this is what shows above the seat
+                driverWidth = bounds.size.x;
+                Object.DestroyImmediate(probe);
+            }
+            Debug.Log($"[content] driver height {driverHeight:F2} m");
+        }
+
         // ---- kart visual prefabs: Car Kit body + wheels, seated driver slot, blob shadow ----
         foreach (var kart in new[] { "kart-oobi", "kart-oodi", "kart-ooli", "kart-oopi", "kart-oozi" })
         {
@@ -90,8 +106,21 @@ public static class ContentSetup
             PrefabUtility.UnpackPrefabInstance(go, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
             go.name = "KartVisual_" + kart.Substring(5);
             foreach (var r in go.GetComponentsInChildren<MeshRenderer>()) r.sharedMaterial = carkit;
-            var seated = Find(go.transform, "character"); if (seated) Object.DestroyImmediate(seated.gameObject);   // Kenney's placeholder driver
-            var seat = new GameObject("DriverSeat").transform; seat.SetParent(go.transform, false); seat.localPosition = new Vector3(0, 0.28f, -0.07f); seat.localScale = Vector3.one * 0.38f;
+            // Kenney's karts ship a placeholder driver: its transform and height are exactly where and how big a
+            // driver belongs, so take the seat from it instead of guessing offsets.
+            var seated = Find(go.transform, "character");
+            var seatPos = new Vector3(0, 0.30f, -0.08f); float seatScale = 0.32f;
+            if (seated)
+            {
+                seatPos = seated.localPosition;
+                var placeholder = new Bounds(seated.position, Vector3.zero);
+                foreach (var rend in seated.GetComponentsInChildren<Renderer>()) placeholder.Encapsulate(rend.bounds);
+                if (placeholder.size.y > 0.01f && driverHeight > 0.01f)
+                    seatScale = Mathf.Min(placeholder.size.y / driverHeight, placeholder.size.x / Mathf.Max(driverWidth, 0.01f));
+                Object.DestroyImmediate(seated.gameObject);
+            }
+            var seat = new GameObject("DriverSeat").transform; seat.SetParent(go.transform, false);
+            seat.localPosition = seatPos; seat.localScale = Vector3.one * seatScale;   // a blocky driver reads best at about a third of the kart's length
             var shadow = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(Prefabs + "World/BlobShadow.prefab"));
             shadow.transform.SetParent(go.transform, false); shadow.transform.localPosition = new Vector3(0, 0.03f, 0);
             SavePrefab(go, Prefabs + $"Karts/{go.name}.prefab");
@@ -105,11 +134,18 @@ public static class ContentSetup
     /// Blocky `drive` clip is a static pose: root lowered 0.15, arms swung ±60° about Y. Bake it as the rest pose.
     static void ApplyDrivePose(Transform root)
     {
-        var r = Find(root, "root"); if (r) r.localPosition += new Vector3(0, -0.15f, 0);
-        var al = Find(root, "arm-left"); if (al) al.localRotation = Quaternion.Euler(0, -60, 0) * al.localRotation;
-        var ar = Find(root, "arm-right"); if (ar) ar.localRotation = Quaternion.Euler(0, 60, 0) * ar.localRotation;
-        var ll = Find(root, "leg-left"); if (ll) ll.localRotation = Quaternion.Euler(-75, 0, 0) * ll.localRotation;
-        var lr = Find(root, "leg-right"); if (lr) lr.localRotation = Quaternion.Euler(-75, 0, 0) * lr.localRotation;
+        // Seated at a kart wheel: hips dropped, thighs forward, arms out in front. X is the forward axis for these
+        // nodes — the old Y rotations left the arms hanging straight down.
+        var r = Find(root, "root"); if (r) r.localPosition += new Vector3(0, -0.06f, 0);
+        var al = Find(root, "arm-left"); if (al) al.localRotation = Quaternion.Euler(-80, 0, -6) * al.localRotation;
+        var ar = Find(root, "arm-right"); if (ar) ar.localRotation = Quaternion.Euler(-80, 0, 6) * ar.localRotation;
+        var ll = Find(root, "leg-left"); if (ll) ll.localRotation = Quaternion.Euler(-78, 0, -4) * ll.localRotation;
+        var lr = Find(root, "leg-right"); if (lr) lr.localRotation = Quaternion.Euler(-78, 0, 4) * lr.localRotation;
+        var t = Find(root, "torso"); if (t) t.localRotation = Quaternion.Euler(6, 0, 0) * t.localRotation;
+
+        // Re-pivot to the hips. Kenney's own placeholder driver sits with its base on the seat, so ours has to as
+        // well — with the pivot at the feet, every seat offset put the torso a leg's length too high.
+        if (t && r) r.localPosition -= new Vector3(0, t.position.y - root.position.y, 0);
     }
 
     static Material ColormapMat(Shader s, string name, string texPath)

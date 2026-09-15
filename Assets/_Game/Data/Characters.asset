@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 63b9721c9a09748239decfdf9d8e7ec1, type: 3}
+  m_Name: Characters
+  m_EditorClassIdentifier: Assembly-CSharp::KartCup.CharacterDatabase
+  characters:
+  - {fileID: 11400000, guid: 5edb16072c1174a1cae7ee3a7f37f476, type: 2}
+  - {fileID: 11400000, guid: e24fe1b989f4143f69fc23a57313153a, type: 2}
+  - {fileID: 11400000, guid: 3609ad86cdada4cc59b5a9b8c15c03cf, type: 2}
+  - {fileID: 11400000, guid: fb7df5156e3e34254b27ea618551429e, type: 2}
+  - {fileID: 11400000, guid: 34917bb3aab5946b985799c441d45921, type: 2}
+  - {fileID: 11400000, guid: e017f91f1fcdf4281b33f25a84232306, type: 2}

@@ -1,53 +1,47 @@
-using System;
-using System.Reflection;
+using PowerslideKartPhysics;
 using UnityEngine;
-using UnityEngine.Events;
 
 namespace KartCup
 {
-    /// Glue between Ultimate Kart Racing and our feel scripts. Wire UKR's UnityEvents (jumpEvent, landEvent, boostStartEvent,
-    /// collisionEvent, spinOutEvent) to these methods in the Inspector; steer is read from UKR's InputManager by name once.
+    /// Glue between one Powerslide kart and our feel layer: driver pose, body squash, camera kick, haptics, hit-stop.
+    /// Subscribes to the kart's own UnityEvents in code — no Inspector wiring, no reflection.
     public sealed class KartHooks : MonoBehaviour
     {
-        [SerializeField] bool isPlayer;
+        public bool isPlayer;
         [SerializeField] BlockyDriverPose driver;
         [SerializeField] BodyJuice body;
-        [SerializeField] Rigidbody rb;
-        [SerializeField] float topSpeed = 30f;        // UKR Kart.maxSpeed
-        [SerializeField] MonoBehaviour ukrInputManager;   // drag UKR's InputManager (only for the player kart)
-        [SerializeField] UnityEvent onPlayerHit = new();
 
-        FieldInfo steerField; object steerOwner;
+        Kart kart;
+        Rigidbody rb;
 
-        void Start()
+        public void Bind(Kart k, BlockyDriverPose pose, bool player)
         {
-            // UKR's InputManager exposes `steerInput`; resolve it once by name so we do not hard-reference the paid package.
-            if (ukrInputManager)
-            {
-                steerField = ukrInputManager.GetType().GetField("steerInput", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-                          ?? ukrInputManager.GetType().GetField("steerInput", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                steerOwner = steerField != null && steerField.IsStatic ? null : ukrInputManager;
-                if (steerField == null) Debug.LogWarning("[KartHooks] steerInput field not found on " + ukrInputManager.GetType().Name);
-            }
+            kart = k; driver = pose; isPlayer = player; rb = k.rb;
+            body = GetComponent<BodyJuice>();
+            k.landEvent.AddListener(OnLand);
+            k.boostStartEvent.AddListener(OnBoostStart);
+            k.spinOutEvent.AddListener(OnSpinOut);
+            k.collisionEvent.AddListener((point, normal) => OnCollision());
         }
 
         void Update()
         {
-            if (driver && steerField != null) driver.Steer = Convert.ToSingle(steerField.GetValue(steerOwner));
-            if (isPlayer && CameraFeel.Instance && rb) CameraFeel.Instance.SetSpeed01(rb.linearVelocity.magnitude / topSpeed);
+            if (kart == null) return;
+            if (driver != null) driver.Steer = kart.GetVisualSteer();
+            if (isPlayer && CameraFeel.Instance != null && rb != null)
+                CameraFeel.Instance.SetSpeed01(rb.linearVelocity.magnitude / Mathf.Max(1f, kart.maxSpeed));
         }
 
-        // ---- UKR UnityEvent targets ----
         public void OnBoostStart()
         {
             if (!isPlayer) return;
-            CameraFeel.Instance?.Boost(3f);
+            CameraFeel.Instance?.Boost(2.5f);
             Haptics.Play(Haptics.Kind.Boost);
         }
 
         public void OnLand()
         {
-            float impact = rb ? Mathf.Clamp01(-rb.linearVelocity.y / 8f) : 0.5f;
+            float impact = rb != null ? Mathf.Clamp01(-rb.linearVelocity.y / 8f) : 0.5f;
             body?.Kick(-impact * 0.4f);
             if (isPlayer && impact > 0.3f) { Haptics.Play(Haptics.Kind.Land); CameraFeel.Instance?.Kick(Vector3.down, impact); }
         }
@@ -55,7 +49,7 @@ namespace KartCup
         public void OnCollision()
         {
             body?.Kick(-0.15f);
-            if (isPlayer) { Haptics.Play(Haptics.Kind.Hit); CameraFeel.Instance?.Kick(-transform.forward, 0.5f); }
+            if (isPlayer) { Haptics.Play(Haptics.Kind.Hit); CameraFeel.Instance?.Kick(-transform.forward, 0.4f); }
         }
 
         public void OnSpinOut()
@@ -66,7 +60,6 @@ namespace KartCup
             HitStop.Do();
             Haptics.Play(Haptics.Kind.Hit);
             CameraFeel.Instance?.Kick(-transform.forward, 1f);
-            onPlayerHit?.Invoke();
         }
 
         public void OnFinish()

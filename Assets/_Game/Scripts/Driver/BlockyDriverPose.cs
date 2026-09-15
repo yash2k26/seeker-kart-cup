@@ -21,6 +21,9 @@ namespace KartCup
             tRest = torso.localRotation; alRest = armLeft.localRotation; arRest = armRight.localRotation; hRest = head.localRotation;
         }
 
+        /// Spawned karts bind at runtime; the editor-built prefabs keep their serialized reference.
+        public void Bind(Rigidbody body) => kartBody = body;
+
         public void OnHit()    => hitT = 1.2f;
         public void OnFinish() => winT = 3f;
 
