@@ -74,7 +74,12 @@ namespace KartCup
                 case State.Countdown:
                     countdown -= Time.deltaTime;
                     int tick = Mathf.CeilToInt(Mathf.Max(0, countdown));
-                    if (tick != lastTick) { lastTick = tick; onCountdown.Invoke(tick); }
+                    if (tick != lastTick)
+                    {
+                        lastTick = tick;
+                        onCountdown.Invoke(tick);
+                        AudioDirector.Instance?.Countdown(tick);
+                    }
                     if (countdown <= 0) { raceTime = 0; SetState(State.Racing); }
                     break;
 

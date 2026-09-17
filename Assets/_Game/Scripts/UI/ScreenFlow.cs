@@ -18,6 +18,7 @@ namespace KartCup
         {
             for (int i = 0; i < panels.Length; i++) if (panels[i] != null) panels[i].SetActive(i == panel);
             Haptics.Play(Haptics.Kind.Tick);
+            AudioDirector.Instance?.Click();
         }
 
         public void ShowTitle() => Show(0);
@@ -27,6 +28,7 @@ namespace KartCup
 
         public void StartRace()
         {
+            AudioDirector.Instance?.Confirm();
             KartApi.Event("race_enter", new { character = CharacterDatabase.SelectedIndex });
             SceneManager.LoadScene("Race");
         }

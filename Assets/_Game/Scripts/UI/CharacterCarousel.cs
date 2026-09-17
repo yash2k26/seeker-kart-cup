@@ -43,6 +43,7 @@ namespace KartCup
             index = ((index + delta) % roster.characters.Length + roster.characters.Length) % roster.characters.Length;
             CharacterDatabase.SelectedIndex = index;
             Haptics.Play(Haptics.Kind.Tick);
+            AudioDirector.Instance?.Click();
             Show();
         }
 

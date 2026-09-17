@@ -39,6 +39,7 @@ namespace KartCup
             if (lap > 0) lapTimes.Add(race.raceTime - lapStart);    // crossing the line completes a lap
             lapStart = race.raceTime;
             lap++;
+            if (isPlayer && lap > 1 && lap <= race.totalLaps) AudioDirector.Instance?.Lap(lap == race.totalLaps);
             if (lap > race.totalLaps) race.Finish(this);
         }
 

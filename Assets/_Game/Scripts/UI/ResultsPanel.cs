@@ -37,6 +37,7 @@ namespace KartCup
             if (status != null) status.text = best > 0 ? $"best lap {RaceHud.Clock(best)}" : "";
 
             Haptics.Play(place == 1 ? Haptics.Kind.Win : Haptics.Kind.Tick);
+            AudioDirector.Instance?.Finish(place == 1);
             Submit(who, place);
         }
 

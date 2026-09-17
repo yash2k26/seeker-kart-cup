@@ -46,6 +46,7 @@ public static class TrackSetup
         var boot = new GameObject("Boot");
         boot.AddComponent<GameBoot>();
         boot.AddComponent<HitStop>();
+        AudioSetup.Build(menu: false);
 
         var input = Instantiate(PKP + "Prefabs/Scene/Input Manager.prefab", "Input Manager").GetComponent<InputManager>();
         input.enableStandardInput = false;                 // Android runs the new Input System only; legacy axes would throw

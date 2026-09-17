@@ -63,6 +63,7 @@ public static class MenuSetup
         new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
         var boot = new GameObject("Boot");
         boot.AddComponent<GameBoot>();
+        AudioSetup.Build(menu: true);
         new GameObject("Web3Api").AddComponent<LeaderboardFeed>();
 
         EditorSceneManager.SaveScene(scene, ScenePath);

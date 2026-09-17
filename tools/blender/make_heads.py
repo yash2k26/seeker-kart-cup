@@ -1,10 +1,18 @@
-"""Generate three blocky caricature heads for Kenney Blocky Characters (head node = 8x8x8 units at scale 0.1).
+"""Generate blocky caricature heads for the game's drivers.
+
+Authoring space is an 8-unit cube (the old Kenney Blocky head). HEAD_SCALE retargets the export to whatever body
+is in use: Kenney Mini Characters have a head 0.454 wide x 0.328 tall sitting on a `head` bone, so 8 units maps
+to 0.454 and the head's origin sits at the neck joint.
 Run:  /Applications/Blender.app/Contents/MacOS/Blender -b -P tools/blender/make_heads.py -- <out_dir> <tex_dir>
 Each head: origin bottom-centre, < 300 tris, one UV'd onto a 128x128 palette (16-px cells, swatch centres).
 Kenney's front is -Y in Blender (glTF +Z forward). Exports FBX (-Z forward, Y up) so Unity sees the same orientation as the body.
 """
 import bpy, bmesh, sys, os, math
 from mathutils import Vector
+
+# Mini Characters: head-mesh spans x -0.2268..0.2268, y 0.3432..0.6713 above the origin, and the `head` bone
+# sits at the bottom of that. 8 authoring units -> 0.454 wide.
+HEAD_SCALE = 0.454 / 8.0
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 OUT = argv[0] if argv else "."
@@ -115,6 +123,47 @@ def wizard_hat(h):
     h.cone(3.6, 0.3, 7.0, (0.3, 0.6, 11.9), "wizard_purple", segs=8)   # cone, slightly tilted look via offset
     h.box((1.2, 1.2, 1.2), (2.2, FRONT * 3.0, 10.5), "wizard_star")
 
+def beanie(h, color):
+    h.box((8.4, 8.4, 2.6), (0, 0, 8.6), color)
+    h.box((8.6, 8.6, 0.9), (0, 0, 7.4), color)
+
+def bucket_hat(h, color):
+    h.box((8.6, 8.6, 2.0), (0, 0, 8.8), color)
+    h.box((11.5, 11.5, 0.7), (0, 0, 7.7), color)
+
+def headphones(h, color="glass_black"):
+    for x in (-4.4, 4.4): h.box((1.2, 3.4, 3.4), (x, 0, 5.4), color)
+    h.box((9.6, 1.6, 1.2), (0, 0, 8.4), color)
+
+def sunglasses(h):
+    h.box((7.4, 0.7, 1.8), (0, FRONT * 4.2, 5.2), "glass_black")
+    for x in (-4.1, 4.1): h.box((0.4, 4.2, 0.4), (x, FRONT * 2.2, 5.4), "glass_black")
+
+def moustache(h):
+    h.box((3.6, 1.0, 0.9), (0, FRONT * 4.5, 3.1), "beard")
+
+def stubble(h):
+    h.box((6.4, 0.5, 2.6), (0, FRONT * 4.3, 1.9), "beard")
+
+def long_hair(h, color):
+    hair_slab(h, color, fringe=1.4, sides=2.0, back=2.0)
+    for x in (-3.9, 3.9): h.box((0.9, 6.0, 5.0), (x, -0.4, 3.0), color)
+    h.box((7.0, 1.0, 5.4), (0, -FRONT * 3.9, 2.8), color)
+
+def ponytail(h, color):
+    hair_slab(h, color, fringe=1.2, sides=1.4, back=1.6)
+    h.box((2.2, 2.6, 4.6), (0, -FRONT * 4.6, 4.6), color)
+
+def bald(h):
+    pass
+
+def headband(h, color):
+    h.box((8.4, 8.4, 1.1), (0, 0, 6.6), color)
+
+def visor_cap(h, color):
+    h.box((8.4, 8.4, 1.3), (0, 0, 7.6), color)
+    h.box((5.2, 3.6, 0.5), (0, FRONT * 5.6, 7.2), color)
+
 def build(name, parts):
     clear(); write_palette(os.path.join(TEX, "head_palette.png"))
     h = Head(); skull(h)
@@ -122,6 +171,8 @@ def build(name, parts):
     ob = h.finish(name)
     bpy.ops.object.select_all(action='DESELECT'); ob.select_set(True); bpy.context.view_layer.objects.active = ob
     tris = sum(1 for _ in ob.data.polygons)
+    ob.scale = (HEAD_SCALE, HEAD_SCALE, HEAD_SCALE)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
     bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, f"{name}.fbx"), use_selection=True, apply_unit_scale=True,
                              apply_scale_options='FBX_SCALE_UNITS', axis_forward='-Z', axis_up='Y',
                              mesh_smooth_type='OFF', add_leaf_bones=False, bake_space_transform=False, path_mode='STRIP')

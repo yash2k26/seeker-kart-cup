@@ -56,7 +56,10 @@ public static class Playtest
         var race = Object.FindFirstObjectByType<RaceManager>();
         var racers = Object.FindObjectsByType<KartProgress>(FindObjectsSortMode.None).OrderByDescending(r => r.score).ToArray();
         if (race == null) { Debug.LogError("[playtest] no RaceManager"); return; }
-        Debug.Log($"[playtest] t={t:F0}s state={race.state} clock={race.raceTime:F1} racers={racers.Length}");
+        var audio = Object.FindFirstObjectByType<KartCup.AudioDirector>();
+        var sources = Object.FindObjectsByType<AudioSource>(FindObjectsSortMode.None);
+        Debug.Log($"[playtest] t={t:F0}s state={race.state} clock={race.raceTime:F1} racers={racers.Length} " +
+                  $"audio={(audio != null ? "ok" : "MISSING")} sources={sources.Length} playing={sources.Count(s2 => s2.isPlaying)}");
         foreach (var r in racers)
         {
             var kart = r.GetComponent<Kart>();

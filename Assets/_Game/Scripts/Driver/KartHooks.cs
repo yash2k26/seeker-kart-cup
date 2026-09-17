@@ -13,6 +13,8 @@ namespace KartCup
 
         Kart kart;
         Rigidbody rb;
+        ItemCaster caster;
+        Item heldItem;
 
         public void Bind(Kart k, BlockyDriverPose pose, bool player)
         {
@@ -22,12 +24,22 @@ namespace KartCup
             k.boostStartEvent.AddListener(OnBoostStart);
             k.spinOutEvent.AddListener(OnSpinOut);
             k.collisionEvent.AddListener((point, normal) => OnCollision());
+
+            caster = GetComponent<ItemCaster>();
+            if (caster != null && player) caster.castEvent.AddListener(() => AudioDirector.Instance?.UseItem());
         }
 
         void Update()
         {
             if (kart == null) return;
             if (driver != null) driver.Steer = kart.GetVisualSteer();
+
+            // the item box has no event of its own: notice the slot filling instead
+            if (isPlayer && caster != null && caster.item != heldItem)
+            {
+                if (caster.item != null && heldItem == null) AudioDirector.Instance?.Pickup();
+                heldItem = caster.item;
+            }
             if (isPlayer && CameraFeel.Instance != null && rb != null)
                 CameraFeel.Instance.SetSpeed01(rb.linearVelocity.magnitude / Mathf.Max(1f, kart.maxSpeed));
         }
