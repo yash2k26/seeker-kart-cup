@@ -177,20 +177,40 @@ public static class MenuSetup
         return podium;
     }
 
+    /// A left-to-right alpha ramp for the title plate, generated once and committed like any other sprite.
+    static Sprite FadeSprite()
+    {
+        const string path = Art + "Textures/UI/plate_fade.png";
+        var existing = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        if (existing != null) return existing;
+
+        const int w = 256, h = 8;
+        var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        for (int x = 0; x < w; x++)
+        {
+            float t = x / (w - 1f);
+            float a = 0.88f * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.28f, 1f, t)));
+            for (int y = 0; y < h; y++) tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+        }
+        tex.Apply();
+        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
+        System.IO.File.WriteAllBytes(path, tex.EncodeToPNG());
+        Object.DestroyImmediate(tex);
+        AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+    }
+
     // ---------- screens ----------
     static GameObject TitleScreen(RectTransform parent)
     {
         var screen = Rect("Title", parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject;
 
         var plate = Rect("Plate", screen.transform, new Vector2(0, 0), new Vector2(0.46f, 1f), Vector2.zero, Vector2.zero);
-        // three stacked slices fake a gradient: the kit has no gradient sprite and a hard edge looks pasted on
-        foreach (var (width, alpha) in new[] { (0.62f, 0.80f), (0.82f, 0.34f), (1f, 0.14f) })
-        {
-            var slice = Rect($"Fade{alpha}", plate, Vector2.zero, new Vector2(width, 1f), Vector2.zero, Vector2.zero);
-            var img = slice.gameObject.AddComponent<Image>();
-            img.color = new Color(Deep.r, Deep.g, Deep.b, alpha);
-            img.raycastTarget = false;
-        }
+        // One generated alpha ramp. Stacked translucent slices used to fake this and left hard vertical steps.
+        var fade = plate.gameObject.AddComponent<Image>();
+        fade.sprite = FadeSprite();
+        fade.color = Deep;
+        fade.raycastTarget = false;
 
         Label("Kicker", plate, body, "BEACH GRAND PRIX", 44, Sand, TextAlignmentOptions.Left,
               new Vector2(0, 1), new Vector2(120, -190), new Vector2(1240, 70));

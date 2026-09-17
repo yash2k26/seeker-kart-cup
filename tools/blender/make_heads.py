@@ -26,6 +26,11 @@ PALETTE = {
     "wizard_purple": (0.36, 0.20, 0.62), "wizard_star": (0.98, 0.85, 0.30), "cap_orange": (0.95, 0.45, 0.12),
     "cap_green": (0.18, 0.62, 0.36), "cap_white": (0.95, 0.95, 0.95), "glass_black": (0.08, 0.08, 0.10),
     "glass_lens": (0.15, 0.35, 0.55), "eye_white": (1.0, 1.0, 1.0), "eye_black": (0.05, 0.05, 0.05), "mouth": (0.55, 0.20, 0.20),
+    # roster tones
+    "skin_tan": (0.88, 0.68, 0.50), "skin_brown": (0.70, 0.48, 0.32), "skin_pale": (0.98, 0.84, 0.72),
+    "hair_grey": (0.62, 0.60, 0.58), "hair_salt": (0.45, 0.40, 0.38), "beard_black": (0.10, 0.09, 0.09),
+    "beard_grey": (0.52, 0.50, 0.48), "cap_black": (0.10, 0.10, 0.12), "logo_green": (0.12, 0.85, 0.55),
+    "teeth": (0.98, 0.98, 0.96),
 }
 NAMES = list(PALETTE.keys())
 
@@ -89,13 +94,52 @@ class Head:
 
 FRONT = -1  # Kenney characters face -Y in Blender after glTF import
 
-def skull(h):
-    h.box((8, 8, 8), (0, 0, 4), "skin")
+def skull(h, skin="skin"):
+    h.box((8, 8, 8), (0, 0, 4), skin)
     # eyes + mouth as thin boxes proud of the front face (-Y)
     for x in (-1.8, 1.8):
         h.box((1.6, 0.3, 1.6), (x, FRONT * 4.1, 4.6), "eye_white")
         h.box((0.7, 0.35, 0.7), (x + 0.2, FRONT * 4.2, 4.5), "eye_black")
     h.box((2.2, 0.3, 0.5), (0, FRONT * 4.1, 2.4), "mouth")
+
+def eyebrows(h, color="hair_black", thick=0.7, raise_=0.0):
+    for x in (-1.9, 1.9):
+        h.box((2.4, 0.3, thick), (x, FRONT * 4.12, 5.7 + raise_), color)
+
+def quiff(h, color, height=0.9):
+    """volume on top, faded at the sides. Kept low: anything more than about a unit above the skull stops
+    reading as hair and starts reading as a hat."""
+    h.box((8.3, 8.3, 0.9), (0, 0, 8.05), color)
+    h.box((5.6, 4.0, height), (0, FRONT * 1.6, 8.5 + height / 2), color)        # the volume on top
+    h.box((8.3, 1.4, 1.1), (0, FRONT * 3.5, 7.35), color)                       # fringe
+    for x in (-3.8, 3.8): h.box((0.7, 8.3, 0.8), (x, 0, 7.5), color)            # faded sides
+    h.box((8.3, 0.7, 0.9), (0, -FRONT * 3.8, 7.4), color)
+
+def swept_hair(h, color, temple=None):
+    """short, parted, swept back; optional greying temples"""
+    h.box((8.3, 8.3, 1.4), (0, 0, 8.0), color)
+    h.box((8.3, 2.2, 1.1), (0, FRONT * 3.1, 7.3), color)
+    for x in (-3.75, 3.75): h.box((0.8, 7.0, 2.2), (x, -0.3, 7.0), temple or color)
+    h.box((8.3, 0.9, 2.2), (0, -FRONT * 3.75, 7.0), color)
+
+def mouth_on(h, depth=5.25, w=2.4, colour="mouth", z=2.75):
+    """the skull's mouth sits inside a beard; this one sits proud of it"""
+    h.box((w, 0.4, 0.5), (0, FRONT * depth, z), colour)
+
+def big_beard(h, color="beard_black"):
+    """jaw-wrapping beard: the silhouette cue for Mert and Akshay"""
+    h.box((8.3, 8.3, 3.1), (0, 0, 1.65), color)           # jaw wrap
+    h.box((5.6, 1.2, 3.6), (0, FRONT * 4.3, 1.6), color)  # chin mass, overlapping the moustache
+    h.box((6.6, 1.0, 0.9), (0, FRONT * 4.3, 3.45), color) # moustache
+    h.box((5.0, 8.3, 0.9), (0, 0, 0.3), color)            # underside
+
+def smile(h):
+    h.box((2.4, 0.3, 0.5), (0, FRONT * 5.05, 2.75), "teeth")
+
+def cap_logo(h, cap_color="cap_black", logo="logo_green"):
+    h.box((8.5, 8.5, 2.1), (0, 0, 8.5), cap_color)
+    h.box((7.2, 3.8, 0.55), (0, FRONT * 5.9, 7.6), cap_color)     # peak, proud of the brow
+    h.box((1.5, 0.35, 0.9), (0, FRONT * 4.3, 8.7), logo)          # mark on the front panel
 
 def hair_slab(h, color, fringe=1.8, sides=2.5, back=2.5):
     h.box((8.3, 8.3, 1.6), (0, 0, 8.0), color)                       # lid
@@ -164,9 +208,14 @@ def visor_cap(h, color):
     h.box((8.4, 8.4, 1.3), (0, 0, 7.6), color)
     h.box((5.2, 3.6, 0.5), (0, FRONT * 5.6, 7.2), color)
 
-def build(name, parts):
+def stubble_grey(h, colour="beard_grey"):
+    h.box((7.4, 0.35, 1.0), (0, FRONT * 4.2, 1.35), colour)        # jawline
+    for x in (-3.5, 3.5): h.box((0.9, 2.0, 2.2), (x, FRONT * 3.4, 2.1), colour)   # sideburns
+    h.box((3.0, 0.35, 0.45), (0, FRONT * 4.2, 3.2), colour)        # moustache shadow
+
+def build(name, parts, skin="skin"):
     clear(); write_palette(os.path.join(TEX, "head_palette.png"))
-    h = Head(); skull(h)
+    h = Head(); skull(h, skin)
     for p in parts: p(h)
     ob = h.finish(name)
     bpy.ops.object.select_all(action='DESELECT'); ob.select_set(True); bpy.context.view_layer.objects.active = ob
@@ -178,7 +227,45 @@ def build(name, parts):
                              mesh_smooth_type='OFF', add_leaf_bones=False, bake_space_transform=False, path_mode='STRIP')
     print(f"[heads] {name}: {tris} tris -> {OUT}/{name}.fbx")
 
-build("head_wizard",     [lambda h: hair_slab(h, "hair_brown", fringe=1.2, sides=4.5, back=5.0), wizard_hat])
-build("head_noderunner", [lambda h: hair_slab(h, "hair_black", fringe=0.8, sides=1.2, back=1.2), beard, lambda h: cap(h, "cap_orange")])
-build("head_builder",    [lambda h: hair_slab(h, "hair_black", fringe=1.0, sides=1.6, back=1.6), glasses, lambda h: cap(h, "cap_green")])
-build("head_generic",    [lambda h: hair_slab(h, "hair_blond", fringe=1.4, sides=1.8, back=1.8), lambda h: cap(h, "cap_white")])
+# --- the roster, read off reference photos ---
+build("head_toly",   [lambda h: hair_slab(h, "hair_salt", fringe=0.0, sides=0.9, back=0.9),
+                      lambda h: eyebrows(h, "hair_salt"),
+                      stubble_grey,
+                      lambda h: cap_logo(h)], skin="skin_pale")
+
+build("head_mert",   [bald,
+                      lambda h: eyebrows(h, "beard_black", thick=0.95),
+                      lambda h: big_beard(h, "beard_black"),
+                      lambda h: mouth_on(h)], skin="skin_tan")
+
+build("head_akshay", [lambda h: quiff(h, "hair_black", height=1.0),
+                      lambda h: eyebrows(h, "hair_black", thick=0.85),
+                      lambda h: big_beard(h, "beard_black"),
+                      smile], skin="skin_brown")
+
+build("head_emmett", [lambda h: swept_hair(h, "hair_brown", temple="hair_grey"),
+                      lambda h: eyebrows(h, "hair_brown")], skin="skin_pale")
+
+# generic filler so the grid can be padded out
+build("head_generic", [lambda h: hair_slab(h, "hair_blond", fringe=1.4, sides=1.8, back=1.8),
+                       lambda h: eyebrows(h, "hair_blond")], skin="skin")
+
+# --- the four invented racers. Distinct silhouettes so the grid never reads as one repeated driver. ---
+build("head_bitsy",  [lambda h: ponytail(h, "hair_blond"),
+                      lambda h: headband(h, "cap_orange"),
+                      lambda h: eyebrows(h, "hair_blond"),
+                      smile], skin="skin")
+
+build("head_pip",    [lambda h: long_hair(h, "hair_brown"),
+                      lambda h: bucket_hat(h, "cap_green"),
+                      lambda h: eyebrows(h, "hair_brown"),
+                      lambda h: mouth_on(h)], skin="skin_tan")
+
+build("head_runa",   [lambda h: long_hair(h, "hair_black"),
+                      lambda h: visor_cap(h, "cap_white"),
+                      sunglasses], skin="skin_brown")
+
+build("head_vee",    [lambda h: quiff(h, "hair_blond", height=0.8),
+                      lambda h: headphones(h),
+                      lambda h: eyebrows(h, "hair_brown"),
+                      lambda h: mouth_on(h)], skin="skin_pale")

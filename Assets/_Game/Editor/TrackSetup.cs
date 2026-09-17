@@ -64,8 +64,8 @@ public static class TrackSetup
         camGo.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>();
         var kartCam = camGo.AddComponent<KartCamera>();
         kartCam.useLegacyInput = false;                    // it would poll legacy axes every frame otherwise
-        kartCam.initialDist = 7.6f; kartCam.initialHeight = 3.0f; kartCam.smoothRate = 9f;
-        kartCam.lookAtHeight = 1.3f;      // frame the kart in the lower third rather than staring at the horizon
+        kartCam.initialDist = 6.6f; kartCam.initialHeight = 3.4f; kartCam.smoothRate = 9f;
+        kartCam.lookAtHeight = 1.05f;     // ~19 deg down: low and level put the driver's head over the road ahead
         camGo.AddComponent<CameraFeel>();
         camGo.GetComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>().renderPostProcessing = true;
 
@@ -434,12 +434,12 @@ public static class TrackSetup
         // name, kart, driver, speed, accel, handling, weight  (pips sum to 0 so nobody is strictly better)
         var rows = new (string name, string kart, string driver, int sp, int ac, int hd, int wt, string blurb)[]
         {
-            ("Nodey",    "oodi", "Nodey",  1,  0,  0, -1, "Runs the node that never misses a block."),
-            ("Bitsy",    "ooli", "Bitsy",  0,  2,  0, -2, "Ships fast, brakes late."),
-            ("Chunk",    "oobi", "Chunk",  2, -1, -1,  0, "Top speed, turns like a ferry."),
-            ("Pip",      "oopi", "Pip",   -1,  1,  2, -2, "Threads corners nobody else sees."),
-            ("Bolt",     "oozi", "Bolt",   1,  1, -1, -1, "All gas, some brakes."),
-            ("Tank",     "oodi", "Tank",  -1, -1,  0,  2, "Hard to move, harder to pass."),
+            ("Toly",     "oodi", "Toly",   1,  0,  0, -1, "Ships blocks faster than you can read them."),
+            ("Mert",     "ooli", "Mert",   0,  2,  0, -2, "Indexes every corner before he takes it."),
+            ("Akshay",   "oobi", "Akshay", 2, -1, -1,  0, "Top speed, turns like a ferry."),
+            ("Emmett",   "oopi", "Emmett", -1, 1,  2, -2, "Threads corners nobody else sees."),
+            ("Bitsy",    "oozi", "Bitsy",  1,  1, -1, -1, "All gas, some brakes."),
+            ("Pip",      "oodi", "Pip",   -1, -1,  0,  2, "Hard to move, harder to pass."),
             ("Runa",     "ooli", "Runa",   0,  1,  1, -2, "Never lifts."),
             ("Vee",      "oopi", "Vee",    1, -1,  1, -1, "Late braker, early apex."),
         };
@@ -499,7 +499,8 @@ public static class TrackSetup
         var item = Text("Item", safe.transform, body, "", 42, sand, TextAlignmentOptions.BottomRight, new Vector2(1, 0), new Vector2(-48, 300), new Vector2(620, 60));
         var big = Text("Big", safe.transform, display, "3", 240, paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 90), new Vector2(1400, 300));
         big.enabled = false;
-        var fps = Text("Fps", safe.transform, body, "", 26, new Color(1, 1, 1, 0.45f), TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(52, -180), new Vector2(1200, 40));
+        // Bottom-left, above the steer buttons: stamped under the position readout it read as part of the HUD.
+        var fps = Text("Fps", safe.transform, body, "", 22, new Color(1, 1, 1, 0.30f), TextAlignmentOptions.BottomLeft, new Vector2(0, 0), new Vector2(52, 300), new Vector2(1200, 34));
 
         var fpsCounter = canvasGo.AddComponent<FpsCounter>();
         new SerializedObject(fpsCounter).Do(s => s.FindProperty("label").objectReferenceValue = fps);

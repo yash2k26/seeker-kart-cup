@@ -17,26 +17,15 @@ spec.loader.exec_module(mk)                        # this also writes the defaul
 
 # Each entry is a label plus the parts that make it, so the roster can be described as "cap + beard + glasses".
 CATALOGUE = [
-    ("short hair",   [lambda h: mk.hair_slab(h, "hair_brown")]),
-    ("black hair",   [lambda h: mk.hair_slab(h, "hair_black")]),
-    ("blond hair",   [lambda h: mk.hair_slab(h, "hair_blond")]),
-    ("long hair",    [lambda h: mk.long_hair(h, "hair_brown")]),
-    ("ponytail",     [lambda h: mk.ponytail(h, "hair_black")]),
-    ("bald",         [mk.bald]),
-    ("cap",          [lambda h: mk.hair_slab(h, "hair_black", fringe=0.8, sides=1.2, back=1.2), lambda h: mk.cap(h, "cap_orange")]),
-    ("beanie",       [lambda h: mk.beanie(h, "cap_green")]),
-    ("bucket hat",   [lambda h: mk.bucket_hat(h, "cap_white")]),
-    ("visor cap",    [lambda h: mk.hair_slab(h, "hair_brown", fringe=0.8), lambda h: mk.visor_cap(h, "cap_white")]),
-    ("headband",     [lambda h: mk.hair_slab(h, "hair_black"), lambda h: mk.headband(h, "cap_orange")]),
-    ("wizard hat",   [lambda h: mk.hair_slab(h, "hair_brown", fringe=1.2, sides=4.5, back=5.0), mk.wizard_hat]),
-    ("glasses",      [lambda h: mk.hair_slab(h, "hair_black"), mk.glasses]),
-    ("sunglasses",   [lambda h: mk.hair_slab(h, "hair_black"), mk.sunglasses]),
-    ("headphones",   [lambda h: mk.hair_slab(h, "hair_brown"), lambda h: mk.headphones(h)]),
-    ("full beard",   [lambda h: mk.hair_slab(h, "hair_black"), mk.beard]),
-    ("moustache",    [lambda h: mk.hair_slab(h, "hair_brown"), mk.moustache]),
-    ("stubble",      [lambda h: mk.hair_slab(h, "hair_black"), mk.stubble]),
-    ("cap + beard",  [lambda h: mk.hair_slab(h, "hair_black", fringe=0.8), mk.beard, lambda h: mk.cap(h, "cap_green")]),
-    ("cap + shades", [lambda h: mk.hair_slab(h, "hair_black", fringe=0.8), mk.sunglasses, lambda h: mk.cap(h, "cap_white")]),
+    ("toly",   dict(skin="skin_pale",  parts=[lambda h: mk.hair_slab(h, "hair_salt", fringe=0.6, sides=1.0, back=1.0),
+                                              lambda h: mk.eyebrows(h, "hair_salt"), mk.stubble_grey, lambda h: mk.cap_logo(h)])),
+    ("mert",   dict(skin="skin_tan",   parts=[mk.bald, lambda h: mk.eyebrows(h, "beard_black", thick=0.95),
+                                              lambda h: mk.big_beard(h, "beard_black")])),
+    ("akshay", dict(skin="skin_brown", parts=[lambda h: mk.quiff(h, "hair_black", height=1.0),
+                                              lambda h: mk.eyebrows(h, "hair_black", thick=0.85),
+                                              lambda h: mk.big_beard(h, "beard_black"), mk.smile])),
+    ("emmett", dict(skin="skin_pale",  parts=[lambda h: mk.swept_hair(h, "hair_brown", temple="hair_grey"),
+                                              lambda h: mk.eyebrows(h, "hair_brown")])),
 ]
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -44,15 +33,15 @@ sc = bpy.context.scene
 sc.render.engine = 'BLENDER_WORKBENCH'
 sc.display.shading.light = 'FLAT'
 sc.display.shading.color_type = 'TEXTURE'
-sc.render.resolution_x, sc.render.resolution_y = 2000, 1500
+sc.render.resolution_x, sc.render.resolution_y = 1800, 560
 sc.world = bpy.data.worlds.new("w"); sc.world.color = (0.93, 0.95, 0.97)
 mk.write_palette(os.path.join(TMP, "head_palette.png"))
 
-COLS, SPACING = 5, 12.0
-for i, (label, parts) in enumerate(CATALOGUE):
+COLS, SPACING = 4, 12.0
+for i, (label, spec) in enumerate(CATALOGUE):
     h = mk.Head()
-    mk.skull(h)
-    for p in parts:
+    mk.skull(h, spec["skin"] if isinstance(spec, dict) else "skin")
+    for p in (spec["parts"] if isinstance(spec, dict) else spec):
         p(h)
     ob = h.finish(f"part_{i:02d}")
     col, row = i % COLS, i // COLS

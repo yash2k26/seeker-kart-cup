@@ -15,7 +15,8 @@ namespace KartCup
         [SerializeField] GameObject[] driverPrefabs;
         [SerializeField] TMP_Text nameLabel, blurbLabel;
         [SerializeField] StatBar speedBar, accelBar, handlingBar, weightBar;
-        [SerializeField] float spinSpeed = 18f;
+        // A full spin shows the back of the driver's head half the time. Sway instead: the face always reads.
+        [SerializeField] float baseYaw = 65f, sway = 14f, swaySpeed = 0.5f;
 
         GameObject current;
         int index;
@@ -27,11 +28,11 @@ namespace KartCup
         }
 
         /// Editor-side preview so the menu scene is not empty when it is opened or screenshotted.
-        public void ShowInEditor(int i) { index = i; Show(); }
+        public void ShowInEditor(int i) { index = i; Show(); if (podium != null) podium.localRotation = Quaternion.Euler(0, baseYaw, 0); }
 
         void Update()
         {
-            if (podium != null) podium.Rotate(0, spinSpeed * Time.deltaTime, 0, Space.World);
+            if (podium != null) podium.localRotation = Quaternion.Euler(0, baseYaw + Mathf.Sin(Time.time * swaySpeed) * sway, 0);
         }
 
         public void Next() { Step(+1); }

@@ -77,22 +77,30 @@ public static class KartPreview
 
         Preview.Batcher(false);
         var kart = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Karts/Kart_oodi.prefab"));
-        var driver = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Drivers/Driver_Nodey.prefab");
         var seat = kart.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "DriverSeat");
-        if (driver != null && seat != null)
-        {
-            var d = (GameObject)PrefabUtility.InstantiatePrefab(driver, seat);
-            d.transform.localPosition = Vector3.zero; d.transform.localRotation = Quaternion.identity;
-        }
 
         var camGo = new GameObject("Cam");
         var cam = camGo.AddComponent<Camera>();
         cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0.72f, 0.86f, 0.92f);
         cam.fieldOfView = 34;
-        Shot(cam, new Vector3(9.5f, 1.9f, 0), new Vector3(0, 1.0f, 0), "kart-side");
-        Shot(cam, new Vector3(6.5f, 3.4f, -6.5f), new Vector3(0, 0.9f, 0), "kart-3q");
+
+        bool first = true;
+        foreach (var path in System.IO.Directory.GetFiles("Assets/_Game/Prefabs/Drivers", "Driver_*.prefab").OrderBy(p => p))
+        {
+            var name = System.IO.Path.GetFileNameWithoutExtension(path).Replace("Driver_", "");
+            var d = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(path), seat);
+            d.transform.localPosition = Vector3.zero; d.transform.localRotation = Quaternion.identity;
+            // Edit mode does not run the Animation component, so without this every preview shows the standing bind
+            // pose and hides exactly the seated-pose bugs these shots exist to catch.
+            var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>($"Assets/_Game/Prefabs/Drivers/{name}_drive.anim");
+            if (clip != null) clip.SampleAnimation(d, 0f);
+
+            Shot(cam, new Vector3(6.5f, 3.4f, -6.5f), new Vector3(0, 0.9f, 0), $"driver-{name}");
+            if (first) { Shot(cam, new Vector3(9.5f, 1.9f, 0), new Vector3(0, 1.0f, 0), "kart-side"); first = false; }
+            Object.DestroyImmediate(d);
+        }
         Preview.Batcher(true);
-        Debug.Log("[preview] wrote Builds/kart-*.png");
+        Debug.Log("[preview] wrote Builds/driver-*.png");
         if (Application.isBatchMode) EditorApplication.Exit(0);
     }
 
@@ -139,6 +147,7 @@ public static class MenuPreview
 
         var carousel = Object.FindFirstObjectByType<CharacterCarousel>();
         if (carousel != null) carousel.ShowInEditor(0);      // Start() never runs in edit mode
+        var backdrop = Object.FindFirstObjectByType<MenuBackdrop>();
 
         var flow = Object.FindFirstObjectByType<ScreenFlow>();
         var panels = new SerializedObject(flow).FindProperty("panels");
@@ -146,6 +155,7 @@ public static class MenuPreview
         {
             for (int j = 0; j < panels.arraySize; j++)
                 ((GameObject)panels.GetArrayElementAtIndex(j).objectReferenceValue).SetActive(i == j);
+            if (backdrop != null) backdrop.Snap(i == 1);     // LateUpdate never runs in edit mode either
             Canvas.ForceUpdateCanvases();
             Shot(cam, $"menu{i}");
         }

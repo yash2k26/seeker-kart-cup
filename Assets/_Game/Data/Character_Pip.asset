@@ -13,11 +13,11 @@ MonoBehaviour:
   m_Name: Character_Pip
   m_EditorClassIdentifier: Assembly-CSharp::KartCup.CharacterDef
   displayName: Pip
-  kartId: oopi
+  kartId: oodi
   driverId: Pip
   tint: {r: 1, g: 1, b: 1, a: 1}
   speed: -1
-  accel: 1
-  handling: 2
-  weight: -2
-  blurb: Threads corners nobody else sees.
+  accel: -1
+  handling: 0
+  weight: 2
+  blurb: Hard to move, harder to pass.

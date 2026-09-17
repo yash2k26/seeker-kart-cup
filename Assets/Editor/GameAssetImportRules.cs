@@ -6,7 +6,7 @@ using UnityEngine;
 // Bump k_Version when you change a rule -> Unity reimports everything this touches.
 public sealed class GameAssetImportRules : AssetPostprocessor
 {
-    const uint k_Version = 3;
+    const uint k_Version = 4;
     public override uint GetVersion() => k_Version;
 
     const string Root = "Assets/_Game/";
@@ -56,7 +56,8 @@ public sealed class GameAssetImportRules : AssetPostprocessor
             t.textureType = TextureImporterType.Sprite;
             t.mipmapEnabled = false;                        // UI never minifies
             ps.maxTextureSize = 1024;
-            ps.format = TextureImporterFormat.ASTC_4x4;
+            // A smooth alpha ramp is exactly what ASTC bands. It is 8 KB uncompressed; keep it exact.
+            ps.format = assetPath.EndsWith("plate_fade.png") ? TextureImporterFormat.RGBA32 : TextureImporterFormat.ASTC_4x4;
         }
         else if (In("Art/Textures/Sky"))
         {

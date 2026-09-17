@@ -99,6 +99,10 @@ public static class KartSetup
         var seat = new GameObject("DriverSeat").transform;
         seat.SetParent(body.transform, false);
         if (artSeat != null) { seat.localPosition = artSeat.localPosition; seat.localScale = artSeat.localScale; }
+        // The kit's seat empty is authored for a standing root, but every driver plays a seated "drive" clip that
+        // drops the skeleton root by 0.15 in driver space (Build/Probe Driver Sink). Without this the torso sits
+        // inside the bodywork and only the head shows. Compensating here fixes the podium, the grid and the race at once.
+        seat.localPosition += Vector3.up * (0.15f * seat.localScale.y);
 
         // ---- blob shadow under the body, flattened to the ground ----
         var blobSrc = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/World/BlobShadow.prefab");

@@ -11,12 +11,15 @@ namespace KartCup
         [SerializeField] GameObject[] panels = System.Array.Empty<GameObject>();   // 0 = title, 1 = select, 2 = leaderboard, 3 = settings
         [SerializeField] int startPanel;
 
-        void Awake() { Instance = this; }
+        MenuBackdrop backdrop;
+
+        void Awake() { Instance = this; backdrop = FindFirstObjectByType<MenuBackdrop>(); }
         void Start() { Show(startPanel); }
 
         public void Show(int panel)
         {
             for (int i = 0; i < panels.Length; i++) if (panels[i] != null) panels[i].SetActive(i == panel);
+            if (backdrop != null) backdrop.Focused = panel == 1;   // hold a composed angle while a kart is on show
             Haptics.Play(Haptics.Kind.Tick);
             AudioDirector.Instance?.Click();
         }
