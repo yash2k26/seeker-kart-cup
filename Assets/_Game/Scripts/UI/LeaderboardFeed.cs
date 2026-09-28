@@ -13,20 +13,31 @@ namespace KartCup
         async void OnEnable()
         {
             if (rows == null) return;
+            Centre(true);
             rows.text = "loading…";
             try
             {
                 var board = await KartApi.Leaderboard(track);
-                rows.text = board == null || board.entries.Count == 0
-                    ? "no times yet — be the first"
+                bool empty = board == null || board.entries.Count == 0;
+                Centre(empty);                      // a one-line empty state orphaned in the top-left of a big card reads as a bug
+                rows.text = empty
+                    ? "No times yet.\nBe the first."
                     : string.Join("\n", board.entries.Take(10).Select(e =>
-                        $"{e.rank,2}.  {e.name,-16}{(e.isSeeker ? " *" : "  ")}  {RaceHud.Clock(e.bestMs / 1000f)}"));
+                        $"{e.rank}.<pos=12%>{Fit(e.name)}{(e.isSeeker ? " *" : "")}<pos=76%>{RaceHud.Clock(e.bestMs / 1000f)}"));
             }
             catch (System.Exception e)
             {
                 Debug.LogWarning("[board] " + e.Message);
-                rows.text = "offline";
+                Centre(true);
+                rows.text = "Can't reach the leaderboard.\nCheck your connection and reopen.";
             }
         }
+
+        /// Loading, empty and error are one short line in a tall card, so they centre; a real table starts top-left.
+        void Centre(bool on) => rows.alignment = on ? TextAlignmentOptions.Center : TextAlignmentOptions.TopLeft;
+
+        /// <pos> sets an absolute pen position rather than a column width, so an over-long name would render
+        /// straight through the time beside it. Clip it instead.
+        static string Fit(string name) => string.IsNullOrEmpty(name) || name.Length <= 18 ? name : name[..17] + "…";
     }
 }

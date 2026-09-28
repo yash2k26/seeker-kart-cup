@@ -13,7 +13,7 @@ public static class Preview
     [MenuItem("Build/Capture Preview")]
     public static void Capture()
     {
-        EditorSceneManager.OpenScene("Assets/_Game/Scenes/Race.unity", OpenSceneMode.Single);
+        EditorSceneManager.OpenScene("Assets/_Game/Scenes/Race1.unity", OpenSceneMode.Single);
         Batcher(false);   // a manual cam.Render() in edit mode reuses the batcher's constants: every object comes out one colour
         var cam = Camera.main;
         if (System.Environment.GetCommandLineArgs().Contains("-nopost"))
@@ -27,6 +27,10 @@ public static class Preview
             Shot(cam, slot.position + Vector3.up * 30f - slot.forward * 30f, slot.position + slot.forward * 90f, "ahead");
         }
         Shot(cam, new Vector3(0, 430, -30), Vector3.zero, "map");
+
+        // No per-circuit map shots here: re-opening scenes in edit mode and calling Camera.Render by hand rendered
+        // the same geometry three times even though the scene data differed. Circuits are compared by driving them
+        // (ContractTest) and by their checkpoint radii, never by an edit-mode render.
         Batcher(true);
         Debug.Log("[preview] wrote Builds/preview-*.png");
         if (Application.isBatchMode) EditorApplication.Exit(0);
@@ -67,10 +71,12 @@ public static class KartPreview
     public static void Capture()
     {
         var scene = UnityEditor.SceneManagement.EditorSceneManager.NewScene(UnityEditor.SceneManagement.NewSceneSetup.EmptyScene, UnityEditor.SceneManagement.NewSceneMode.Single);
-        RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-        RenderSettings.ambientLight = new Color(0.8f, 0.84f, 0.88f);
+        // The game's own sky, so glossy paint and metal reflect what they reflect on the phone, not a flat grey box.
+        var sky = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Game/Art/Materials/Sky_beach.mat") ?? AssetDatabase.LoadAssetAtPath<Material>("Assets/_Game/Art/Materials/Sky.mat");
+        if (sky != null) { RenderSettings.skybox = sky; RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox; RenderSettings.defaultReflectionMode = UnityEngine.Rendering.DefaultReflectionMode.Skybox; RenderSettings.defaultReflectionResolution = 128; DynamicGI.UpdateEnvironment(); }
+        else { RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat; RenderSettings.ambientLight = new Color(0.8f, 0.84f, 0.88f); }
         var sun = new GameObject("Sun").AddComponent<Light>();
-        sun.type = LightType.Directional; sun.transform.rotation = Quaternion.Euler(50, -35, 0); sun.shadows = LightShadows.None;
+        sun.type = LightType.Directional; sun.transform.rotation = Quaternion.Euler(50, -35, 0); sun.shadows = LightShadows.Soft; sun.intensity = 1.1f; sun.color = new Color(1f, 0.96f, 0.9f);
         var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
         ground.transform.localScale = Vector3.one * 4;
         ground.GetComponent<MeshRenderer>().sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Game/Art/Materials/Road.mat");
@@ -81,7 +87,7 @@ public static class KartPreview
 
         var camGo = new GameObject("Cam");
         var cam = camGo.AddComponent<Camera>();
-        cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0.72f, 0.86f, 0.92f);
+        cam.clearFlags = sky != null ? CameraClearFlags.Skybox : CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0.72f, 0.86f, 0.92f);
         cam.fieldOfView = 34;
 
         bool first = true;
@@ -94,13 +100,39 @@ public static class KartPreview
             // pose and hides exactly the seated-pose bugs these shots exist to catch.
             var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>($"Assets/_Game/Prefabs/Drivers/{name}_drive.anim");
             if (clip != null) clip.SampleAnimation(d, 0f);
+            // SampleAnimation moves the bones but not the renderer's bounds, so the posed skin got culled (the
+            // "limbs vanish" shots). Recomputing bounds per render keeps it in frame.
+            foreach (var smr in d.GetComponentsInChildren<SkinnedMeshRenderer>()) smr.updateWhenOffscreen = true;
 
             Shot(cam, new Vector3(6.5f, 3.4f, -6.5f), new Vector3(0, 0.9f, 0), $"driver-{name}");
+            Shot(cam, new Vector3(-2.5f, 3.2f, 8.5f), new Vector3(0, 0.9f, 0), $"driver-{name}-front");   // the kart faces +Z
             if (first) { Shot(cam, new Vector3(9.5f, 1.9f, 0), new Vector3(0, 1.0f, 0), "kart-side"); first = false; }
             Object.DestroyImmediate(d);
         }
+        Object.DestroyImmediate(kart);
+
+        // Every kart in the garage with one driver aboard: the seat height and driver scale of each vehicle are judged here.
+        var driverPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Drivers/Driver_Toly.prefab");
+        foreach (var id in KartSetup.Karts)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Game/Prefabs/Karts/Kart_{id}.prefab");
+            if (prefab == null) continue;
+            var k = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            var s = k.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "DriverSeat");
+            if (s != null && driverPrefab != null)
+            {
+                var d = (GameObject)PrefabUtility.InstantiatePrefab(driverPrefab, s);
+                d.transform.localPosition = Vector3.zero; d.transform.localRotation = Quaternion.identity;
+                var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>("Assets/_Game/Prefabs/Drivers/Toly_drive.anim");
+                if (clip != null) clip.SampleAnimation(d, 0f);
+                foreach (var smr in d.GetComponentsInChildren<SkinnedMeshRenderer>()) smr.updateWhenOffscreen = true;
+            }
+            Shot(cam, new Vector3(6.5f, 3.4f, -6.5f), new Vector3(0, 1.0f, 0), $"kart-{id}");
+            Shot(cam, new Vector3(-6.5f, 3.4f, 6.5f), new Vector3(0, 1.0f, 0), $"kart-{id}-front");   // the kart faces +Z
+            Object.DestroyImmediate(k);
+        }
         Preview.Batcher(true);
-        Debug.Log("[preview] wrote Builds/driver-*.png");
+        Debug.Log("[preview] wrote Builds/driver-*.png and Builds/kart-*.png");
         if (Application.isBatchMode) EditorApplication.Exit(0);
     }
 
@@ -147,6 +179,12 @@ public static class MenuPreview
 
         var carousel = Object.FindFirstObjectByType<CharacterCarousel>();
         if (carousel != null) carousel.ShowInEditor(0);      // Start() never runs in edit mode
+        // nor does the drivers' seated clip: pose them as the phone will, and keep the posed skin from being culled
+        foreach (var anim in Object.FindObjectsByType<Animation>(FindObjectsSortMode.None).Where(a => a.clip != null))
+        {
+            anim.clip.SampleAnimation(anim.gameObject, 0f);
+            foreach (var smr in anim.GetComponentsInChildren<SkinnedMeshRenderer>()) smr.updateWhenOffscreen = true;
+        }
         var backdrop = Object.FindFirstObjectByType<MenuBackdrop>();
 
         var flow = Object.FindFirstObjectByType<ScreenFlow>();
@@ -155,7 +193,16 @@ public static class MenuPreview
         {
             for (int j = 0; j < panels.arraySize; j++)
                 ((GameObject)panels.GetArrayElementAtIndex(j).objectReferenceValue).SetActive(i == j);
-            if (backdrop != null) backdrop.Snap(i == 1);     // LateUpdate never runs in edit mode either
+            if (backdrop != null) backdrop.Snap(i == 1 || i == 7);     // LateUpdate never runs in edit mode either; the garage shares the select pose
+            // OnEnable does not run in edit mode: hand the sample/preview content to the panels that need it.
+            if (i == 6) foreach (var lobby in Object.FindObjectsByType<LobbyPanel>(FindObjectsSortMode.None)) lobby.RefreshSample();
+            if (i == 7) foreach (var garage in Object.FindObjectsByType<GaragePanel>(FindObjectsSortMode.None)) garage.ShowInEditor(KartSetup.Karts.Length - 1);
+            if (i != 7 && carousel != null) carousel.SetVisible(true);
+            foreach (var img in Object.FindObjectsByType<Image>(FindObjectsSortMode.None))
+                if (img.name == "Single" || img.name == "Cell0")
+                    Debug.Log($"[preview] panel {i} {img.name}: active={img.isActiveAndEnabled} sprite={(img.sprite ? img.sprite.name : "null")} " +
+                              $"tex={(img.sprite && img.sprite.texture ? img.sprite.texture.width + "x" + img.sprite.texture.height : "none")} rect={(img.sprite ? img.sprite.rect.ToString() : "-")} " +
+                              $"alpha={string.Join("/", img.GetComponentsInParent<CanvasGroup>(true).Select(g => g.alpha))} colour={img.color} size={img.rectTransform.rect.size}");
             Canvas.ForceUpdateCanvases();
             Shot(cam, $"menu{i}");
         }

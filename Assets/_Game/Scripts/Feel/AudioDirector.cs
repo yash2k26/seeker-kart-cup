@@ -41,6 +41,7 @@ namespace KartCup
 
             sfx = gameObject.AddComponent<AudioSource>();
             sfx.playOnAwake = false; sfx.spatialBlend = 0f; sfx.priority = 32;
+            sfx.ignoreListenerPause = true;   // the pause overlay's own clicks
 
             PlayMusic(track);
         }

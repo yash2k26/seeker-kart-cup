@@ -1,5 +1,6 @@
 using System.Linq;
 using PowerslideKartPhysics;
+using PrimeTween;
 using TMPro;
 using UnityEngine;
 
@@ -7,7 +8,7 @@ namespace KartCup
 {
     /// The character select: a live kart and driver on the podium, swapped by the arrows. No render textures and no
     /// portraits to maintain — the thing you race is the thing you are looking at.
-    public sealed class CharacterCarousel : MonoBehaviour
+    public sealed class CharacterCarousel : Carousel
     {
         [SerializeField] CharacterDatabase roster;
         [SerializeField] Transform podium;
@@ -15,8 +16,9 @@ namespace KartCup
         [SerializeField] GameObject[] driverPrefabs;
         [SerializeField] TMP_Text nameLabel, blurbLabel;
         [SerializeField] StatBar speedBar, accelBar, handlingBar, weightBar;
-        // A full spin shows the back of the driver's head half the time. Sway instead: the face always reads.
-        [SerializeField] float baseYaw = 65f, sway = 14f, swaySpeed = 0.5f;
+        // The podium is a turntable: it turns steadily (degrees per second) with the kart standing on it. Swaying the
+        // kart alone over bare sand read as floating. Time-based, so the garage and this screen never jump between them.
+        [SerializeField] float baseYaw = 65f, spin = 14f;
 
         GameObject current;
         int index;
@@ -32,11 +34,12 @@ namespace KartCup
 
         void Update()
         {
-            if (podium != null) podium.localRotation = Quaternion.Euler(0, baseYaw + Mathf.Sin(Time.time * swaySpeed) * sway, 0);
+            if (!Dragging) DragYaw = Mathf.Lerp(DragYaw, 0f, 1f - Mathf.Exp(-4f * Time.deltaTime));
+            if (podium != null) podium.localRotation = Quaternion.Euler(0, baseYaw + Time.time * spin + DragYaw, 0);
         }
 
-        public void Next() { Step(+1); }
-        public void Previous() { Step(-1); }
+        public override void Next() { Step(+1); }
+        public override void Previous() { Step(-1); }
 
         void Step(int delta)
         {
@@ -48,6 +51,13 @@ namespace KartCup
             Show();
         }
 
+        /// The garage borrows the podium: hide our kart (and stop turning it) while it is open, bring it back after.
+        public void SetVisible(bool on)
+        {
+            enabled = on;
+            if (current != null) current.SetActive(on);
+        }
+
         void Show()
         {
             var def = roster != null ? roster.At(index) : null;
@@ -55,25 +65,8 @@ namespace KartCup
 
             if (current != null) Destroy(current);
             var kartPrefab = kartPrefabs.FirstOrDefault(k => k.name.EndsWith(def.kartId)) ?? kartPrefabs.FirstOrDefault();
-            if (kartPrefab != null && podium != null)
-            {
-                current = Instantiate(kartPrefab, podium);
-                current.transform.localPosition = Vector3.zero;
-                current.transform.localRotation = Quaternion.identity;
-                // display only: no physics, no input, no race components on the podium
-                foreach (var body in current.GetComponentsInChildren<Rigidbody>()) body.isKinematic = true;
-                foreach (var kart in current.GetComponentsInChildren<Kart>()) kart.enabled = false;
-                foreach (var col in current.GetComponentsInChildren<Collider>()) col.enabled = false;
-
-                var seat = current.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "DriverSeat");
-                var driverPrefab = driverPrefabs.FirstOrDefault(d => d.name.EndsWith(def.driverId)) ?? driverPrefabs.FirstOrDefault();
-                if (seat != null && driverPrefab != null)
-                {
-                    var driver = Instantiate(driverPrefab, seat);
-                    driver.transform.localPosition = Vector3.zero;
-                    driver.transform.localRotation = Quaternion.identity;
-                }
-            }
+            var driverPrefab = driverPrefabs.FirstOrDefault(d => d.name.EndsWith(def.driverId)) ?? driverPrefabs.FirstOrDefault();
+            if (kartPrefab != null && podium != null) current = Mount(kartPrefab, driverPrefab, podium, def.tint, Application.isPlaying);
 
             if (nameLabel != null) nameLabel.text = def.displayName.ToUpperInvariant();
             if (blurbLabel != null) blurbLabel.text = def.blurb;
@@ -81,6 +74,46 @@ namespace KartCup
             accelBar?.Set(def.accel);
             handlingBar?.Set(def.handling);
             weightBar?.Set(def.weight);
+        }
+
+        /// A display-only kart with its driver on the podium: no physics, no input, no race components, tyres grounded,
+        /// body painted. Shared by the character select and the garage so the two screens show the same thing.
+        public static GameObject Mount(GameObject kartPrefab, GameObject driverPrefab, Transform podium, Color tint, bool animate)
+        {
+            var current = Instantiate(kartPrefab, podium);
+            current.transform.localPosition = Vector3.zero;
+            current.transform.localRotation = Quaternion.identity;
+            if (animate) Tween.Scale(current.transform, 0.7f, 1f, 0.28f, Ease.OutBack);   // the swap is felt, not just seen
+            foreach (var body in current.GetComponentsInChildren<Rigidbody>()) body.isKinematic = true;
+            foreach (var kart in current.GetComponentsInChildren<Kart>()) kart.enabled = false;
+            foreach (var col in current.GetComponentsInChildren<Collider>()) col.enabled = false;
+            // Wheel Update still extends suspension when Kart is disabled. Freeze the display at its authored axle.
+            var wheels = current.GetComponentsInChildren<KartWheel>();
+            foreach (var wheel in wheels)
+            {
+                wheel.enabled = false;
+                if (wheel.visualWheel != null) wheel.visualWheel.localPosition = Vector3.zero;
+            }
+            foreach (var fx in current.GetComponentsInChildren<ParticleSystem>()) fx.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            foreach (var audio in current.GetComponentsInChildren<AudioSource>()) audio.enabled = false;
+            foreach (var effects in current.GetComponentsInChildren<KartEffects>()) effects.enabled = false;
+            // Ground the displayed tyres; the physics prefab root is above the contact patch.
+            float lowest = float.PositiveInfinity;
+            foreach (var wheel in wheels)
+                foreach (var renderer in wheel.visualWheel.GetComponentsInChildren<MeshRenderer>())
+                    if (renderer.enabled) lowest = Mathf.Min(lowest, renderer.bounds.min.y);
+            if (!float.IsInfinity(lowest)) current.transform.position += Vector3.up * (podium.position.y - lowest + 0.015f);
+
+            if (tint != Color.white) CharacterDef.Paint(current, tint);   // painted like the one you will race
+
+            var seat = current.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "DriverSeat");
+            if (seat != null && driverPrefab != null)
+            {
+                var driver = Instantiate(driverPrefab, seat);
+                driver.transform.localPosition = Vector3.zero;
+                driver.transform.localRotation = Quaternion.identity;
+            }
+            return current;
         }
     }
 }

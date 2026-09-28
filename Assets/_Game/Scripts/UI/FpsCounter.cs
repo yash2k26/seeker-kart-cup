@@ -10,8 +10,11 @@ namespace KartCup
         float acc; int frames; float worst;
         readonly char[] buf = new char[48];
 
+        void Start() { if (label != null) label.enabled = Settings.ShowFps; }   // off by default: it is a gate-test tool, not HUD
+
         void Update()
         {
+            if (label != null && !label.enabled) return;
             float dt = Time.unscaledDeltaTime;
             acc += dt; frames++; if (dt > worst) worst = dt;
             if (acc < 0.5f) return;
