@@ -15,6 +15,22 @@ namespace KartCup
         [Range(-2, 2)] public int speed, accel, handling, weight;
         public string blurb = "";
 
+        /// Paint the kart in this racer's colour. Six runtime material instances per race is nothing, and the SRP
+        /// Batcher still batches them because it keys on the shader, not the material.
+        public void ApplyLivery(GameObject kartRoot) { if (tint != Color.white) Paint(kartRoot, tint); }
+
+        /// Any colour onto the body: the character's tint, or a paint job the player bought.
+        public static void Paint(GameObject kartRoot, Color colour)
+        {
+            foreach (var r in kartRoot.GetComponentsInChildren<MeshRenderer>())
+            {
+                if (r.name != "Body") continue;                  // wheels, driver and shadow keep their own colours
+                var mats = r.materials;                          // instances, so one racer's paint is their own
+                for (int i = 0; i < mats.Length; i++) mats[i].SetColor("_BaseColor", colour);
+                r.materials = mats;
+            }
+        }
+
         public void ApplyTo(Kart kart)
         {
             kart.maxSpeed *= 1f + speed * 0.05f;
