@@ -23,7 +23,7 @@ namespace KartCup
         Vector3 shakeVel, shakeOffset;
         float boostUntil, speed01;
 
-        void Awake() { Instance = this; cam = GetComponent<Camera>(); }
+        void Awake() { Instance = this; cam = GetComponent<Camera>(); shakeGain = Settings.Shake ? 1f : 0f; }
 
         public void SetSpeed01(float s) => speed01 = Mathf.Clamp01(s);
         public void Boost(float seconds = 3f) => boostUntil = Time.time + seconds;

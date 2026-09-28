@@ -5,7 +5,7 @@ using UnityEngine.EventSystems;
 namespace KartCup
 {
     /// One on-screen control. Press-and-hold for drift/brake, single press for the item slot.
-    public sealed class HoldButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
+    public sealed class HoldButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerEnterHandler, IPointerExitHandler
     {
         public enum Control { Drift, Brake, Item, Boost, SteerLeft, SteerRight, Accelerate }
         [SerializeField] Control control = Control.Drift;
@@ -28,6 +28,22 @@ namespace KartCup
 
         public void OnPointerUp(PointerEventData e)
         {
+            Set(false);
+            if (fade != null) fade.alpha = 1f;
+        }
+
+        // A thumb that slides from one control to its neighbour must hand over: uGUI keeps sending enter/exit to a
+        // touch pointer while it is down, so release on exit and engage on enter only when a finger is actually down.
+        public void OnPointerEnter(PointerEventData e)
+        {
+            if (e.pointerPress == null) return;   // mouse hover in the editor must not engage the control
+            Set(true);
+            if (fade != null) fade.alpha = 0.6f;
+        }
+
+        public void OnPointerExit(PointerEventData e)
+        {
+            if (e.pointerPress == null) return;
             Set(false);
             if (fade != null) fade.alpha = 1f;
         }

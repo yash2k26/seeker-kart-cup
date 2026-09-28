@@ -30,6 +30,7 @@ namespace KartCup
         public readonly List<KartProgress> racers = new();
 
         int lastTick = -1;
+        double goAt = -1;                                // online: GO on the unscaled clock, shared by every phone
         readonly List<KartProgress> order = new();
 
         void Awake() { Instance = this; }
@@ -38,7 +39,7 @@ namespace KartCup
         {
             checkpoints = checkpoints.Where(c => c != null).OrderBy(c => c.index).ToArray();
             Rescan();
-            BeginCountdown();
+            if (!RoomClient.InRoom) BeginCountdown();   // online, NetRace holds the grid until the room's GO
         }
 
         /// Call after spawning or despawning karts.
@@ -54,8 +55,25 @@ namespace KartCup
         {
             state = State.Countdown;
             countdown = countdownSeconds;
+            goAt = -1;
             lastTick = -1;
             foreach (var r in racers) r.GetComponent<Kart>().active = false;    // input is clamped to zero while frozen
+        }
+
+        /// Online: everyone waits on the grid until the room says when; nothing counts down on its own.
+        public void Hold()
+        {
+            state = State.Idle;
+            goAt = -1;
+            foreach (var r in racers) r.GetComponent<Kart>().active = false;
+        }
+
+        /// Online: 3-2-1 toward a GO instant in Time.unscaledTimeAsDouble terms, the same server instant on every phone.
+        public void BeginCountdownAt(double unscaledGo)
+        {
+            BeginCountdown();
+            goAt = unscaledGo;
+            countdown = (float)(goAt - Time.unscaledTimeAsDouble);
         }
 
         public void SetState(State next)                                        // the online race state object calls this
@@ -64,7 +82,7 @@ namespace KartCup
             state = next;
             bool live = next == State.Racing;
             foreach (var r in racers) r.GetComponent<Kart>().active = live;
-            if (live) onGo.Invoke();
+            if (live) { RaceSession.Instance?.BeginRace(); onGo.Invoke(); }
         }
 
         void Update()
@@ -72,7 +90,7 @@ namespace KartCup
             switch (state)
             {
                 case State.Countdown:
-                    countdown -= Time.deltaTime;
+                    if (goAt > 0) countdown = (float)(goAt - Time.unscaledTimeAsDouble); else countdown -= Time.deltaTime;
                     int tick = Mathf.CeilToInt(Mathf.Max(0, countdown));
                     if (tick != lastTick)
                     {

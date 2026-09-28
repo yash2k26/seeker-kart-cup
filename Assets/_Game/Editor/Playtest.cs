@@ -11,8 +11,9 @@ using UnityEngine;
 // Run: Unity -batchmode -projectPath . -executeMethod Playtest.Run -logFile -   (no -quit: it exits itself)
 public static class Playtest
 {
-    static double start;
-    static int shot;
+    static double start, captureAt = -1;
+    static int shot, track = 1, cam = -1;
+    static bool camSet;
     static readonly double[] shotTimes = { 5, 12, 22, 34 };
 
     [MenuItem("Build/Playtest 30s")]
@@ -25,7 +26,12 @@ public static class Playtest
             EditorSettings.enterPlayModeOptions = EnterPlayModeOptions.DisableDomainReload;
             AssetDatabase.SaveAssets();
         }
-        EditorSceneManager.OpenScene("Assets/_Game/Scenes/Race.unity", OpenSceneMode.Single);
+        KartCup.Cup.End();     // PlayerPrefs survive batch runs; without this each run scores into the last run's cup
+        // -track N drives circuit N (default 1), like ContractTest, so every map gets in-race frames.
+        var args = System.Environment.GetCommandLineArgs();
+        for (int i = 0; i < args.Length - 1; i++) { if (args[i] == "-track") int.TryParse(args[i + 1], out track); if (args[i] == "-cam") int.TryParse(args[i + 1], out cam); }
+        camSet = false;
+        EditorSceneManager.OpenScene($"Assets/_Game/Scenes/Race{track}.unity", OpenSceneMode.Single);
         start = EditorApplication.timeSinceStartup;
         shot = 0;
         EditorApplication.update += Tick;
@@ -36,11 +42,23 @@ public static class Playtest
     {
         if (!EditorApplication.isPlaying) return;
         double t = EditorApplication.timeSinceStartup - start;
+        if (!camSet && cam >= 0 && t > 1) { camSet = true; var a = Object.FindFirstObjectByType<CameraAngles>(); a?.Set(cam); a?.Toggle(); }   // picker open for the first shots
 
-        if (shot < shotTimes.Length && t >= shotTimes[shot])
+        if (shot < shotTimes.Length && captureAt < 0 && t >= shotTimes[shot])
         {
-            Capture($"play{shot}");
+            var pause = Object.FindFirstObjectByType<PauseMenu>();
+            var race = Object.FindFirstObjectByType<RaceManager>();
+            if (shot == 2 && pause != null) pause.Pause();                                   // overlay in the frame
+            if (shot == 3 && race != null && race.Player != null) race.Finish(race.Player);   // results card in the frame
+            captureAt = t + 0.6;                                                              // after the entrance has landed
+        }
+        if (captureAt >= 0 && t >= captureAt)
+        {
+            Capture($"play{track}-{shot}");
             Report(t);
+            var pause = Object.FindFirstObjectByType<PauseMenu>();
+            if (shot == 2 && pause != null) pause.Resume();
+            captureAt = -1;
             shot++;
         }
         if (t < 38) return;

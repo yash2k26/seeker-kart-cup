@@ -8,7 +8,7 @@ public static class Probe
     [MenuItem("Build/Probe Race Scene")]
     public static void Run()
     {
-        EditorSceneManager.OpenScene("Assets/_Game/Scenes/Race.unity", OpenSceneMode.Single);
+        EditorSceneManager.OpenScene("Assets/_Game/Scenes/Race1.unity", OpenSceneMode.Single);
         var slot = GameObject.Find("StartGrid").transform.GetChild(0);
         Debug.Log($"[p] slot0 {slot.position}");
         foreach (var r in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None)

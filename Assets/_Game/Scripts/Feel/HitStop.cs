@@ -7,10 +7,11 @@ namespace KartCup
     {
         static float until, cooldown;
         public static bool Paused;
+        public static bool Online;   // set by NetRace: the room's clock is the race clock, so no time dips
 
         public static void Do(float realSeconds = 0.06f)
         {
-            if (Time.unscaledTime < cooldown) return;
+            if (Online || Time.unscaledTime < cooldown) return;
             until = Time.unscaledTime + realSeconds;
             cooldown = until + 1f;
             Time.timeScale = 0.05f;

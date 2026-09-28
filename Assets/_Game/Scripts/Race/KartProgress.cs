@@ -11,6 +11,8 @@ namespace KartCup
     {
         public string racerName = "Racer";
         public bool isPlayer;
+        public int characterIndex = -1;   // which roster entry this kart is, so the cup can score it
+        public bool remote;               // another phone's kart: its lap, gate and score arrive over the network
 
         public int lap;                       // 0 until the first crossing of the start line
         public int checkpointIndex = -1;      // last gate crossed
@@ -21,22 +23,24 @@ namespace KartCup
 
         Kart kart;
         float lapStart;
-        float offTrackSince = -1f;
+        float offTrackSince = -1f, crawlingSince = -1f;
 
         void Awake() { kart = GetComponent<Kart>(); }
 
         public void Pass(Checkpoint cp)
         {
             var race = RaceManager.Instance;
-            if (race == null || finished || race.state == RaceManager.State.Countdown) return;
+            if (remote || race == null || finished || race.state == RaceManager.State.Countdown) return;
             int count = race.checkpoints.Length;
             int expected = (checkpointIndex + 1) % count;
             if (cp.index != expected) return;                      // cutting the course or driving backwards
 
             checkpointIndex = cp.index;
-            if (cp.index != 0) return;
+            // The Worker counts the intermediate gates per lap; the start line is reported through OnLap instead.
+            if (cp.index != 0) { if (isPlayer) RaceSession.Instance?.OnCheckpoint(); return; }
 
             if (lap > 0) lapTimes.Add(race.raceTime - lapStart);    // crossing the line completes a lap
+            if (lap > 0 && isPlayer) RaceSession.Instance?.OnLap();
             lapStart = race.raceTime;
             lap++;
             if (isPlayer && lap > 1 && lap <= race.totalLaps) AudioDirector.Instance?.Lap(lap == race.totalLaps);
@@ -46,14 +50,32 @@ namespace KartCup
         void Update()
         {
             var race = RaceManager.Instance;
-            if (race == null) return;
+            if (race == null || remote) return;
             score = Score(race);
 
-            // Recovery: below the world, or stuck off the track for 3 s -> back on the last gate.
+            // Recovery. Two separate cases, because they fail differently:
+            //   airborne//fallen  - the old test, still needed for a kart that leaves the world
+            //   wedged            - jammed against a rock or another kart. It stays GROUNDED, so the test above
+            //                       never fires and the racer is out of the race for good.
             bool lost = transform.position.y < -8f;
+            bool racing = race.state == RaceManager.State.Racing && !finished;
+
             if (!lost && kart.velMag < 1.5f && !kart.grounded) { if (offTrackSince < 0) offTrackSince = Time.time; }
             else offTrackSince = -1f;
-            if (lost || (offTrackSince > 0 && Time.time - offTrackSince > 3f)) Respawn(race);
+
+            if (racing && kart.velMag < 2f) { if (crawlingSince < 0) crawlingSince = Time.time; }
+            else crawlingSince = -1f;
+
+            // An AI that is not moving is stuck, so free it quickly. A PLAYER may simply have stopped — parking to
+            // look around must not teleport you — so they get a much longer rope before the game intervenes.
+            float patience = isPlayer ? 10f : 5f;
+
+            if (lost || (offTrackSince > 0 && Time.time - offTrackSince > 3f)
+                     || (crawlingSince > 0 && Time.time - crawlingSince > patience))
+            {
+                crawlingSince = -1f;
+                Respawn(race);
+            }
         }
 
         float Score(RaceManager race)
