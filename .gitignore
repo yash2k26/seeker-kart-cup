@@ -135,3 +135,19 @@ Assets/Photon/**
 !Assets/Photon/Fusion/Resources/
 !Assets/Photon/Fusion/Resources/NetworkProjectConfig.fusion
 !Assets/Photon/Fusion/Resources/NetworkProjectConfig.fusion.meta
+
+# Blender-side Python deps for tools/blender/heads.py (scikit-image, Pillow): install, never commit
+#   /Applications/Blender.app/Contents/Resources/*/python/bin/python3.13 -m pip install --target tools/blender/pylib scikit-image pillow
+tools/blender/pylib/
+__pycache__/
+tools/blender/refs/
+
+# ---- Never publish (pre-push audit, 28 Sep 2026) ----
+# Photon AppId, Solana keypairs, certificates and private keys, Worker secrets: wherever they land
+**/PhotonAppSettings.asset
+**/PhotonAppSettings.asset.meta
+**/*keypair*.json
+**/id.json
+*.pem
+*.p12
+**/.dev.vars
