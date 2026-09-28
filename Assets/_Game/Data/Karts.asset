@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 39d2a3c491b9b48ae91b918697c5472a, type: 3}
+  m_Name: Karts
+  m_EditorClassIdentifier: Assembly-CSharp::KartCup.KartDatabase
+  karts:
+  - {fileID: 11400000, guid: 38f1cffa6a501455799d65c342ccfb23, type: 2}
+  - {fileID: 11400000, guid: abb1db72a9d3447ada58746e127c040a, type: 2}
+  - {fileID: 11400000, guid: 8390f32021d0344eea3adbda1c585b16, type: 2}
+  - {fileID: 11400000, guid: 76eb2f3b0fc3a49ab9cc9d4c028f309b, type: 2}
+  - {fileID: 11400000, guid: c7a282cba544341f1a2d7e2001ffd010, type: 2}
+  - {fileID: 11400000, guid: b42eefe79620a4edf86ab720fb6f03ae, type: 2}
+  - {fileID: 11400000, guid: 2cbb29ff6eb904e1ebb0e9ef01945822, type: 2}
+  - {fileID: 11400000, guid: f13304a4290774bffa7cf0fd63aee4e3, type: 2}
+  - {fileID: 11400000, guid: 376d48f77849b49dbb0fc82d365e81c0, type: 2}
+  - {fileID: 11400000, guid: 69e18e034043745fcabf3552a2701894, type: 2}
+  - {fileID: 11400000, guid: e84950d99a5d64ef59a0ad2ab1f8b690, type: 2}
+  - {fileID: 11400000, guid: 52319b3be7b91480d978dfd22d46fa6c, type: 2}
+  - {fileID: 11400000, guid: 7ba49d326d10542ac977143ad0f67710, type: 2}
