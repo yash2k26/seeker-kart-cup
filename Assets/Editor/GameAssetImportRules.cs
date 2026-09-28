@@ -1,3 +1,5 @@
+using System.IO;
+using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
 
@@ -6,7 +8,7 @@ using UnityEngine;
 // Bump k_Version when you change a rule -> Unity reimports everything this touches.
 public sealed class GameAssetImportRules : AssetPostprocessor
 {
-    const uint k_Version = 4;
+    const uint k_Version = 6;
     public override uint GetVersion() => k_Version;
 
     const string Root = "Assets/_Game/";
@@ -14,6 +16,9 @@ public sealed class GameAssetImportRules : AssetPostprocessor
 
     bool In(string sub) => assetPath.StartsWith(Root + sub, System.StringComparison.Ordinal);
     bool Mine => assetPath.StartsWith(Root, System.StringComparison.Ordinal);
+    // Kenney's Nature and Racing kits predate his colormaps: no texture, a few flat-colour FBX materials
+    // (grass, dirt, woodBark...) and a submesh per material. Imported like the colormap kits they are grey boxes.
+    bool FlatKit => In("Art/Models/Props/Nature") || In("Art/Models/Props/Racing");
 
     void OnPreprocessTexture()
     {
@@ -57,7 +62,15 @@ public sealed class GameAssetImportRules : AssetPostprocessor
             t.mipmapEnabled = false;                        // UI never minifies
             ps.maxTextureSize = 1024;
             // A smooth alpha ramp is exactly what ASTC bands. It is 8 KB uncompressed; keep it exact.
-            ps.format = assetPath.EndsWith("plate_fade.png") ? TextureImporterFormat.RGBA32 : TextureImporterFormat.ASTC_4x4;
+            ps.format = assetPath.Contains("plate_fade") ? TextureImporterFormat.RGBA32 : TextureImporterFormat.ASTC_4x4;
+            if (In("Art/Textures/UI/Tracks"))
+            {
+                // Key art, shown full-bleed, and re-rendered by every track build. Single mode regenerates the sprite
+                // rect from the texture each import; Multiple kept a rect from the first 1024-wide render, so the
+                // sprite no longer matched its texture after the size changed and the select screen showed nothing.
+                t.spriteImportMode = SpriteImportMode.Single;
+                ps.maxTextureSize = 2048; ps.format = TextureImporterFormat.ASTC_6x6;
+            }
         }
         else if (In("Art/Textures/Sky"))
         {
@@ -70,7 +83,7 @@ public sealed class GameAssetImportRules : AssetPostprocessor
         {
             t.mipmapEnabled = true;
             t.alphaIsTransparency = true;
-            if (In("Art/Textures/World")) t.wrapMode = TextureWrapMode.Repeat;   // water tiles, chevrons
+            if (In("Art/Textures/World") || In("Art/Textures/Kits")) t.wrapMode = TextureWrapMode.Repeat;   // water tiles, chevrons, fence net
             ps.maxTextureSize = 512;
             ps.format = TextureImporterFormat.ASTC_6x6;
         }
@@ -102,8 +115,10 @@ public sealed class GameAssetImportRules : AssetPostprocessor
         m.generateSecondaryUV = false;               // no lightmaps -> no UV2
         m.addCollider = false;
 
-        // One shared material per colormap, authored by hand. Never import FBX materials.
-        m.materialImportMode = ModelImporterMaterialImportMode.None;
+        // One shared material per colormap, authored by hand. Never import FBX materials — except the flat-colour
+        // kits: None also suppresses OnAssignMaterialModel, and ImportStandard is what hands it the FBX colour.
+        m.materialImportMode = FlatKit ? ModelImporterMaterialImportMode.ImportStandard : ModelImporterMaterialImportMode.None;
+        m.materialName = ModelImporterMaterialName.BasedOnMaterialName;
 
         // Kenney's Mini Characters (Art/Models/Drivers) are skinned and carry ~30 takes including "drive" and "sit".
         // Legacy keeps those playable by name with a plain Animation component — no controller asset per character.
@@ -115,6 +130,47 @@ public sealed class GameAssetImportRules : AssetPostprocessor
         m.importAnimation = rigged;
         if (drivers) m.animationCompression = ModelImporterAnimationCompression.KeyframeReduction;
         m.optimizeGameObjects = false;               // keep torso/arm-left/arm-right/head addressable
+    }
+
+    // One shared .mat per kit and FBX material name (Kits/Nature_grass.mat), so 300 props still batch by colour.
+    // The source material is destroyed after this call, hence a fresh one rather than saving it.
+    Material OnAssignMaterialModel(Material src, Renderer renderer)
+    {
+        if (!FlatKit) return null;
+        const string Mats = Root + "Art/Materials/Kits/";
+        string kit = Path.GetFileName(Path.GetDirectoryName(assetPath));
+        string name = Regex.Replace(src.name, "[^A-Za-z0-9]", "");         // "_defaultMat"
+        string path = $"{Mats}{kit}_{name}.mat";
+        var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (mat != null) return mat;
+
+        // Born on Simple Lit with the spec-off flags LookSetup.Materials gives the KartCup/ ones; it never sees these.
+        mat = new Material(Shader.Find("Universal Render Pipeline/Simple Lit"));
+        mat.SetColor("_BaseColor", src.color);                              // the FBX DiffuseColor
+        mat.SetColor("_SpecColor", Color.black);
+        mat.SetFloat("_SpecularHighlights", 0f);
+        mat.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
+        mat.SetFloat("_Smoothness", 0f);
+
+        // Racing names its three textured materials after their PNG (tankco, net, checkers). Keying on the name
+        // rather than src.mainTexture means the result does not depend on Unity's texture search finding the file.
+        string texPath = Root + "Art/Textures/Kits/" + name + ".png";
+        var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(texPath);
+        if (tex != null)
+        {
+            mat.SetTexture("_BaseMap", tex);
+            if (((TextureImporter)AssetImporter.GetAtPath(texPath)).DoesSourceTextureHaveAlpha())
+            {
+                // net.png is white on alpha: without clipping the fence is a solid white slab
+                mat.SetFloat("_AlphaClip", 1f); mat.EnableKeyword("_ALPHATEST_ON");
+                mat.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Off);   // one panel, seen from both sides
+                mat.SetOverrideTag("RenderType", "TransparentCutout");
+                mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.AlphaTest;
+            }
+        }
+        Directory.CreateDirectory(Mats);
+        AssetDatabase.CreateAsset(mat, path);
+        return mat;
     }
 
     void OnPreprocessAudio()
