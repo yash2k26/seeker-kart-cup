@@ -11,34 +11,66 @@ using UnityEngine.InputSystem.UI;
 using TMPro;
 using UnityEngine.UI;
 
-// Generates the beach circuit and the whole race scene headlessly. One closed spline gives us the road mesh,
-// the AI waypoint chain, the checkpoints, the start grid and the prop placement — so the track is one edit away
-// from a different shape. Run: Unity -batchmode -projectPath . -executeMethod TrackSetup.BuildRace -quit
-public static class TrackSetup
+// Generates the four circuits and their whole race scenes headlessly. One closed spline gives us the road mesh,
+// the AI waypoint chain, the checkpoints, the start grid and the prop placement; a heightfield flattened to that
+// spline gives every map its terrain. Run: Unity -batchmode -projectPath . -executeMethod TrackSetup.BuildRace -quit
+// (with graphics: BuildOne renders each map's track-select thumbnail).
+public static partial class TrackSetup
 {
-    const string ScenePath = "Assets/_Game/Scenes/Race.unity";
+    // Four circuits from one generator and a theme table (TrackThemes.cs). Order, ids, names and blurbs come from
+    // KartCup.Tracks; Themes[i] is the look and shape of Tracks.At(i), and Race{i+1}.unity is its scene.
+    // The circuits are also the cup's difficulty ramp: open and flowing, then hairpins, then a tight technical one
+    // on a narrower road, then the flat-out stadium. Measured before building — lap 1371/1126/1054/1279 m,
+    // 95th-percentile corner 3.6/6.4/20.5/4.8 deg per sample — so they differ in character, not just in dressing.
+    static Theme V;                                          // the circuit currently being generated
+    static int Index;                                        // its index in Tracks / Themes
+    static string ScenePath => $"Assets/_Game/Scenes/{Tracks.SceneOf(Index)}.unity";
+    static string MeshDir => Art + $"Models/Track/{Tracks.SceneOf(Index)}";
     const string Art = "Assets/_Game/Art/";
     const string Prefabs = "Assets/_Game/Prefabs/";
     const string PKP = "Assets/ThirdParty/PowerslideKartPhysics/";
 
-    // Track shape: a wobbled circle. Two sine terms give long sweepers, a hairpin and a couple of kinks.
-    const float Radius = 150f, HalfWidth = 9f, Kerb = 1.4f;
-    const int ControlPoints = 16, PerSegment = 24;
+    const float Kerb = 1.4f;
+    static float HalfWidth => V.halfWidth;
+    static int ControlPoints => V.controlPoints;
+    static int PerSegment => Mathf.Max(8, 384 / V.controlPoints);   // ~384 samples whatever the control count
 
-    static Vector3[] centre;      // sampled centreline
+    static Vector3[] centre;      // sampled centreline, with elevation once TerrainGen.Profile has run
     static Vector3[] right;       // road right vector per sample
 
-    [MenuItem("Build/Build Race Scene")]
+    [MenuItem("Build/Build Race Scenes")]
     public static void BuildRace()
     {
+        // Drop any scene from a previous single-track build so the list cannot keep a stale "Race.unity".
+        EditorBuildSettings.scenes = EditorBuildSettings.scenes
+            .Where(s => !s.path.StartsWith("Assets/_Game/Scenes/Race")).ToArray();
+        for (int i = 0; i < Tracks.Count; i++)
+        {
+            var theme = System.Array.Find(Themes, t => t.id == Tracks.At(i).id);
+            if (theme == null) { Debug.LogError($"[track] no theme for track '{Tracks.At(i).id}'"); continue; }
+            BuildOne(theme, i);
+        }
+        Debug.Log($"[track] built {Tracks.Count} circuits");
+        if (Application.isBatchMode) EditorApplication.Exit(0);
+    }
+
+    static void BuildOne(Theme theme, int index)
+    {
+        V = theme; Index = index;
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
         Sample();
+        // Elevation goes onto the centreline before any geometry exists, so road, kerbs, walls, waypoints,
+        // checkpoints, grid and props all inherit it.
+        TerrainGen.Profile(centre, V.shape, Length());
+        Analyse();
 
         Environment();
+        RenderMap();
         var road = Road();
         var waypoints = Waypoints();
         var checkpoints = Checkpoints();
         var grid = StartGrid();
+        Barriers();
         Dressing();
         ItemBoxes();
 
@@ -59,31 +91,36 @@ public static class TrackSetup
 
         var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
         var cam = camGo.AddComponent<Camera>();
-        cam.fieldOfView = 62; cam.nearClipPlane = 0.3f; cam.farClipPlane = 400; cam.clearFlags = CameraClearFlags.Skybox;
+        cam.fieldOfView = 67; cam.nearClipPlane = 0.3f; cam.farClipPlane = V.farClip; cam.clearFlags = CameraClearFlags.Skybox;   // far enough to keep the mountains
         camGo.AddComponent<AudioListener>();
         camGo.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>();
         var kartCam = camGo.AddComponent<KartCamera>();
         kartCam.useLegacyInput = false;                    // it would poll legacy axes every frame otherwise
-        kartCam.initialDist = 6.6f; kartCam.initialHeight = 3.4f; kartCam.smoothRate = 9f;
+        kartCam.initialDist = 6.3f; kartCam.initialHeight = 3.05f; kartCam.smoothRate = 9f;  // low enough to read speed, high enough to see past trackside props
         kartCam.lookAtHeight = 1.05f;     // ~19 deg down: low and level put the driver's head over the road ahead
         camGo.AddComponent<CameraFeel>();
+        var angles = camGo.AddComponent<CameraAngles>();
+        new SerializedObject(angles).Do(a => a.FindProperty("kartCamera").objectReferenceValue = kartCam);
         camGo.GetComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>().renderPostProcessing = true;
 
         var volumeGo = new GameObject("Post");
         var volume = volumeGo.AddComponent<UnityEngine.Rendering.Volume>();
         volume.isGlobal = true;
-        volume.sharedProfile = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.VolumeProfile>("Assets/Settings/PostProfile.asset");
+        volume.sharedProfile = PostProfile();
 
+        var session = new GameObject("RaceSession").AddComponent<RaceSession>();   // lap/checkpoint times for the Worker; nothing reached the leaderboard without it
+        new SerializedObject(session).Do(s => s.FindProperty("trackId").stringValue = Tracks.At(Index).id);   // what the Worker keys the leaderboard on
         var race = new GameObject("RaceManager").AddComponent<RaceManager>();
         race.totalLaps = 2;
         race.checkpoints = checkpoints;
 
-        var hud = Hud(input, out var hudComp);
+        var hud = Hud(input, angles, out var hudComp);
 
         var spawner = new GameObject("RaceSpawner").AddComponent<RaceSpawner>();
         var so = new SerializedObject(spawner);
         so.FindProperty("roster").objectReferenceValue = Roster();
-        Fill(so.FindProperty("kartPrefabs"), KartSetup.Karts.Select(k => AssetDatabase.LoadAssetAtPath<GameObject>(Prefabs + $"Karts/Kart_{k}.prefab")).ToArray());
+        so.FindProperty("garage").objectReferenceValue = AssetDatabase.LoadAssetAtPath<KartDatabase>("Assets/_Game/Data/Karts.asset");
+        Fill(so.FindProperty("kartPrefabs"), KartSetup.Karts.Select(k => AssetDatabase.LoadAssetAtPath<GameObject>(Prefabs + $"Karts/Kart_{k}.prefab")).Where(k => k != null).ToArray());
         Fill(so.FindProperty("driverPrefabs"), Directory.GetFiles(Prefabs + "Drivers", "*.prefab").Select(AssetDatabase.LoadAssetAtPath<GameObject>).ToArray());
         Fill(so.FindProperty("gridSlots"), grid.Cast<Object>().ToArray());
         so.FindProperty("firstWaypoint").objectReferenceValue = waypoints;
@@ -93,14 +130,116 @@ public static class TrackSetup
 
         new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
 
+        Thumbnail(cam);      // here, with the scene complete and still open: re-opening scenes to render is a known trap
+
         EditorSceneManager.SaveScene(scene, ScenePath);
         // Menu is the entry point, so the race always goes last in the build list.
         var scenes = EditorBuildSettings.scenes.Where(s => s.path != ScenePath).ToList();
         scenes.Add(new EditorBuildSettingsScene(ScenePath, true));
         EditorBuildSettings.scenes = scenes.ToArray();
         AssetDatabase.SaveAssets();
-        Debug.Log($"[track] race scene built: {centre.Length} samples, {checkpoints.Length} checkpoints, {grid.Length} grid slots");
-        if (Application.isBatchMode) EditorApplication.Exit(0);
+        Debug.Log($"[track] {Tracks.At(Index).name} ({V.id}): lap {Length():F0} m, {centre.Length} samples, {corners.Count} corners, {checkpoints.Length} checkpoints, {grid.Length} grid slots, " +
+                  $"road grade max {TerrainGen.MaxGrade * 100f:F1}% kink {TerrainGen.MaxKink * 100f:F2}%, terrain {terrainTris} tris, {props} props / {propTris} tris");
+    }
+
+    /// The track-select card: a 3/4 aerial from behind the start straight, looking along it toward the first corner.
+    /// The shared post profile, or a per-map copy with the theme's overrides applied (see Theme.post).
+    static UnityEngine.Rendering.VolumeProfile PostProfile()
+    {
+        const string basePath = "Assets/Settings/PostProfile.asset";
+        if (V.post == null) return AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.VolumeProfile>(basePath);
+        string path = $"Assets/Settings/Post_{V.id}.asset";
+        AssetDatabase.DeleteAsset(path);
+        AssetDatabase.CopyAsset(basePath, path);          // the copy carries the components as sub-assets
+        var profile = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.VolumeProfile>(path);
+        V.post(profile);
+        foreach (var c in profile.components) EditorUtility.SetDirty(c);
+        EditorUtility.SetDirty(profile);
+        return profile;
+    }
+
+    static void Thumbnail(Camera cam)
+    {
+        int n = centre.Length;
+        // Key art: the tightest corner carries each map's landmarks (headland, cabins, rock wall, stands), so frame
+        // that from low on the approach — a high shot over the first corner showed mostly empty ground.
+        var tight = Tightest();
+        var first = tight.Count > 0 ? tight[0] : new Corner { start = Wrap(Samples(140f), n), apex = Wrap(Samples(160f), n), outside = -1 };
+        int back = Wrap(first.start - Samples(70f), n);
+        // From the outside of the corner, except on the speedway: its stands face the track, so from the outside the
+        // key art was the blank back of a grandstand. Shoot it from the infield instead.
+        float side = V.id == "speedway" ? -first.outside : first.outside;
+        Vector3 from = centre[back] + right[back] * (HalfWidth * 2.4f * side) + Vector3.up * 15f;
+        Vector3 at = centre[first.apex] + Vector3.up * 4f;
+        cam.transform.position = from;
+        cam.transform.LookAt(at);
+        float fov = cam.fieldOfView; cam.fieldOfView = 52f;
+
+        Preview.Batcher(false);   // a manual cam.Render() in edit mode reuses the batcher's constants: every object comes out one colour
+        int w = 2048, h = 1024;   // shown full-bleed at 2400 wide: 1024 was visibly soft
+        var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 };
+        cam.targetTexture = rt; cam.Render();
+        var prev = RenderTexture.active; RenderTexture.active = rt;
+        var tex = new Texture2D(w, h, TextureFormat.RGB24, false);
+        tex.ReadPixels(new Rect(0, 0, w, h), 0, 0); tex.Apply();
+        RenderTexture.active = prev; cam.targetTexture = null;
+        Preview.Batcher(true);
+        cam.fieldOfView = fov;
+
+        const string dir = Art + "Textures/UI/Tracks";
+        Directory.CreateDirectory(dir);
+        string path = $"{dir}/{V.id}.png";
+        File.WriteAllBytes(path, tex.EncodeToPNG());
+        Object.DestroyImmediate(tex); rt.Release(); Object.DestroyImmediate(rt);
+        AssetDatabase.ImportAsset(path);      // the UI folder rule makes it a sprite
+    }
+
+    // ---------- minimap ----------
+    static Sprite mapSprite; static Vector2 mapMin; static float mapSize;
+
+    /// The centreline as a pale line with a dark outline on a transparent square, plus the world-to-picture fit the
+    /// HUD's Minimap needs. Drawn by hand: a 256 px texture of a 400–500 m circuit is a two-metre pixel.
+    static void RenderMap()
+    {
+        float minX = centre.Min(c => c.x), maxX = centre.Max(c => c.x), minZ = centre.Min(c => c.z), maxZ = centre.Max(c => c.z);
+        mapSize = Mathf.Max(maxX - minX, maxZ - minZ) * 1.18f;
+        mapMin = new Vector2((minX + maxX) * 0.5f - mapSize * 0.5f, (minZ + maxZ) * 0.5f - mapSize * 0.5f);
+        const int N = 256;
+        var px = new Color32[N * N];
+        void Disc(Vector3 w, Color32 c, float radius)
+        {
+            float u = (w.x - mapMin.x) / mapSize * N, v = (w.z - mapMin.y) / mapSize * N;
+            int r = Mathf.CeilToInt(radius);
+            for (int y = -r; y <= r; y++) for (int x = -r; x <= r; x++)
+            {
+                if (x * x + y * y > radius * radius) continue;
+                int ix = Mathf.RoundToInt(u) + x, iy = Mathf.RoundToInt(v) + y;
+                if (ix < 0 || iy < 0 || ix >= N || iy >= N) continue;
+                px[iy * N + ix] = c;
+            }
+        }
+        void Stroke(Color32 c, float radius)
+        {
+            for (int i = 0; i < centre.Length; i++)
+            {
+                Vector3 a = centre[i], b = centre[Wrap(i + 1, centre.Length)];
+                int steps = Mathf.Max(1, Mathf.CeilToInt(Vector3.Distance(a, b) / mapSize * N));
+                for (int k = 0; k <= steps; k++) Disc(Vector3.Lerp(a, b, k / (float)steps), c, radius);
+            }
+        }
+        Stroke(new Color32(10, 21, 28, 235), 7.5f);          // outline
+        Stroke(new Color32(244, 241, 234, 255), 4.5f);      // road
+        Disc(centre[0], new Color32(255, 90, 54, 255), 7f); // start line
+        var tex = new Texture2D(N, N, TextureFormat.RGBA32, false);
+        tex.SetPixels32(px); tex.Apply();
+        const string dir = Art + "Textures/UI/Tracks";
+        Directory.CreateDirectory(dir);
+        string path = $"{dir}/{V.id}_map.png";
+        File.WriteAllBytes(path, tex.EncodeToPNG());
+        Object.DestroyImmediate(tex);
+        AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+        mapSprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        if (mapSprite == null) Debug.LogWarning("[track] minimap sprite did not import: " + path);
     }
 
     // ---------- geometry ----------
@@ -110,7 +249,8 @@ public static class TrackSetup
         for (int i = 0; i < ControlPoints; i++)
         {
             float t = i / (float)ControlPoints * Mathf.PI * 2f;
-            float r = Radius * (1f + 0.22f * Mathf.Sin(3f * t) + 0.10f * Mathf.Cos(5f * t));
+            if (V.straight > 0f) { ctrl[i] = Stadium(i); continue; }
+            float r = V.radius * (1f + V.ampA * Mathf.Sin(V.harmA * t) + V.ampB * Mathf.Cos(V.harmB * t));
             ctrl[i] = new Vector3(Mathf.Sin(t) * r, 0, Mathf.Cos(t) * r);
         }
         int n = ControlPoints * PerSegment;
@@ -125,6 +265,25 @@ public static class TrackSetup
             var fwd = (centre[Wrap(i + 1, n)] - centre[Wrap(i - 1, n)]).normalized;
             right[i] = Vector3.Cross(Vector3.up, fwd).normalized;
         }
+    }
+
+    /// Control point i of a stadium: straights of V.straight along x, semicircles of V.radius, clockwise from the
+    /// middle of the front straight (so sample 0 is the start line on a straight, like the other circuits), and a
+    /// chicane — two adjacent points pushed out and in by V.chicane — in the middle of the back straight.
+    static Vector3 Stadium(int i)
+    {
+        float R = V.radius, S = V.straight, L = 2f * S + 2f * Mathf.PI * R;
+        float u = i / (float)ControlPoints * L;
+        Vector3 p, normal;
+        if (u < S / 2f) { p = new Vector3(u, 0, R); normal = Vector3.forward; }
+        else if (u < S / 2f + Mathf.PI * R) { float a = (u - S / 2f) / R; normal = new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a)); p = new Vector3(S / 2f, 0, 0) + normal * R; }
+        else if (u < S * 1.5f + Mathf.PI * R) { p = new Vector3(S / 2f - (u - S / 2f - Mathf.PI * R), 0, -R); normal = Vector3.back; }
+        else if (u < S * 1.5f + 2f * Mathf.PI * R) { float a = (u - S * 1.5f - Mathf.PI * R) / R; normal = new Vector3(-Mathf.Sin(a), 0, -Mathf.Cos(a)); p = new Vector3(-S / 2f, 0, 0) + normal * R; }
+        else { p = new Vector3(-S / 2f + (u - S * 1.5f - 2f * Mathf.PI * R), 0, R); normal = Vector3.forward; }
+        int mid = ControlPoints / 2;
+        if (i == mid) p += normal * V.chicane;
+        if (i == mid + 1) p -= normal * V.chicane;
+        return p;
     }
 
     static int Wrap(int i, int n) => ((i % n) + n) % n;
@@ -199,8 +358,8 @@ public static class TrackSetup
         }
         var mesh = new Mesh { name = name, indexFormat = UnityEngine.Rendering.IndexFormat.UInt32, vertices = verts.ToArray(), uv = uvs.ToArray(), normals = norms.ToArray(), triangles = tris.ToArray() };
         mesh.RecalculateBounds();
-        Directory.CreateDirectory(Art + "Models/Track");
-        AssetDatabase.CreateAsset(mesh, Art + $"Models/Track/{name}.asset");
+        Directory.CreateDirectory(MeshDir);
+        AssetDatabase.CreateAsset(mesh, $"{MeshDir}/{name}.asset");
 
         var go = new GameObject(name);
         go.transform.SetParent(parent, false);
@@ -274,127 +433,130 @@ public static class TrackSetup
         return d;
     }
 
+    static int terrainTris;
+
     static void Environment()
     {
-        var unlit = Shader.Find("KartCup/Unlit Colormap");
-        RenderSettings.skybox = AssetDatabase.LoadAssetAtPath<Material>(Art + "Materials/Sky.mat");
-        // Gradient ambient: sky blue from above, warm sand bounce from below — flat ambient is what made
+        // Sky: Unity's procedural skybox, one material per map, with the sun disc following the directional light.
+        var sky = LoadOrCreate(Art + $"Materials/Sky_{V.id}.mat", Shader.Find("Skybox/Procedural"), Color.white);
+        sky.shader = Shader.Find("Skybox/Procedural");
+        sky.SetColor("_SkyTint", V.skyTint); sky.SetColor("_GroundColor", V.horizon);
+        sky.SetFloat("_Exposure", V.exposure); sky.SetFloat("_AtmosphereThickness", V.atmosphere);
+        sky.SetFloat("_SunSize", V.sunSize); sky.SetFloat("_SunSizeConvergence", V.sunConvergence);
+        EditorUtility.SetDirty(sky);
+        RenderSettings.skybox = sky;
+        // Gradient ambient: sky from above, a bounce from the ground colour below — flat ambient is what made
         // everything read as one colour.
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
-        RenderSettings.ambientSkyColor = new Color(0.30f, 0.37f, 0.46f);
-        RenderSettings.ambientEquatorColor = new Color(0.26f, 0.26f, 0.25f);
-        RenderSettings.ambientGroundColor = new Color(0.20f, 0.17f, 0.13f);
+        RenderSettings.ambientSkyColor = V.ambientSky;
+        RenderSettings.ambientEquatorColor = V.ambientEquator;
+        RenderSettings.ambientGroundColor = V.ambientGround;
+        // Fog in the sky's horizon colour, so props fade into the sky instead of into a grey.
         RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Linear;
-        RenderSettings.fogStartDistance = 220; RenderSettings.fogEndDistance = 420;
-        RenderSettings.fogColor = new Color(0.72f, 0.86f, 0.92f);
+        RenderSettings.fogStartDistance = V.fogStart; RenderSettings.fogEndDistance = V.fogEnd;
+        RenderSettings.fogColor = V.fog;
 
         var sun = new GameObject("Sun").AddComponent<Light>();
-        sun.type = LightType.Directional; sun.transform.rotation = Quaternion.Euler(46, -38, 0);
-        sun.shadows = LightShadows.Soft; sun.intensity = 1.0f;
-        sun.color = new Color(1f, 0.96f, 0.88f);
+        sun.type = LightType.Directional; sun.transform.rotation = Quaternion.Euler(V.sun);
+        sun.shadows = LightShadows.Soft; sun.intensity = V.sunIntensity;
+        sun.color = V.sunColor;
         sun.shadowStrength = 0.72f; sun.shadowBias = 0.06f; sun.shadowNormalBias = 0.5f;
+        RenderSettings.sun = sun;
 
-        var sandMat = LoadOrCreate(Art + "Materials/Sand.mat", unlit, new Color(0.96f, 0.86f, 0.62f));
-        var sand = GameObject.CreatePrimitive(PrimitiveType.Plane);
-        sand.name = "Sand";
-        sand.transform.localScale = new Vector3(50, 1, 50);                  // 500 m island: the loop reaches ~200 m, so the shore stays in view from the track
-        sand.GetComponent<MeshRenderer>().sharedMaterial = sandMat;
-        var sandSurface = sand.AddComponent<GroundSurface>();
-        sandSurface.props = AssetDatabase.LoadAssetAtPath<GroundSurfacePreset>(PKP + "Prefabs/GroundSurfacePresets/Dirt.asset");   // slower and slidey: cutting corners costs you
-        GameObjectUtility.SetStaticEditorFlags(sand, StaticEditorFlags.BatchingStatic);
+        // Terrain: the theme's heightfield, painted per face, on the "KartCup/Terrain" shader (albedo = tint x vertex
+        // colour). If that shader is not imported yet the map still builds, on Simple Lit in the palette's mid tone.
+        // The material lives with the terrain meshes, not in Art/Materials: LookSetup moves every KartCup/* material
+        // it finds there onto Simple Lit, which would drop the vertex colours and leave the terrain white.
+        var terrainShader = Shader.Find("KartCup/Terrain");
+        var lit = Shader.Find("Universal Render Pipeline/Simple Lit");
+        Directory.CreateDirectory(MeshDir);
+        var mat = LoadOrCreate($"{MeshDir}/Terrain_{V.id}.mat", terrainShader != null ? terrainShader : lit, Color.white);
+        if (terrainShader != null)
+        {
+            mat.shader = terrainShader;
+            mat.SetColor("_BaseColor", Color.white); mat.SetFloat("_ShadowTint", 0.5f);
+            mat.SetFloat("_Wrap", V.id == "speedway" ? 0.55f : 0.3f);   // a 17 deg sun barely grazes a flat field: wrap the lambert so dusk stays readable
+        }
+        else
+        {
+            Debug.LogWarning("[track] KartCup/Terrain shader missing: terrain on Simple Lit without vertex colours");
+            mat.shader = lit; mat.SetColor("_BaseColor", V.ground);
+        }
+        EditorUtility.SetDirty(mat);
+        var dirt = AssetDatabase.LoadAssetAtPath<GroundSurfacePreset>(PKP + "Prefabs/GroundSurfacePresets/Dirt.asset");   // slower and slidey: cutting corners costs you
+        TerrainGen.Build(centre, V.shape, HalfWidth + Kerb + 1.5f, V.palette, mat, dirt, MeshDir, out terrainTris);
 
+        // Water: the sea round the island, or a lake in a basin. One shared material; its surf ring is radial from
+        // the origin at the island's shoreline, so the lake (well inside it) gets the caustics without the surf.
+        if (!float.IsNaN(V.sea)) Water("Water", new Vector3(0, V.sea, 0), 200f);
+        if (V.lakeRadius > 0f) Water("Lake", new Vector3(V.lake.x, -1.3f, V.lake.y), V.lakeRadius * 0.3f);
+    }
+
+    static void Water(string name, Vector3 pos, float scale)
+    {
         var water = GameObject.CreatePrimitive(PrimitiveType.Plane);
-        water.name = "Water";
-        water.transform.position = new Vector3(0, -0.9f, 0);
-        water.transform.localScale = new Vector3(200, 1, 200);
+        water.name = name;
+        water.transform.position = pos;
+        water.transform.localScale = new Vector3(scale, 1, scale);
         water.GetComponent<MeshRenderer>().sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(Art + "Materials/Water.mat");
         Object.DestroyImmediate(water.GetComponent<Collider>());
     }
 
-    static void Dressing()
+    /// Crash barriers, but only where a circuit would really have them: the outside of a corner. A wall down every
+    /// straight would turn the map into a corridor and take away the ground you are allowed to run wide onto.
+    static void Barriers()
     {
-        var pirate = AssetDatabase.LoadAssetAtPath<Material>(Art + "Materials/Pirate.mat");
-        var craft = AssetDatabase.LoadAssetAtPath<Material>(Art + "Materials/Watercraft.mat");
-        var toycar = AssetDatabase.LoadAssetAtPath<Material>(Art + "Materials/ToyCar.mat");
-        var root = new GameObject("Dressing").transform;
-        var palms = new[] { "palm-straight", "palm-bend", "palm-detailed-straight", "palm-detailed-bend" };
-        var rocks = new[] { "rocks-sand-a", "rocks-sand-b", "rocks-sand-c" };
-        var clutter = new[] { "crate", "barrel", "crate-bottles", "chest" };
-        var rnd = new System.Random(11);
-        float edge = HalfWidth + Kerb;
+        var unlit = Shader.Find("KartCup/Unlit Colormap");
+        var white = LoadOrCreate(Art + "Materials/Barrier.mat", unlit, new Color(0.88f, 0.88f, 0.90f));
+        var red = LoadOrCreate(Art + "Materials/BarrierRed.mat", unlit, new Color(0.78f, 0.16f, 0.15f));
+        var root = new GameObject("Barriers").transform;
         int n = centre.Length;
-
-        // No start gantry: Kenney's toy-scale arch has to be blown up ~13x to span the road, and its legs then
-        // fill the screen as you drive under it. The chequered band and the flags carry the start line instead.
-
-        // Trackside: palms and rocks in clusters, clutter tight to the kerb, foliage patches breaking up the sand.
-        for (int i = 0; i < n; i += 3)
+        foreach (var c in corners)
         {
-            for (int side = -1; side <= 1; side += 2)
-            {
-                double roll = rnd.NextDouble();
-                if (roll < 0.34)
-                {
-                    float off = edge + 2.5f + (float)rnd.NextDouble() * 10f;
-                    var name = rnd.NextDouble() > 0.55 ? rocks[rnd.Next(rocks.Length)] : palms[rnd.Next(palms.Length)];
-                    Place(root, Art + $"Models/Props/Pirate/{name}.fbx", pirate,
-                          centre[i] + right[i] * off * side, (float)rnd.NextDouble() * 360f, 1.6f + (float)rnd.NextDouble() * 1.8f);
-                }
-                else if (roll < 0.44)
-                {
-                    Place(root, Art + $"Models/Props/Pirate/{clutter[rnd.Next(clutter.Length)]}.fbx", pirate,
-                          centre[i] + right[i] * (edge + 1.6f) * side, (float)rnd.NextDouble() * 360f, 1.6f + (float)rnd.NextDouble() * 0.8f);
-                }
-                else if (roll < 0.60)
-                {
-                    // These are already flat slabs about 7 m across, so they only need a yaw and a modest scale.
-                    var patch = rnd.NextDouble() > 0.5 ? "patch-sand-foliage" : "patch-sand";
-                    Place(root, Art + $"Models/Props/Pirate/{patch}.fbx", pirate,
-                          centre[i] + right[i] * (edge + 5f + (float)rnd.NextDouble() * 26f) * side + Vector3.up * 0.02f,
-                          (float)rnd.NextDouble() * 360f, 0.8f + (float)rnd.NextDouble() * 1.1f);
-                }
-            }
+            int from = Wrap(c.start - 3, n), len = Mathf.Min(c.count + 6, n - 1);
+            Wall(root, $"Barrier{from}", white, red, (HalfWidth + Kerb + 0.7f) * c.outside, 1.15f, from, len);
+        }
+    }
+
+    /// A vertical ribbon along the centreline: one mesh, one draw call, one static collider.
+    static void Wall(Transform parent, string name, Material body, Material stripe, float lateral, float height, int start, int count)
+    {
+        int n = centre.Length;
+        var verts = new System.Collections.Generic.List<Vector3>();
+        var norms = new System.Collections.Generic.List<Vector3>();
+        var uvs = new System.Collections.Generic.List<Vector2>();
+        var tris = new System.Collections.Generic.List<int>();
+        var stripeTris = new System.Collections.Generic.List<int>();
+
+        for (int k = 0; k <= count; k++)
+        {
+            int i = Wrap(start + k, n);
+            Vector3 basePos = centre[i] + right[i] * lateral + Vector3.down * 0.3f;   // buried a little: the shoulder sits 5 cm under the road
+            Vector3 outward = right[i] * Mathf.Sign(lateral);
+            verts.Add(basePos); verts.Add(basePos + Vector3.up * (height + 0.3f));
+            norms.Add(-outward); norms.Add(-outward);
+            uvs.Add(new Vector2(k * 0.25f, 0)); uvs.Add(new Vector2(k * 0.25f, 1));
+            if (k == 0) continue;
+            int v = (k - 1) * 2;
+            // Alternating panels give the chevron rhythm without needing a texture.
+            var target = (k / 2) % 2 == 0 ? tris : stripeTris;
+            target.AddRange(new[] { v, v + 1, v + 2, v + 1, v + 3, v + 2 });
         }
 
-        // Cones on the apex of the tighter corners: they read as a racing line.
-        for (int i = 0; i < n; i += 2)
-        {
-            float turn = Vector3.SignedAngle(Forward(Wrap(i - 6, n)), Forward(Wrap(i + 6, n)), Vector3.up);
-            if (Mathf.Abs(turn) < 7f) continue;
-            float side = -Mathf.Sign(turn);
-            Place(root, Art + "Models/Props/ToyCar/item-cone.fbx", toycar,
-                  centre[i] + right[i] * (HalfWidth - 0.6f) * side, 0, 1.6f);
-        }
+        var mesh = new Mesh { name = name, indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+        mesh.SetVertices(verts); mesh.SetNormals(norms); mesh.SetUVs(0, uvs);
+        mesh.subMeshCount = 2;
+        mesh.SetTriangles(tris, 0); mesh.SetTriangles(stripeTris, 1);
+        mesh.RecalculateBounds();
+        Directory.CreateDirectory(MeshDir);
+        AssetDatabase.CreateAsset(mesh, $"{MeshDir}/{name}.asset");
 
-        // Marker flags every ~45 m so straights have rhythm.
-        for (int i = 0; i < n; i += 18)
-            for (int side = -1; side <= 1; side += 2)
-                Place(root, Art + "Models/Props/Pirate/flag-high-pennant.fbx", pirate,
-                      centre[i] + right[i] * (edge + 1.2f) * side, side * 90f, 1.5f);
-
-        // The island rim. The Nature kit's cliff blocks ship without their colormap here, so they render as plain
-        // grey boxes — the Pirate rocks are textured and read as a shoreline.
-        for (int i = 0; i < 48; i++)
-        {
-            float a = i / 48f * Mathf.PI * 2f;
-            float r = 244f + (float)rnd.NextDouble() * 26f;
-            Place(root, Art + $"Models/Props/Pirate/{rocks[rnd.Next(rocks.Length)]}.fbx", pirate,
-                  new Vector3(Mathf.Sin(a) * r, -0.8f, Mathf.Cos(a) * r), (float)rnd.NextDouble() * 360f, 1.8f + (float)rnd.NextDouble() * 2.4f);
-            if (rnd.NextDouble() > 0.6)
-                Place(root, Art + $"Models/Props/Pirate/{palms[rnd.Next(palms.Length)]}.fbx", pirate,
-                      new Vector3(Mathf.Sin(a + 0.02f) * (r - 14f), 0, Mathf.Cos(a + 0.02f) * (r - 14f)), (float)rnd.NextDouble() * 360f, 2f + (float)rnd.NextDouble() * 1.5f);
-        }
-
-        // Landmarks and water dressing, so the horizon has something to read against.
-        for (int i = 0; i < 16; i++)
-        {
-            float a = i / 16f * Mathf.PI * 2f + 0.2f;
-            Place(root, Art + $"Models/Props/Watercraft/{(i % 3 == 0 ? "buoy-flag" : "buoy")}.fbx", craft,
-                  new Vector3(Mathf.Sin(a) * 300f, -0.5f, Mathf.Cos(a) * 300f), 0, 2.6f);
-        }
-        Place(root, Art + "Models/Props/Pirate/ship-wreck.fbx", pirate, new Vector3(-236, -0.6f, 96), 140, 2.6f);
-        Place(root, Art + "Models/Props/Pirate/tower-complete-large.fbx", pirate, new Vector3(30, 0, 10), 15, 3.2f);
-        Place(root, Art + "Models/Props/Pirate/structure-platform-dock.fbx", pirate, new Vector3(214, -0.2f, -60), 90, 3f);
+        var go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        go.AddComponent<MeshFilter>().sharedMesh = mesh;
+        go.AddComponent<MeshRenderer>().sharedMaterials = new[] { body, stripe };
+        go.AddComponent<MeshCollider>().sharedMesh = mesh;
+        GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
     }
 
     static Bounds Bounds(GameObject go)
@@ -428,10 +590,12 @@ public static class TrackSetup
         const string dir = "Assets/_Game/Data/";
         Directory.CreateDirectory(dir);
         var db = AssetDatabase.LoadAssetAtPath<CharacterDatabase>(dir + "Characters.asset");
-        if (db != null) return db;
+        bool fresh = db == null;
+        if (fresh) { db = ScriptableObject.CreateInstance<CharacterDatabase>(); AssetDatabase.CreateAsset(db, dir + "Characters.asset"); }
 
-        db = ScriptableObject.CreateInstance<CharacterDatabase>();
         // name, kart, driver, speed, accel, handling, weight  (pips sum to 0 so nobody is strictly better)
+        // Existing rows keep whatever was hand-tuned in their asset; new names are appended, so a roster that grows
+        // (Chase and Beeman arrived on 28 Sep 2026) never resets the select-screen order or the saved character index.
         var rows = new (string name, string kart, string driver, int sp, int ac, int hd, int wt, string blurb)[]
         {
             ("Toly",     "oodi", "Toly",   1,  0,  0, -1, "Ships blocks faster than you can read them."),
@@ -442,30 +606,35 @@ public static class TrackSetup
             ("Pip",      "oodi", "Pip",   -1, -1,  0,  2, "Hard to move, harder to pass."),
             ("Runa",     "ooli", "Runa",   0,  1,  1, -2, "Never lifts."),
             ("Vee",      "oopi", "Vee",    1, -1,  1, -1, "Late braker, early apex."),
+            ("Chase",    "oozi", "Chase",  0,  1,  1, -2, "Knows every dev on the grid. Waves at all of them."),
+            ("Beeman",   "oobi", "Beeman", 2,  0, -1, -1, "Bald, fast, and debugging at sixty frames a second."),
         };
-        var defs = new List<CharacterDef>();
+        var defs = (db.characters ?? System.Array.Empty<CharacterDef>()).Where(d => d != null).ToList();
         foreach (var r in rows)
         {
-            var def = ScriptableObject.CreateInstance<CharacterDef>();
-            def.name = r.name;
+            if (defs.Any(d => d.displayName == r.name)) continue;
+            var path = dir + $"Character_{r.name}.asset";
+            var def = AssetDatabase.LoadAssetAtPath<CharacterDef>(path);
+            if (def == null) { def = ScriptableObject.CreateInstance<CharacterDef>(); def.name = r.name; AssetDatabase.CreateAsset(def, path); }
             def.displayName = r.name; def.kartId = r.kart; def.driverId = r.driver; def.blurb = r.blurb;
             def.speed = r.sp; def.accel = r.ac; def.handling = r.hd; def.weight = r.wt;
-            AssetDatabase.CreateAsset(def, dir + $"Character_{r.name}.asset");
+            EditorUtility.SetDirty(def);
             defs.Add(def);
+            Debug.Log($"[track] roster: added {r.name}");
         }
         db.characters = defs.ToArray();
-        AssetDatabase.CreateAsset(db, dir + "Characters.asset");
+        EditorUtility.SetDirty(db);
         return db;
     }
 
     // ---------- UI ----------
-    static GameObject Hud(InputManager input, out RaceHud hud)
+    static GameObject Hud(InputManager input, CameraAngles angles, out RaceHud hud)
     {
         MenuSetup.Fonts();
         var display = MenuSetup.display;
         var body = MenuSetup.body;
-        var paper = new Color(0.965f, 0.945f, 0.894f);
-        var sand = new Color(0.957f, 0.773f, 0.404f);
+        var paper = Design.Paper;
+        var sand = Design.Muted;      // the HUD's secondary text; Ember is reserved for the primary control
 
         var canvasGo = new GameObject("HUD", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         var canvas = canvasGo.GetComponent<Canvas>();
@@ -486,20 +655,41 @@ public static class TrackSetup
         var steering = canvasGo.AddComponent<SteerButtons>();
         new SerializedObject(steering).Do(s => s.FindProperty("input").objectReferenceValue = input);
 
-        Button("SteerLeft", safe.transform, input, HoldButton.Control.SteerLeft, "grey_button_rectangle_depth_flat", new Color(0.24f, 0.31f, 0.35f), new Vector2(0, 0), new Vector2(60, 60), new Vector2(300, 230), "", display, steering, "arrow_basic_w");
-        Button("SteerRight", safe.transform, input, HoldButton.Control.SteerRight, "grey_button_rectangle_depth_flat", new Color(0.24f, 0.31f, 0.35f), new Vector2(0, 0), new Vector2(380, 60), new Vector2(300, 230), "", display, steering, "arrow_basic_e");
-        Button("Gas", safe.transform, input, HoldButton.Control.Accelerate, "green_button_rectangle_depth_gradient", new Color(0.353f, 0.706f, 0.404f), new Vector2(1, 0), new Vector2(-60, 60), new Vector2(340, 230), "GAS", display, steering);
-        Button("Drift", safe.transform, input, HoldButton.Control.Drift, "red_button_rectangle_depth_gradient", new Color(0.937f, 0.416f, 0.294f), new Vector2(1, 0), new Vector2(-420, 60), new Vector2(260, 230), "DRIFT", display, steering);
-        Button("Brake", safe.transform, input, HoldButton.Control.Brake, "grey_button_rectangle_depth_flat", new Color(0.24f, 0.31f, 0.35f), new Vector2(1, 0), new Vector2(-700, 60), new Vector2(220, 170), "BRAKE", display, steering);
-        Button("Item", safe.transform, input, HoldButton.Control.Item, "yellow_button_rectangle_depth_flat", new Color(0.957f, 0.773f, 0.404f), new Vector2(1, 0), new Vector2(-60, 310), new Vector2(340, 150), "ITEM", display, steering);
+        // One accent: GAS is the action a thumb holds for the whole race, so it carries Ember and nothing else does.
+        // The item button lights up only while an item is actually armed (RaceHud tints it), which is a state, not chrome.
+        var ink = Design.Ink700;
+        Button("SteerLeft", safe.transform, input, HoldButton.Control.SteerLeft, ink, new Vector2(0, 0), new Vector2(64, 64), new Vector2(240, 184), "", display, steering, "arrow_basic_w");
+        Button("SteerRight", safe.transform, input, HoldButton.Control.SteerRight, ink, new Vector2(0, 0), new Vector2(328, 64), new Vector2(240, 184), "", display, steering, "arrow_basic_e");
+        Button("Gas", safe.transform, input, HoldButton.Control.Accelerate, Design.Ember, new Vector2(1, 0), new Vector2(-64, 64), new Vector2(288, 184), "GAS", display, steering);
+        Button("Drift", safe.transform, input, HoldButton.Control.Drift, ink, new Vector2(1, 0), new Vector2(-376, 64), new Vector2(224, 184), "DRIFT", display, steering);
+        Button("Brake", safe.transform, input, HoldButton.Control.Brake, ink, new Vector2(1, 0), new Vector2(-624, 64), new Vector2(184, 150), "BRAKE", display, steering);
+        var itemBtn = Button("Item", safe.transform, input, HoldButton.Control.Item, ink, new Vector2(1, 0), new Vector2(-64, 272), new Vector2(288, 128), "ITEM", display, steering);
 
-        var position = Text("Position", safe.transform, display, "1st", 130, paper, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(48, -30), new Vector2(420, 150));
-        var lap = Text("Lap", safe.transform, body, "LAP 1/2", 52, paper, TextAlignmentOptions.TopRight, new Vector2(1, 1), new Vector2(-48, -34), new Vector2(520, 70));
-        var time = Text("Time", safe.transform, body, "0:00.00", 46, sand, TextAlignmentOptions.TopRight, new Vector2(1, 1), new Vector2(-48, -106), new Vector2(520, 70));
-        var item = Text("Item", safe.transform, body, "", 42, sand, TextAlignmentOptions.BottomRight, new Vector2(1, 0), new Vector2(-48, 300), new Vector2(620, 60));
+        // Readouts sit on dark plates: paper on sky and sand failed contrast on the device shots.
+        var deep = new Color(Design.Ink900.r, Design.Ink900.g, Design.Ink900.b, 0.66f);
+        Plate("PositionPlate", safe.transform, new Vector2(0, 1), new Vector2(32, -20), new Vector2(340, 196), deep);
+        Plate("LapPlate", safe.transform, new Vector2(1, 1), new Vector2(-32, -20), new Vector2(342, 156), deep);
+        var position = Text("Position", safe.transform, display, "1st", 130, paper, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(56, -24), new Vector2(420, 150));
+        var lap = Text("Lap", safe.transform, body, "LAP 1/2", 52, paper, TextAlignmentOptions.TopRight, new Vector2(1, 1), new Vector2(-56, -38), new Vector2(520, 70));
+        var time = Text("Time", safe.transform, body, "0:00.00", 46, sand, TextAlignmentOptions.TopRight, new Vector2(1, 1), new Vector2(-56, -108), new Vector2(520, 70));
+        var item = Text("Item", safe.transform, body, "", 42, sand, TextAlignmentOptions.BottomRight, new Vector2(1, 0), new Vector2(-48, 400), new Vector2(620, 60));
+
+        // Drift meter above DRIFT: fills through three tiers while sliding, drains while the boost is spent.
+        var meterBack = Plate("BoostMeter", safe.transform, new Vector2(1, 0), new Vector2(-376, 268), new Vector2(224, 24), new Color(Design.Ink900.r, Design.Ink900.g, Design.Ink900.b, 0.75f));
+        var fillRt = Rect("Fill", meterBack, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        fillRt.offsetMin = new Vector2(5, 5); fillRt.offsetMax = new Vector2(-5, -5);
+        var fill = fillRt.gameObject.AddComponent<Image>();
+        fill.sprite = Design.Row;
+        fill.type = Image.Type.Filled; fill.fillMethod = Image.FillMethod.Horizontal; fill.fillAmount = 0f;
+        fill.color = Design.Ember; fill.raycastTarget = false;
+
+        // Pause: top centre, out of both thumbs' way. Back on Android does the same thing.
+        var pauseBtn = IconButton("Pause", safe.transform, "icon_pause", new Vector2(0.5f, 1), new Vector2(0, -20), new Vector2(104, 104));
         var big = Text("Big", safe.transform, display, "3", 240, paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 90), new Vector2(1400, 300));
         big.enabled = false;
-        // Bottom-left, above the steer buttons: stamped under the position readout it read as part of the HUD.
+        // Under the position readout, on its plate. Track name only: the race number is cup state, and a single race has none.
+        Text("Track", safe.transform, body, Tracks.At(Index).name.ToUpperInvariant(), 30,
+             Design.Paper, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(56, -170), new Vector2(700, 40));
         var fps = Text("Fps", safe.transform, body, "", 22, new Color(1, 1, 1, 0.30f), TextAlignmentOptions.BottomLeft, new Vector2(0, 0), new Vector2(52, 300), new Vector2(1200, 34));
 
         var fpsCounter = canvasGo.AddComponent<FpsCounter>();
@@ -512,10 +702,113 @@ public static class TrackSetup
         hudSo.FindProperty("timeLabel").objectReferenceValue = time;
         hudSo.FindProperty("itemLabel").objectReferenceValue = item;
         hudSo.FindProperty("bigLabel").objectReferenceValue = big;
+        hudSo.FindProperty("boostFill").objectReferenceValue = fill;
+        hudSo.FindProperty("itemButton").objectReferenceValue = itemBtn.GetComponent<Image>();
         hudSo.ApplyModifiedPropertiesWithoutUndo();
 
+        // Camera angle: the pill names the current view; tapping it drops a picker with all four, current one lit.
+        var camBtn = TextButton("Cam", safe.transform, "CAM · CHASE", new Color(Design.Ink700.r, Design.Ink700.g, Design.Ink700.b, 0.85f), paper, 28, display,
+                                new Vector2(1, 1), new Vector2(-398, -28), new Vector2(250, 80));
+        var picker = Rect("CamPicker", safe.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-398, -124), new Vector2(250, 4 * 78 + 12));
+        picker.pivot = new Vector2(1, 1);
+        var pickerBack = picker.gameObject.AddComponent<Image>();
+        pickerBack.sprite = Design.Row; pickerBack.type = Image.Type.Sliced; pickerBack.color = new Color(Design.Ink900.r, Design.Ink900.g, Design.Ink900.b, 0.82f); pickerBack.raycastTarget = true;
+        var optionPills = new Image[CameraAngles.Presets.Length];
+        for (int i = 0; i < optionPills.Length; i++)
+        {
+            var opt = TextButton("Cam" + i, picker, CameraAngles.Presets[i].name, Design.Ink700, paper, 30, display,
+                                 new Vector2(0.5f, 1), new Vector2(0, -6 - i * 78), new Vector2(226, 70));
+            optionPills[i] = opt.GetComponent<Image>();
+            if (angles != null) UnityEditor.Events.UnityEventTools.AddIntPersistentListener(opt.onClick, angles.Set, i);
+        }
+        picker.gameObject.SetActive(false);
+        if (angles != null)
+        {
+            UnityEditor.Events.UnityEventTools.AddPersistentListener(camBtn.onClick, angles.Toggle);
+            new SerializedObject(angles).Do(a =>
+            {
+                a.FindProperty("pillLabel").objectReferenceValue = camBtn.GetComponentInChildren<TMP_Text>();
+                a.FindProperty("picker").objectReferenceValue = picker.gameObject;
+                Fill(a.FindProperty("optionPills"), optionPills.Cast<Object>().ToArray());
+                a.FindProperty("accent").colorValue = Design.Ember;
+                a.FindProperty("idle").colorValue = Design.Ink700;
+            });
+        }
+
+        // Minimap under the lap plate: the circuit line with everyone on it, you as your face.
+        var mapPlate = Plate("MapPlate", safe.transform, new Vector2(1, 1), new Vector2(-32, -196), new Vector2(236, 236), deep);
+        var mapRt = Rect("Map", mapPlate, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        mapRt.offsetMin = new Vector2(8, 8); mapRt.offsetMax = new Vector2(-8, -8);
+        var mapImg = mapRt.gameObject.AddComponent<Image>();
+        mapImg.sprite = mapSprite; mapImg.preserveAspect = true; mapImg.raycastTarget = false;
+        var mini = mapRt.gameObject.AddComponent<Minimap>();
+        var portraitFiles = Directory.Exists(PortraitSetup.Dir) ? Directory.GetFiles(PortraitSetup.Dir, "*.png").OrderBy(f => f).ToArray() : new string[0];
+        new SerializedObject(mini).Do(m =>
+        {
+            m.FindProperty("map").objectReferenceValue = mapRt;
+            m.FindProperty("worldMin").vector2Value = mapMin;
+            m.FindProperty("worldSize").floatValue = mapSize;
+            m.FindProperty("roster").objectReferenceValue = Roster();
+            m.FindProperty("dot").objectReferenceValue = Design.Pill;
+            Fill(m.FindProperty("portraits"), portraitFiles.Select(f => (Object)AssetDatabase.LoadAssetAtPath<Sprite>(f)).ToArray());
+            var ids = m.FindProperty("portraitIds"); ids.arraySize = portraitFiles.Length;
+            for (int i = 0; i < portraitFiles.Length; i++) ids.GetArrayElementAtIndex(i).stringValue = Path.GetFileNameWithoutExtension(portraitFiles[i]);
+        });
+
         Results(safe.transform, display, body, paper, sand);
+        Pause(safe.transform, display, paper, pauseBtn);   // last: it must draw over the results card too
         return canvasGo;
+    }
+
+    /// Pause overlay: resume is the one accent, restart and quit are neutral.
+    static void Pause(Transform parent, TMP_FontAsset display, Color paper, UnityEngine.UI.Button pauseBtn)
+    {
+        var slate = Design.Ink700;
+        var dim = Rect("PauseOverlay", parent, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(600, 600));
+        dim.gameObject.AddComponent<Image>().color = new Color(Design.Ink900.r, Design.Ink900.g, Design.Ink900.b, 0.74f);
+        var card = Rect("Card", dim, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(920, 560));
+        Design.AsCard(card, Design.Ink800);
+        Text("Headline", card, display, "PAUSED", 82, Design.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -50), new Vector2(800, 100));
+
+        var menu = new GameObject("PauseMenu").AddComponent<PauseMenu>();
+        var resume = TextButton("Resume", card, "RESUME", Design.Ember, paper, 48, display, new Vector2(0.5f, 0), new Vector2(0, 244), new Vector2(580, 124));
+        var restart = TextButton("Restart", card, "RESTART", slate, paper, 38, display, new Vector2(0.5f, 0), new Vector2(-152, 80), new Vector2(276, 112));
+        var quit = TextButton("Quit", card, "QUIT", slate, paper, 38, display, new Vector2(0.5f, 0), new Vector2(152, 80), new Vector2(276, 112));
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(resume.onClick, menu.Resume);
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(restart.onClick, menu.Restart);
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(quit.onClick, menu.Quit);
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(pauseBtn.onClick, menu.Toggle);
+
+        var so = new SerializedObject(menu);
+        so.FindProperty("overlay").objectReferenceValue = dim.gameObject;
+        so.FindProperty("restartButton").objectReferenceValue = restart.gameObject;   // hidden online: a room has no restart
+        var hide = so.FindProperty("hideWhilePaused");
+        hide.arraySize = 1; hide.GetArrayElementAtIndex(0).objectReferenceValue = pauseBtn.gameObject;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        dim.gameObject.SetActive(false);
+    }
+
+    static RectTransform Plate(string name, Transform parent, Vector2 anchor, Vector2 offset, Vector2 dims, Color colour)
+    {
+        var rt = Rect(name, parent, anchor, anchor, offset, dims);
+        rt.pivot = anchor;
+        var img = Design.AsRow(rt, colour);
+        img.raycastTarget = false;
+        return rt;
+    }
+
+    static UnityEngine.UI.Button IconButton(string name, Transform parent, string icon, Vector2 anchor, Vector2 offset, Vector2 dims)
+    {
+        var rt = Rect(name, parent, anchor, anchor, offset, dims);
+        rt.pivot = anchor;
+        Design.AsPill(rt, new Color(Design.Ink700.r, Design.Ink700.g, Design.Ink700.b, 0.85f));
+        var button = rt.gameObject.AddComponent<UnityEngine.UI.Button>();
+        rt.gameObject.AddComponent<PressFeel>();
+        var glyph = Rect(name + "Icon", rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, dims * 0.42f);
+        var g = glyph.gameObject.AddComponent<Image>();
+        g.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(Art + $"Textures/UI/Icons/{icon}.png");
+        g.color = Design.Paper; g.raycastTarget = false;
+        return button;
     }
 
     /// End-of-race card: order, times, and the two things you can do next.
@@ -525,46 +818,45 @@ public static class TrackSetup
         var screen = Rect("Results", parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
         // The dim and the card switch on together; leaving the dim on the always-active root greyed out the race.
-        var dim = Rect("Dim", screen, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-        dim.gameObject.AddComponent<Image>().color = new Color(0.02f, 0.06f, 0.09f, 0.72f);
+        // Overhang the safe area (see MenuSetup): a dim that stops at the cutout leaves a bright live strip of track.
+        var dim = Rect("Dim", screen, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(600, 600));
+        dim.gameObject.AddComponent<Image>().color = new Color(Design.Ink900.r, Design.Ink900.g, Design.Ink900.b, 0.74f);
 
-        var card = Rect("Card", dim, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1180, 860));
-        var panel = card.gameObject.AddComponent<Image>();
-        panel.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(Art + "Textures/UI/Kit/blue_button_rectangle_flat.png");
-        panel.type = Image.Type.Sliced;
-        panel.pixelsPerUnitMultiplier = 0.55f;
-        panel.color = new Color(0.071f, 0.227f, 0.282f, 0.97f);
+        var card = Rect("Card", dim, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1220, 840));
+        Design.AsCard(card, Design.Ink800);
 
-        var headline = Text("Headline", card, display, "FINISH", 100, sand, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -60), new Vector2(1000, 120));
-        var table = Text("Table", card, body, "", 44, paper, TextAlignmentOptions.TopLeft, new Vector2(0.5f, 1), new Vector2(0, -200), new Vector2(880, 420));
-        var status = Text("Status", card, body, "", 38, new Color(1, 1, 1, 0.7f), TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 230), new Vector2(900, 60));
+        var headline = Text("Headline", card, display, "FINISH", 104, Design.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -52), new Vector2(1000, 124));
+        var table = Text("Table", card, body, "", 44, paper, TextAlignmentOptions.TopLeft, new Vector2(0.5f, 1), new Vector2(0, -196), new Vector2(940, 420));
+        var status = Text("Status", card, body, "", 36, Design.Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 228), new Vector2(900, 60));
 
-        var again = TextButton("Again", card, "RACE AGAIN", "red_button_rectangle_depth_gradient", new Color(0.937f, 0.416f, 0.294f), paper, 46, display, new Vector2(0.5f, 0), new Vector2(-270, 90), new Vector2(480, 120));
-        var menu = TextButton("Menu", card, "MENU", "grey_button_rectangle_depth_flat", new Color(0.24f, 0.31f, 0.35f), paper, 46, display, new Vector2(0.5f, 0), new Vector2(270, 90), new Vector2(480, 120));
-        UnityEditor.Events.UnityEventTools.AddPersistentListener(again.onClick, flow.Restart);
-        UnityEditor.Events.UnityEventTools.AddPersistentListener(menu.onClick, flow.BackToMenu);
+        var again = TextButton("Again", card, "NEXT RACE", Design.Ember, paper, 46, display, new Vector2(0.5f, 0), new Vector2(276, 80), new Vector2(500, 124));
+        var menu = TextButton("Menu", card, "QUIT CUP", Design.Ink700, paper, 46, display, new Vector2(0.5f, 0), new Vector2(-276, 80), new Vector2(500, 124));
 
         var results = screen.gameObject.AddComponent<ResultsPanel>();
+        // Both labels are rewritten at runtime: mid-cup they read NEXT RACE / QUIT CUP, after the last race NEW CUP / MENU.
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(again.onClick, results.Primary);
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(menu.onClick, results.Secondary);
+
         var so = new SerializedObject(results);
         so.FindProperty("panel").objectReferenceValue = dim.gameObject;
         so.FindProperty("headline").objectReferenceValue = headline;
         so.FindProperty("table").objectReferenceValue = table;
         so.FindProperty("status").objectReferenceValue = status;
+        so.FindProperty("primaryLabel").objectReferenceValue = again.GetComponentInChildren<TMP_Text>();
+        so.FindProperty("secondaryLabel").objectReferenceValue = menu.GetComponentInChildren<TMP_Text>();
+        so.FindProperty("roster").objectReferenceValue = Roster();
         so.ApplyModifiedPropertiesWithoutUndo();
         screen.gameObject.SetActive(true);
         dim.gameObject.SetActive(false);
     }
 
-    static void Button(string name, Transform parent, InputManager input, HoldButton.Control control, string sprite, Color tint, Vector2 anchor, Vector2 offset, Vector2 dims, string caption, TMP_FontAsset font, SteerButtons steering = null, string icon = null)
+    static UnityEngine.UI.Image Button(string name, Transform parent, InputManager input, HoldButton.Control control, Color tint, Vector2 anchor, Vector2 offset, Vector2 dims, string caption, TMP_FontAsset font, SteerButtons steering = null, string icon = null)
     {
         var rt = Rect(name, parent, anchor, anchor, offset, dims);
         rt.pivot = anchor;
-        var img = rt.gameObject.AddComponent<Image>();
-        img.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(Art + $"Textures/UI/Kit/{sprite}.png");
-        img.type = Image.Type.Sliced;
-        img.pixelsPerUnitMultiplier = 0.55f;
-        img.color = new Color(tint.r, tint.g, tint.b, 0.82f);
+        var img = Design.AsPill(rt, new Color(tint.r, tint.g, tint.b, 0.88f));
         var group = rt.gameObject.AddComponent<CanvasGroup>();
+        rt.gameObject.AddComponent<PressFeel>();
         var hold = rt.gameObject.AddComponent<HoldButton>();
         var so = new SerializedObject(hold);
         so.FindProperty("control").enumValueIndex = (int)control;
@@ -578,26 +870,24 @@ public static class TrackSetup
             var glyph = Rect(name + "Icon", rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(110, 110));
             var img2 = glyph.gameObject.AddComponent<Image>();
             img2.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(Art + $"Textures/UI/Kit/{icon}.png");
-            img2.color = new Color(1, 1, 1, 0.92f);
+            img2.color = Design.Paper;
             img2.raycastTarget = false;
-            return;
+            return img;
         }
 
-        var label = Text(name + "Text", rt, font, caption, 40, new Color(1, 1, 1, 0.92f), TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, dims);
+        var label = Text(name + "Text", rt, font, caption, 44, Design.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, dims);
         label.rectTransform.anchorMin = Vector2.zero; label.rectTransform.anchorMax = Vector2.one;
-        label.rectTransform.offsetMin = Vector2.zero; label.rectTransform.offsetMax = Vector2.zero;
+        label.rectTransform.offsetMin = Vector2.zero; label.rectTransform.offsetMax = new Vector2(0, -4);
+        return img;
     }
 
-    static UnityEngine.UI.Button TextButton(string name, Transform parent, string caption, string sprite, Color tint, Color textColour, float size, TMP_FontAsset font, Vector2 anchor, Vector2 offset, Vector2 dims)
+    static UnityEngine.UI.Button TextButton(string name, Transform parent, string caption, Color tint, Color textColour, float size, TMP_FontAsset font, Vector2 anchor, Vector2 offset, Vector2 dims)
     {
         var rt = Rect(name, parent, anchor, anchor, offset, dims);
         rt.pivot = anchor;
-        var img = rt.gameObject.AddComponent<Image>();
-        img.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(Art + $"Textures/UI/Kit/{sprite}.png");
-        img.type = Image.Type.Sliced;
-        img.pixelsPerUnitMultiplier = 0.55f;
-        img.color = tint;
+        Design.AsPill(rt, tint);
         var button = rt.gameObject.AddComponent<UnityEngine.UI.Button>();
+        rt.gameObject.AddComponent<PressFeel>();
         var label = Text(name + "Label", rt, font, caption, size, textColour, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, dims);
         label.rectTransform.anchorMin = Vector2.zero; label.rectTransform.anchorMax = Vector2.one;
         label.rectTransform.offsetMin = Vector2.zero; label.rectTransform.offsetMax = new Vector2(0, -4);
@@ -649,16 +939,77 @@ public static class TrackSetup
         foreach (var r in visual.GetComponentsInChildren<MeshRenderer>()) r.sharedMaterial = mat;
     }
 
-    static GameObject Place(Transform parent, string fbxPath, Material mat, Vector3 pos, float yaw, float scale)
+    /// What a prop does when a kart reaches it.
+    ///   None   flat ground decals, distant scenery and marker flags — nothing a kart should ever feel
+    ///   Solid  rocks, crates, wreck, tower: a static box you bounce off
+    ///   Trunk  palms: a slim capsule around the trunk, so you hit the tree and not its canopy
+    ///   Loose  cones: a light rigidbody that scatters when clipped
+    enum Solid { None, Solid, Trunk, Loose }
+
+    static readonly HashSet<string> missing = new();
+
+    static GameObject Place(Transform parent, string fbxPath, Material mat, Vector3 pos, float yaw, float scale,
+                            Solid solid = Solid.None, float tilt = 0f)
     {
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(fbxPath);
-        if (prefab == null) { Debug.LogWarning("[track] missing " + fbxPath); return new GameObject("missing"); }
+        if (prefab == null)
+        {
+            if (missing.Add(fbxPath)) Debug.LogWarning("[track] missing " + fbxPath);   // once per prop, not once per placement
+            return new GameObject("missing") { transform = { parent = parent } };
+        }
         var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
-        go.transform.SetPositionAndRotation(pos, Quaternion.Euler(0, yaw, 0));
+        go.transform.SetPositionAndRotation(pos, Quaternion.Euler(tilt * 0.6f, yaw, tilt));
         go.transform.localScale = Vector3.one * scale;
-        foreach (var r in go.GetComponentsInChildren<MeshRenderer>()) r.sharedMaterial = mat;
-        GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
+        // Nature and Racing carry their own per-material colours: a null mat leaves them alone.
+        if (mat != null) foreach (var r in go.GetComponentsInChildren<MeshRenderer>()) r.sharedMaterial = mat;
+        if (solid != Solid.None) Collide(go, solid);
+        Count(go);
+        // A loose prop has to move, so it cannot be batched into the static geometry.
+        if (solid != Solid.Loose) GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
         return go;
+    }
+
+    /// Colliders come off each mesh's own local bounds, so they fit the art at any scale or rotation.
+    static void Collide(GameObject go, Solid solid)
+    {
+        foreach (var mf in go.GetComponentsInChildren<MeshFilter>())
+        {
+            var mesh = mf.sharedMesh;
+            if (mesh == null) continue;
+            var b = mesh.bounds;
+
+            if (solid == Solid.Trunk)
+            {
+                // Palms are mostly canopy. A box would make a 6 m wall out of leaves, so wrap the trunk only.
+                var cap = mf.gameObject.AddComponent<CapsuleCollider>();
+                cap.direction = 1;
+                cap.center = new Vector3(b.center.x, b.center.y, b.center.z);
+                cap.height = b.size.y;
+                cap.radius = Mathf.Max(0.12f, Mathf.Min(b.size.x, b.size.z) * 0.16f);
+                continue;
+            }
+
+            var box = mf.gameObject.AddComponent<BoxCollider>();
+            box.center = b.center;
+            box.size = new Vector3(b.size.x * 0.85f, b.size.y, b.size.z * 0.85f);   // slightly inside the art
+        }
+
+        if (solid != Solid.Loose) return;
+        var rb = go.AddComponent<Rigidbody>();
+        rb.mass = 2.5f;
+        rb.linearDamping = 0.6f; rb.angularDamping = 0.8f;
+        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        rb.sleepThreshold = 0.05f;                      // sits asleep until something actually hits it
+    }
+
+    /// Slide a solid prop outward until its own bulk clears the kerb, so a collider never eats the racing line.
+    static void PushClear(GameObject go, Vector3 trackPoint, Vector3 rightVec, float side, float clearance)
+    {
+        var b = Bounds(go);
+        float radius = Mathf.Max(b.extents.x, b.extents.z);
+        float outward = Vector3.Dot(go.transform.position - trackPoint, rightVec) * side;
+        float need = clearance + radius;
+        if (outward < need) go.transform.position += rightVec * (side * (need - outward));
     }
 
     static Material LoadOrCreate(string path, Shader s, Color tint)
