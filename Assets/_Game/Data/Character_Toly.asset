@@ -15,7 +15,7 @@ MonoBehaviour:
   displayName: Toly
   kartId: oodi
   driverId: Toly
-  tint: {r: 1, g: 1, b: 1, a: 1}
+  tint: {r: 0.62, g: 0.35, b: 0.95, a: 1}
   speed: 1
   accel: 0
   handling: 0

@@ -33,13 +33,16 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _ShoreRadius: 420
+    - _ShoreWidth: 30
     - _WaveFreq: 0.6
     - _WaveHeight: 0.05
     - _WaveSpeed: 1.2
     m_Colors:
-    - _DeepColor: {r: 0.049999982, g: 0.41999996, b: 0.54999995, a: 1}
-    - _Edge: {r: 0.2, g: 0.8, b: 0, a: 0}
-    - _ShallowColor: {r: 0.45, g: 0.85, b: 0.85, a: 1}
+    - _DeepColor: {r: 0.02, g: 0.3, b: 0.52, a: 1}
+    - _Edge: {r: 0.18, g: 0.72, b: 0, a: 0}
+    - _ShallowColor: {r: 0.16, g: 0.78, b: 0.8, a: 1}
+    - _ShoreWobble: {r: 16, g: 0.03, b: 0.45, a: 0}
     - _SpeedA: {r: 0.02, g: 0.03, b: 0, a: 0}
     - _SpeedB: {r: -0.03, g: 0.01, b: 0, a: 0}
   m_BuildTextureStacks: []

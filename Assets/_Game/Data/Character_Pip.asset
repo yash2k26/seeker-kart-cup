@@ -15,7 +15,7 @@ MonoBehaviour:
   displayName: Pip
   kartId: oodi
   driverId: Pip
-  tint: {r: 1, g: 1, b: 1, a: 1}
+  tint: {r: 1, g: 0.8, b: 0.18, a: 1}
   speed: -1
   accel: -1
   handling: 0

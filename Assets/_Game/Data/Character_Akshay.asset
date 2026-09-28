@@ -15,7 +15,7 @@ MonoBehaviour:
   displayName: Akshay
   kartId: oobi
   driverId: Akshay
-  tint: {r: 1, g: 1, b: 1, a: 1}
+  tint: {r: 0.18, g: 0.74, b: 0.98, a: 1}
   speed: 2
   accel: -1
   handling: -1

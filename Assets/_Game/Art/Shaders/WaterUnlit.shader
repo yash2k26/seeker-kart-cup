@@ -13,6 +13,9 @@ Shader "KartCup/Water Unlit"
         _WaveHeight ("Wave height", Float) = 0.05
         _WaveFreq ("Wave frequency", Float) = 0.6
         _WaveSpeed ("Wave speed", Float) = 1.2
+        _ShoreRadius ("Shore radius", Float) = 250
+        _ShoreWidth ("Shore foam width", Float) = 26
+        _ShoreWobble ("Shore wobble (amp,freq,speed)", Vector) = (14, 0.035, 0.5, 0)
     }
     SubShader
     {
@@ -32,11 +35,12 @@ Shader "KartCup/Water Unlit"
             CBUFFER_START(UnityPerMaterial)
                 float4 _WaterA_ST, _WaterB_ST, _SpeedA, _SpeedB, _Edge;
                 half4 _DeepColor, _ShallowColor;
-                float _WaveHeight, _WaveFreq, _WaveSpeed;
+                float _WaveHeight, _WaveFreq, _WaveSpeed, _ShoreRadius, _ShoreWidth;
+                float4 _ShoreWobble;
             CBUFFER_END
 
             struct A { float4 positionOS : POSITION; float2 uv : TEXCOORD0; float4 color : COLOR; };
-            struct V { float4 positionCS : SV_POSITION; float2 uvA : TEXCOORD0; float2 uvB : TEXCOORD1; half foam : TEXCOORD2; half fog : TEXCOORD3; };
+            struct V { float4 positionCS : SV_POSITION; float2 uvA : TEXCOORD0; float2 uvB : TEXCOORD1; half foam : TEXCOORD2; half fog : TEXCOORD3; half shore : TEXCOORD4; };
 
             V vert (A i)
             {
@@ -48,6 +52,14 @@ Shader "KartCup/Water Unlit"
                 o.uvA = TRANSFORM_TEX(i.uv, _WaterA) + _SpeedA.xy * _Time.y;
                 o.uvB = TRANSFORM_TEX(i.uv, _WaterB) + _SpeedB.xy * _Time.y;
                 o.foam = i.color.r;                           // paint shoreline vertices white in Blender = foam, no depth needed
+
+                // Shore foam without a depth texture: the island is centred on the origin, so a wobbling radial band
+                // at its edge reads as surf breaking on the beach. A Unity primitive plane has no vertex colours to
+                // paint, which is why the foam above was always zero.
+                float3 w = TransformObjectToWorld(p);
+                float ring = length(w.xz);
+                float wobble = sin(atan2(w.z, w.x) * (_ShoreWobble.y * 100.0) + _Time.y * _ShoreWobble.z) * _ShoreWobble.x;
+                o.shore = saturate(1.0 - abs(ring - (_ShoreRadius + wobble)) / max(1.0, _ShoreWidth));
                 o.fog = ComputeFogFactor(o.positionCS.z);
                 return o;
             }
@@ -59,6 +71,9 @@ Shader "KartCup/Water Unlit"
                 half bands = smoothstep(_Edge.x, _Edge.y, a * b);
                 half3 c = lerp(_DeepColor.rgb, _ShallowColor.rgb, bands);
                 c = lerp(c, 1.0h, i.foam * step(0.6h, a * b));
+                // Surf: brightest right at the sand, breaking up into the caustic bands as it runs out to sea.
+                half surf = i.shore * i.shore;
+                c = lerp(c, half3(0.92h, 0.98h, 1.0h), saturate(surf * (0.55h + 0.45h * bands)));
                 c = MixFog(c, i.fog);
                 return half4(c, 1);
             }
