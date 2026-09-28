@@ -12,8 +12,17 @@ EditorBuildSettings:
     path: Assets/_Game/Scenes/Gate.unity
     guid: 4af73d83a70994d819b9996fd6f5448a
   - enabled: 1
-    path: Assets/_Game/Scenes/Race.unity
-    guid: e9213320317474e7cb1ddf0c95290d31
+    path: Assets/_Game/Scenes/Race1.unity
+    guid: fc446021ff5044a6bb64c7eb0c403fcf
+  - enabled: 1
+    path: Assets/_Game/Scenes/Race2.unity
+    guid: 2813e3113729a421ab30a7702db809ac
+  - enabled: 1
+    path: Assets/_Game/Scenes/Race3.unity
+    guid: 1d04f1a00c120467e8934d38a82cfc52
+  - enabled: 1
+    path: Assets/_Game/Scenes/Race4.unity
+    guid: c4e3a4856027c45b1b7eb5a8b04ced03
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0
