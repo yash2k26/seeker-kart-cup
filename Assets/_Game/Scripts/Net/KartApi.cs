@@ -39,6 +39,34 @@ namespace KartCup
         [Serializable] public class RaceFinish { public bool accepted, isPersonalBest; public string raceId, memo, error; }
         [Serializable] public class Board { public string track; public List<Entry> entries = new(); }
         [Serializable] public class Entry { public int rank; public string wallet, name, memoSig; public bool isSeeker; public int bestMs; }
+        [Serializable] public class RoomCreated { public string code, url; }
+        [Serializable] public class PublicRoom { public string code, host, fee, currency; public int players, maxPlayers; public List<string> tracks = new(); public long createdAt; }
+        [Serializable] public class PublicRooms { public List<PublicRoom> rooms = new(); }
+        [Serializable] public class ShopItem { public string sku, kind, name, blurb; public double usd; public bool skrOnly, onSale = true; public List<string> grants; public Dictionary<string, string> price = new(); }
+        [Serializable] public class ConfigDto
+        {
+            public string treasuryOwner, treasuryAta, skrMint;
+            public bool paidRooms; public int cutBps, hostShareBps, minPaidPlayers, maxPlayers;
+            public Dictionary<string, double> usd = new();             // currency -> USD rate ("source" key is absent here)
+            public Dictionary<string, List<string>> fees = new();      // currency -> base-unit tiers
+            public Dictionary<string, List<int>> splits = new();       // paid players -> % per place
+            public List<ShopItem> catalog = new();
+            public ShopItem Item(string sku) => catalog.Find(i => i.sku == sku);
+            public bool CanPay => !string.IsNullOrEmpty(treasuryOwner);
+        }
+
+        /// The Worker's live config (treasury, fee tiers, prices): fetched once per session, never compiled into the APK.
+        public static ConfigDto Cfg { get; private set; }
+        public static async Awaitable<ConfigDto> Config()
+        {
+            if (Cfg != null) return Cfg;
+            try { Cfg = await Get<ConfigDto>("/v1/config"); }
+            catch (Exception e) { Debug.LogWarning("[api] config: " + e.Message); }
+            return Cfg;
+        }
+        public static Awaitable<RoomCreated> CreateRoom(List<string> tracks, string fee, string currency, bool isPublic)
+            => Post<RoomCreated>("/v1/rooms", new { tracks, fee, currency, device = DeviceId, isPublic });
+        public static Awaitable<PublicRooms> OpenRooms() => Get<PublicRooms>("/v1/rooms/public");
 
         public static Awaitable<SiwsPayload> Challenge() => Post<SiwsPayload>("/v1/auth/challenge", new { });
 
@@ -65,7 +93,7 @@ namespace KartCup
         public static Awaitable<Profile> Me() => Get<Profile>("/v1/me");
         public static Awaitable<object> DeleteMe() => Send<object>("DELETE", "/v1/me", null);
         public static Awaitable<object> ConfirmTx(string signature, string raceId) => Post<object>("/v1/tx/confirm", new { signature, raceId });
-        public static Awaitable<object> VerifyPurchase(string signature, string sku, string orderId) => Post<object>("/v1/purchase/verify", new { signature, sku, orderId });
+        public static Awaitable<object> VerifyPurchase(string signature, string sku, string orderId, string currency) => Post<object>("/v1/purchase/verify", new { signature, sku, orderId, currency });
 
         public static void Event(string name, object props = null)
         {

@@ -21,10 +21,20 @@ namespace KartCup
         readonly List<int> lapMs = new(), checkpointMs = new();
         float raceStart, lapStart;
 
-        void Awake() => Instance = this;
+        void Awake()
+        {
+            // The claim path runs from the Menu (WalletFlow.Login -> ClaimAfterLogin), so this cannot die with the Race
+            // scene or a guest's finished race can never be bound to a wallet. BeginRace clears per-race state, so reuse is safe.
+            if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+        }
 
         public async void BeginRace()
         {
+            // This object outlives the race scene, so the serialized id is only ever the first scene's; the cup knows
+            // which track is actually loaded. Without this every later race scored on the beach board.
+            if (Cup.Active) trackId = Cup.TrackId;
             lapMs.Clear(); checkpointMs.Clear(); Finished = false; PbMemo = null;
             raceStart = lapStart = Time.time;
             KartApi.Event("race_start", new { trackId });

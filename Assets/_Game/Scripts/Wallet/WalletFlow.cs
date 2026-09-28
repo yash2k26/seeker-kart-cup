@@ -12,15 +12,17 @@ using UnityEngine.Events;
 
 namespace KartCup
 {
-    /// The three wallet-only beats: Seed Vault sign-in (SIWS), a mainnet Memo on a personal best, an SKR paint job.
-    /// Rules from research/14: one MWA op at a time (debounce), prompts only from menus, rent guard before any tx,
-    /// mainnet from day one, silent reconnect via cached auth token + our HMAC session.
+    /// Every wallet beat: Seed Vault sign-in (SIWS), a mainnet Memo on a personal best, and one payment path that
+    /// the shop and the tournament entry both use (SOL or SKR to the treasury, plus a memo the Worker verifies).
+    /// Rules from research/14: one MWA op at a time, prompts only from menus, rent guard before any tx, mainnet from
+    /// day one, silent reconnect via cached auth token + our HMAC session. Treasury addresses come from /v1/config,
+    /// never from the APK.
     public sealed class WalletFlow : MonoBehaviour
     {
         public static WalletFlow Instance { get; private set; }
+        /// Fires on sign-in, sign-out and after a purchase: the garage and the lobby redraw from it.
+        public static event Action<KartApi.Profile> ProfileChanged;
 
-        [SerializeField] string skrMint = "SKRbvo6Gf7GondiT3BbTfuRDPqLWei4j2Qy2NPGZhW3";
-        [SerializeField] string treasuryOwner = "";           // TODO: treasury wallet (owner); its SKR ATA is pre-created once
         [SerializeField] long minLamportsForTx = 1_000_000;   // rent floor is ~650k after SIMD-0437; Seed Vault injects ComputeBudget ixs
         [SerializeField] UnityEvent<string> onStatus = new();         // UI text
         [SerializeField] UnityEvent<KartApi.Profile> onLoggedIn = new();
@@ -28,30 +30,42 @@ namespace KartCup
         public KartApi.Profile Profile { get; private set; }
         public bool Busy { get; private set; }
         public bool Connected => Web3.Wallet?.Account != null;
+        public bool SignedIn => Connected && KartApi.HasSession;
+        public string LastStatus { get; private set; }
 
         void Awake() => Instance = this;
 
         async void Start()
         {
+            _ = KartApi.Config();   // treasury + prices, warmed early so the first shop tap does not wait on it
             // Returning player: silent reconnect (no prompt) + our session; no probe with Login() when nothing is cached.
             try
             {
                 if (await MwaSession.HasCachedSession() && KartApi.HasSession)
                 {
                     await Web3.Instance.LoginWalletAdapter();
-                    Profile = await KartApi.Me();
+                    SetProfile(await KartApi.Me());
                     Status(Profile.skrName ?? Short(Profile.wallet));   // label otherwise stays "Not connected" after a silent reconnect
-                    onLoggedIn?.Invoke(Profile);
                     KartApi.Event("wallet_reconnect");
                 }
             }
             catch (Exception e) { Debug.LogWarning("[wallet] silent reconnect skipped: " + e.Message); }
         }
 
-        /// Button: "Save to leaderboard" / "Connect". One prompt: connect + Sign-In-With-Solana.
-        public async void Login()
+        void SetProfile(KartApi.Profile p)
         {
-            if (Busy) return; Busy = true;
+            Profile = p;
+            if (p != null) Unlocks.Set(p.unlocks); else Unlocks.Clear();
+            onLoggedIn?.Invoke(p);
+            ProfileChanged?.Invoke(p);
+        }
+
+        /// Button: "Save to leaderboard" / "Sign in". One prompt: connect + Sign-In-With-Solana.
+        public void Login() { if (!Busy) _ = LoginAsync(); }
+
+        public async Awaitable<bool> LoginAsync()
+        {
+            bool outer = Busy; Busy = true;
             try
             {
                 Status("Opening wallet…");
@@ -61,31 +75,33 @@ namespace KartCup
                     Domain = c.domain, Uri = c.uri, Statement = c.statement, Nonce = c.nonce,
                     IssuedAt = c.issuedAt, ExpirationTime = c.expirationTime, Version = c.version, ChainId = c.chainId,
                 });
-                if (account == null) { Status("Cancelled"); return; }
+                if (account == null) { Status("Cancelled"); return false; }
 
+                KartApi.Profile profile;
                 if (siws != null && !string.IsNullOrEmpty(siws.Signature))
-                    Profile = await KartApi.VerifySiws(c.nonce, siws.Address, siws.SignedMessage, siws.Signature);
+                    profile = await KartApi.VerifySiws(c.nonce, siws.Address, siws.SignedMessage, siws.Signature);
                 else
                 {
                     // Wallet without native SIWS: SignMessage returns message||signature; the Worker checks the last 64 bytes.
                     var msg = Encoding.UTF8.GetBytes($"{c.domain} wants you to sign in with your Solana account:\n{account.PublicKey}\n\n{c.statement}\n\nNonce: {c.nonce}");
                     var payload = await Web3.Wallet.SignMessage(msg);
-                    Profile = await KartApi.VerifySignedMessage(c.nonce, account.PublicKey.Key, payload);
+                    profile = await KartApi.VerifySignedMessage(c.nonce, account.PublicKey.Key, payload);
                 }
+                SetProfile(profile);
                 Status(Profile.skrName ?? Short(Profile.wallet));
-                onLoggedIn?.Invoke(Profile);
                 KartApi.Event("wallet_login", new { seeker = Profile.isSeeker });
                 if (RaceSession.Instance != null) await RaceSession.Instance.ClaimAfterLogin();
+                return true;
             }
-            catch (OperationInFlightException) { /* debounced; should not happen */ }
-            catch (Exception e) { Debug.LogWarning("[wallet] login failed: " + e); Status("Sign-in failed. Try again."); }
-            finally { Busy = false; }
+            catch (OperationInFlightException) { return false; }   // debounced; should not happen
+            catch (Exception e) { Debug.LogWarning("[wallet] login failed: " + e); Status("Sign-in failed. Try again."); return false; }
+            finally { Busy = outer; }
         }
 
         public async void Logout()
         {
             try { await Web3.Instance.DisconnectWalletAdapter(); } catch { }
-            KartApi.SessionToken = ""; Profile = null; Status("Not connected");
+            KartApi.SessionToken = ""; SetProfile(null); Status("Not connected");
         }
 
         /// Results screen, only when the server said isPersonalBest: one mainnet Memo the player signs.
@@ -96,7 +112,7 @@ namespace KartCup
             Busy = true;
             try
             {
-                if (!await HasFunds()) { Status("Add a little SOL (≥0.001) to record on-chain"); return; }
+                if (!await HasSol(0)) { Status("Add a little SOL (≥0.001) to record on-chain"); return; }
                 var tx = await BuildTx();
                 tx.Add(MemoProgram.NewMemoV2(memo, Web3.Wallet.Account.PublicKey));
                 var sig = await SignAndSend(tx);
@@ -109,46 +125,96 @@ namespace KartCup
             finally { Busy = false; }
         }
 
-        /// Garage: fixed-price paint job paid in SKR (legacy SPL token, 6 decimals) + memo, verified by the Worker.
-        public async void BuyPaint(string sku, ulong priceBaseUnits)
+        // ---- the one payment path ----
+
+        /// A transfer of `amount` base units of SOL or SKR to the treasury with `memo`, signed in the wallet.
+        /// Returns the signature, or null when nothing was sent (declined, no funds, offline). Signs the player in first if needed.
+        public async Awaitable<string> Pay(string memo, ulong amount, string currency, string what)
         {
-            if (Busy || !Connected) return;
+            if (Busy) return null;
             Busy = true;
             try
             {
-                if (!await HasFunds()) { Status("Add a little SOL for the network fee"); return; }
+                var cfg = await KartApi.Config();
+                if (cfg == null || !cfg.CanPay) { Status("Payments are offline right now"); return null; }
+                if (!SignedIn && !await LoginAsync()) return null;
                 var me = Web3.Wallet.Account.PublicKey;
-                var mint = new PublicKey(skrMint);
-                var treasury = new PublicKey(treasuryOwner);
-                var src = AssociatedTokenAccountProgram.DeriveAssociatedTokenAccount(me, mint);
-                var dst = AssociatedTokenAccountProgram.DeriveAssociatedTokenAccount(treasury, mint);
-                var orderId = Guid.NewGuid().ToString("N").Substring(0, 12);
-
                 var tx = await BuildTx();
-                tx.Add(TokenProgram.TransferChecked(src, dst, priceBaseUnits, 6, me, mint));
-                tx.Add(MemoProgram.NewMemoV2($"kc:buy:{sku}:{orderId}", me));
-                var sig = await SignAndSend(tx);
-                if (sig == null) return;
-                Status("Verifying…");
-                for (int i = 0; i < 6; i++)
+                if (currency == "SOL")
                 {
-                    try { await KartApi.VerifyPurchase(sig, sku, orderId); break; }
-                    catch (KartApi.ApiException ex) when (ex.Status == 202) { await Awaitable.WaitForSecondsAsync(2f); }
+                    if (!await HasSol(amount)) { Status("Not enough SOL for this"); return null; }
+                    tx.Add(SystemProgram.Transfer(me, new PublicKey(cfg.treasuryOwner), amount));
                 }
-                Profile = await KartApi.Me();
-                onLoggedIn?.Invoke(Profile);
-                Status("Paint unlocked ✓");
-                KartApi.Event("paint_bought", new { sku, sig });
+                else
+                {
+                    if (!await HasSol(0)) { Status("Add a little SOL for the network fee"); return null; }
+                    if (!await HasSkr(cfg.skrMint, amount)) { Status("Not enough SKR for this"); return null; }
+                    var mint = new PublicKey(cfg.skrMint);
+                    var src = AssociatedTokenAccountProgram.DeriveAssociatedTokenAccount(me, mint);
+                    tx.Add(TokenProgram.TransferChecked(src, new PublicKey(cfg.treasuryAta), amount, 6, me, mint));
+                }
+                tx.Add(MemoProgram.NewMemoV2(memo, me));
+                var sig = await SignAndSend(tx);
+                if (sig != null) KartApi.Event("pay", new { what, currency, amount, sig });
+                return sig;
             }
-            catch (Exception e) { Debug.LogWarning("[wallet] purchase failed: " + e); Status("Purchase failed. Nothing was charged unless the wallet showed success."); }
+            catch (Exception e) { Debug.LogWarning("[wallet] payment failed: " + e); Status("Payment failed. Nothing was charged unless the wallet showed success."); return null; }
             finally { Busy = false; }
         }
 
+        /// Shop: pay the catalog price, let the Worker verify it landed, refresh what we own.
+        public async Awaitable<bool> Buy(string sku, string currency)
+        {
+            var cfg = await KartApi.Config();
+            var item = cfg?.Item(sku);
+            if (item == null) { Status("Not for sale right now"); return false; }
+            if (!item.price.TryGetValue(currency, out var priceStr) || string.IsNullOrEmpty(priceStr)) { Status("This one is sold for SKR only"); return false; }
+            var orderId = Guid.NewGuid().ToString("N").Substring(0, 12);
+            var sig = await Pay($"kc:buy:{sku}:{orderId}", ulong.Parse(priceStr), currency, sku);
+            if (sig == null) return false;
+            Status("Verifying…");
+            for (int i = 0; i < 10; i++)
+            {
+                try { await KartApi.VerifyPurchase(sig, sku, orderId, currency); break; }
+                catch (KartApi.ApiException ex) when (ex.Status == 202) { await Awaitable.WaitForSecondsAsync(2f); }
+                catch (KartApi.ApiException ex) { Debug.LogWarning("[wallet] verify: " + ex.Message); Status("Paid, but we could not verify it yet. It will unlock once the network confirms."); return false; }
+                if (i == 9) { Status("Still confirming — it will unlock shortly."); return false; }
+            }
+            try { SetProfile(await KartApi.Me()); } catch { }
+            Status("Unlocked ✓");
+            KartApi.Event("bought", new { sku, currency, sig });
+            return true;
+        }
+
+        /// Lobby: pay the room's entry fee and hand the signature to the room, which verifies it on-chain.
+        public async Awaitable<bool> PayEntry(RoomClient.RoomState room)
+        {
+            if (room == null || !room.IsPaid) return false;
+            var sig = await Pay($"kc:entry:{room.code}:{room.round}", ulong.Parse(room.fee), room.currency, "entry");
+            if (sig == null) return false;
+            RoomClient.Instance?.Send(new { t = "pay", signature = sig });
+            Status("Entry sent · verifying on-chain…");
+            return true;
+        }
+
         // ---- helpers ----
-        async Awaitable<bool> HasFunds()
+        async Awaitable<bool> HasSol(ulong extra)
         {
             var bal = await Web3.Rpc.GetBalanceAsync(Web3.Wallet.Account.PublicKey, Commitment.Confirmed);
-            return (long)(bal.Result?.Value ?? 0) >= minLamportsForTx;
+            return (long)(bal.Result?.Value ?? 0) >= minLamportsForTx + (long)extra;
+        }
+
+        async Awaitable<bool> HasSkr(string mint, ulong amount)
+        {
+            try
+            {
+                var accs = await Web3.Rpc.GetTokenAccountsByOwnerAsync(Web3.Wallet.Account.PublicKey.Key, mint, null, Commitment.Confirmed);
+                ulong total = 0;
+                if (accs.Result?.Value != null)
+                    foreach (var a in accs.Result.Value) total += a.Account?.Data?.Parsed?.Info?.TokenAmount?.AmountUlong ?? 0;
+                return total >= amount;
+            }
+            catch (Exception e) { Debug.LogWarning("[wallet] skr balance: " + e.Message); return true; }   // let the wallet be the judge
         }
 
         async Awaitable<Transaction> BuildTx()
@@ -182,7 +248,18 @@ namespace KartCup
             return res.Result;
         }
 
-        void Status(string s) { Debug.Log("[wallet] " + s); onStatus?.Invoke(s); }
-        static string Short(string w) => string.IsNullOrEmpty(w) || w.Length < 8 ? w : $"{w[..4]}…{w[^4..]}";
+        void Status(string s) { LastStatus = s; Debug.Log("[wallet] " + s); onStatus?.Invoke(s); }
+        public static string Short(string w) => string.IsNullOrEmpty(w) || w.Length < 8 ? w : $"{w[..4]}…{w[^4..]}";
+
+        /// "0.05 SOL" / "25 SKR" from base units, with ≈USD when the config knows the rate.
+        public static string Amount(string baseUnits, string currency, bool withUsd = false)
+        {
+            if (!ulong.TryParse(baseUnits, out var b)) return "";
+            double v = currency == "SOL" ? b / 1e9 : b / 1e6;
+            string s = currency == "SOL" ? $"{v:0.###} SOL" : $"{v:0.##} SKR";
+            var cfg = KartApi.Cfg;
+            if (withUsd && cfg?.usd != null && cfg.usd.TryGetValue(currency, out var rate) && rate > 0) s += $" (≈${v * rate:0.00})";
+            return s;
+        }
     }
 }

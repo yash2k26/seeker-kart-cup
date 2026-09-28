@@ -14,10 +14,26 @@
     </queries>
     <application>
         <activity android:name="com.unity3d.player.UnityPlayerGameActivity"
+                  android:exported="true"
                   android:theme="@style/BaseUnityGameActivityTheme">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Room invites. App Link: https://kartcup.bharadwaj465.workers.dev/r/CODE, verified against the
+                 /.well-known/assetlinks.json the Worker already serves for Mobile Wallet Adapter. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="kartcup.bharadwaj465.workers.dev" android:pathPrefix="/r" />
+            </intent-filter>
+            <!-- Fallback the invite page's intent:// button uses when the https link is not verified: kartcup://r/CODE -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="kartcup" android:host="r" />
             </intent-filter>
             <meta-data android:name="unityplayer.UnityActivity" android:value="true" />
             <meta-data android:name="android.app.lib_name" android:value="game" />
