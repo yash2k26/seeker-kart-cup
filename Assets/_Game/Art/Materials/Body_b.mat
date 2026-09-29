@@ -13,8 +13,7 @@ Material:
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
   - _SPECULAR_COLOR
-  m_InvalidKeywords:
-  - _SPECULARHIGHLIGHTS_OFF
+  m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -78,10 +77,10 @@ Material:
     - _ShadeStrength: 0.35
     - _ShadowTint: 0.45
     - _Shininess: 0
-    - _Smoothness: 0
+    - _Smoothness: 0.72
     - _SmoothnessSource: 0
     - _SpecSource: 0
-    - _SpecularHighlights: 0
+    - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
     - _Surface: 0
@@ -93,7 +92,7 @@ Material:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _ShadeDir: {r: 0.4, g: 0.8, b: 0.3, a: 0}
-    - _SpecColor: {r: 0, g: 0, b: 0, a: 0}
+    - _SpecColor: {r: 0.32, g: 0.32, b: 0.32, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!114 &2464663714780811423

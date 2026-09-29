@@ -17,6 +17,7 @@ public static class LookSetup
     {
         Shadows();
         Materials();
+        Gloss();
         Retint();
         Water();
         Liveries();
@@ -43,6 +44,12 @@ public static class LookSetup
         Set(so, "m_SoftShadowsSupported", true);
         Set(so, "m_SoftShadowQuality", 1);          // low: a 2-tap filter, cheap on mobile
         Set(so, "m_ConservativeEnclosingSphere", true);
+        // The night map: HDR so the lamps, studs and moon bloom from real values, and the sodium lamps and headlights
+        // as per-pixel lights (eight per renderer; the road is built in chunks for it). Light shadows stay off.
+        Set(so, "m_SupportsHDR", true);
+        Set(so, "m_AdditionalLightsRenderingMode", 1);
+        Set(so, "m_AdditionalLightsPerObjectLimit", 8);
+        Set(so, "m_AdditionalLightShadowsSupported", false);
         so.ApplyModifiedPropertiesWithoutUndo();
         EditorUtility.SetDirty(rp);
     }
@@ -61,6 +68,7 @@ public static class LookSetup
             if (!mat.shader.name.StartsWith("KartCup/")) continue;
             if (mat.shader.name.Contains("Water")) continue;                  // the water shader animates its own scroll
             if (mat.shader.name.Contains("Terrain")) continue;                // reads vertex colour; Simple Lit would drop it
+            if (mat.shader.name.Contains("Road") || mat.shader.name.Contains("Beam")) continue;   // the PBR road and the lighthouse beam are their own shaders
             var map = mat.HasProperty("_BaseMap") ? mat.GetTexture("_BaseMap") : null;
             var tint = mat.HasProperty("_BaseColor") ? mat.GetColor("_BaseColor") : Color.white;
             mat.shader = lit;
@@ -75,6 +83,23 @@ public static class LookSetup
             moved++;
         }
         Debug.Log($"[look] {moved} materials on Simple Lit");
+    }
+
+    /// Toy-car paint: the kart bodies take a gloss, so the sun, the lamps and the moon put a highlight on them.
+    static void Gloss()
+    {
+        foreach (var c in "abcdef")
+        {
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(Art + $"Materials/Body_{c}.mat");
+            if (mat == null || !mat.shader.name.EndsWith("Simple Lit")) continue;
+            mat.SetFloat("_Smoothness", 0.72f);
+            mat.SetColor("_SpecColor", new Color(0.32f, 0.32f, 0.32f));
+            mat.SetFloat("_SpecularHighlights", 1f);
+            mat.SetFloat("_SmoothnessSource", 0f);
+            mat.DisableKeyword("_SPECULARHIGHLIGHTS_OFF");
+            mat.EnableKeyword("_SPECULAR_COLOR");
+            EditorUtility.SetDirty(mat);
+        }
     }
 
     static void Retint()
@@ -136,6 +161,23 @@ public static class LookSetup
         bloom.scatter.overrideState = true; bloom.scatter.value = 0.62f;
         bloom.maxIterations.overrideState = true; bloom.maxIterations.value = 3;     // few mip passes: cheap on mobile
         bloom.downscale.overrideState = true; bloom.downscale.value = BloomDownscaleMode.Quarter;
+
+        var grain = profile.Add<FilmGrain>(true);
+        grain.type.overrideState = true; grain.type.value = FilmGrainLookup.Thin1;
+        grain.intensity.overrideState = true; grain.intensity.value = 0f;         // off by day; the night map turns it up
+        grain.response.overrideState = true; grain.response.value = 0.8f;
+
+        var fringe = profile.Add<ChromaticAberration>(true);
+        fringe.intensity.overrideState = true; fringe.intensity.value = 0f;
+
+        // Add<T> only lists a component: it has to be saved into the profile as a sub-asset or the list holds a null,
+        // which is what every entry was until now, so no map had its grade at all.
+        foreach (var c in profile.components)
+        {
+            c.name = c.GetType().Name;
+            c.hideFlags = HideFlags.HideInHierarchy;
+            AssetDatabase.AddObjectToAsset(c, profile);
+        }
 
         EditorUtility.SetDirty(profile);
         Debug.Log("[look] post profile written");
