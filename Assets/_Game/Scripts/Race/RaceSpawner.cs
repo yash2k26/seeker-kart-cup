@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using PowerslideKartPhysics;
@@ -45,8 +46,35 @@ namespace KartCup
                 if (isPlayer && raceCamera != null) raceCamera.Initialize(kart);
             }
             RaceManager.Instance?.Rescan();
-            RaceManager.Instance?.BeginCountdown();
+            StartCoroutine(Intro());
         }
+
+        /// Before the flag: the ceremony stage with the trophies this race is for (a solo race has no money on it, so the
+        /// plates just name the places), poppers and all; then the grid and the 3-2-1. A tap skips it.
+        IEnumerator Intro()
+        {
+            var race = RaceManager.Instance;
+            if (race == null) yield break;
+            var show = PodiumShow.Ensure();
+            if (show == null) { race.BeginCountdown(); yield break; }
+            race.Hold();
+            show.Prizes("RACE FOR GOLD", Tracks.At(Cup.TrackIndex).name.ToUpperInvariant(), new[] { "1ST", "2ND", "3RD" });
+            float until = Time.time + PodiumShow.PrizeSeconds, skippable = Time.time + 0.6f;
+            while (Time.time < until && !(Time.time > skippable && PodiumShow.Tapped())) yield return null;
+            show.End();
+            race.BeginCountdown();
+        }
+
+        /// The driver prefab a character races as (the podium stands them up).
+        public static GameObject DriverPrefab(string driverId)
+        {
+            var spawner = FindAnyObjectByType<RaceSpawner>();
+            if (spawner == null) return null;
+            foreach (var p in spawner.driverPrefabs) if (p != null && p.name == "Driver_" + driverId) return p;
+            return null;
+        }
+
+        public static CharacterDatabase Roster => FindAnyObjectByType<RaceSpawner>()?.roster;
 
         /// The room's roster in join order. Our own kart is the real thing; everyone else is a RemoteKart proxy.
         void SpawnOnline()

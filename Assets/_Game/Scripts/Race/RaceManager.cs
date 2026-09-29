@@ -39,7 +39,9 @@ namespace KartCup
         {
             checkpoints = checkpoints.Where(c => c != null).OrderBy(c => c.index).ToArray();
             Rescan();
-            if (!RoomClient.InRaceRoom) BeginCountdown();   // online, NetRace holds the grid until the room's GO
+            // Online, NetRace holds the grid until the room's GO; solo, RaceSpawner starts it after the intro shot. Only a
+            // scene with neither (an old test scene) starts straight away.
+            if (!RoomClient.InRaceRoom && FindAnyObjectByType<RaceSpawner>() == null) BeginCountdown();
         }
 
         /// Call after spawning or despawning karts.

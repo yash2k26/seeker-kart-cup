@@ -23,6 +23,7 @@ namespace KartCup
         KartProgress me;
         readonly Dictionary<string, RemoteKart> remotes = new();
         double goAt = -1, finishedAt = -1;
+        PodiumShow intro;
         bool countdownStarted, finishSent;
         float sendTimer;
         int boundRound = -1, boundRace = -1;                        // the room race this scene is
@@ -50,6 +51,10 @@ namespace KartCup
 
             race.Hold();
             boundRound = client.Room?.round ?? -1; boundRace = client.Room?.raceIndex ?? -1;
+            // What this race is for, while everyone's phone loads the track and until the 3-2-1: the prize pool,
+            // whatever it is, and what each place takes home.
+            intro = PodiumShow.Ensure();
+            ShowPrizes();
             // A late `countdown` (we loaded after it went out, or it went out while the socket was down) is recovered
             // from the snapshot the room keeps sending.
             RecoverCountdown();
@@ -70,6 +75,19 @@ namespace KartCup
 
         void OnCountdown(double localGo) { goAt = localGo; }
 
+        void ShowPrizes()
+        {
+            var room = client.Room;
+            if (intro == null || room == null) return;
+            var places = new List<string>();
+            for (int i = 0; i < 3; i++)
+            {
+                var label = RaceHud.Ordinal(i + 1).ToUpperInvariant();
+                places.Add(!room.IsPaid ? label : i < room.prizes.Count ? label + "\n" + WalletFlow.Amount(room.prizes[i], room.currency) : label + "\n—");
+            }
+            intro.Prizes(room.IsPaid ? "PRIZE POOL" : "RACE FOR GOLD", room.IsPaid ? WalletFlow.Amount(room.pool, room.currency, true) : "BRAGGING RIGHTS", places);
+        }
+
         void RecoverCountdown()
         {
             var room = client.Room;
@@ -82,6 +100,7 @@ namespace KartCup
             if (goAt > 0 && !countdownStarted && Time.unscaledTimeAsDouble >= goAt - race.countdownSeconds)
             {
                 countdownStarted = true;
+                if (intro != null && intro.Active) intro.End();   // the prize shot gives way to the grid for 3-2-1
                 race.BeginCountdownAt(goAt);
             }
             if (!countdownStarted) return;

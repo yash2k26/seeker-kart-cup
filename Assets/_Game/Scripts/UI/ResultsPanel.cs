@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using TMPro;
@@ -20,6 +21,7 @@ namespace KartCup
 
         bool scored, online;
         RoomClient.ResultsMsg verdict;
+        int ceremonyFor = -1;          // the room race whose podium has played (round * 100 + race)
 
         void Start()
         {
@@ -40,11 +42,12 @@ namespace KartCup
             if (!who.isPlayer || panel == null || scored) return;
             scored = true;
             var race = RaceManager.Instance;
-            UiMotion.Show(panel, panel.transform.childCount > 0 ? panel.transform.GetChild(0) : null);
             foreach (var control in FindObjectsByType<HoldButton>(FindObjectsSortMode.None))
                 control.gameObject.SetActive(false);
 
-            if (RoomClient.Member) { OnlineFinish(who, race); return; }
+            // Online the card comes up at once ("waiting for the others"), and the podium plays when the room's verdict
+            // is in; solo the podium plays first and the card follows it.
+            if (RoomClient.Member) { ShowCard(); OnlineFinish(who, race); return; }
 
             // One ordering decides BOTH the position shown and the points awarded. Deriving them separately let the
             // card say "you finished 6th" while handing out the win's 10 points.
@@ -79,6 +82,46 @@ namespace KartCup
             AudioDirector.Instance?.Finish(place == 1);
             RaceSession.Instance?.OnFinish(place);
             if (saveButton != null) saveButton.SetActive(!KartApi.HasSession);
+
+            // The podium: this race's top three, or after a cup's last race the cup's.
+            bool cupPodium = final && !single;
+            var top = cupPodium ? Cup.Standings.Take(3).Select(s => s.character).ToList() : order.Take(3).Select(r => r.characterIndex).ToList();
+            bool mine = top.Count > 0 && top[0] == Cup.PlayerCharacter;
+            string heading = mine ? (cupPodium ? "YOU TAKE THE CUP!" : "YOU WIN!")
+                : top.Count > 0 ? $"{Name(top[0]).ToUpperInvariant()} {(cupPodium ? "TAKES THE CUP!" : "WINS!")}" : "";
+            StartCoroutine(Ceremony(top.Select(c => Podium(c, Name(c))).ToList(), heading, 1.4f));
+        }
+
+        // ---------- the podium, then the card ----------
+        PodiumShow.Winner Podium(int character, string name)
+        {
+            var def = roster != null && character >= 0 ? roster.At(character) : null;
+            return new PodiumShow.Winner { driver = def != null ? RaceSpawner.DriverPrefab(def.driverId) : null, name = name };
+        }
+
+        /// The finish callout lands, then the top three take the podium (party poppers, trophies, the winner jumping),
+        /// and after a few seconds, or a tap, the card comes up over it with the celebration still going behind.
+        IEnumerator Ceremony(List<PodiumShow.Winner> top, string heading, float delay)
+        {
+            yield return new WaitForSecondsRealtime(delay);
+            var show = top.Count > 0 && top.Any(w => w.driver != null) ? PodiumShow.Ensure() : null;
+            if (show != null)
+            {
+                if (panel != null) panel.SetActive(false);
+                show.Winners(heading, top);
+                float until = Time.unscaledTime + PodiumShow.CeremonySeconds, skippable = Time.unscaledTime + 1f;
+                while (Time.unscaledTime < until && !(Time.unscaledTime > skippable && PodiumShow.Tapped())) yield return null;
+            }
+            ShowCard(podium: show != null);
+        }
+
+        void ShowCard(bool podium = false)
+        {
+            if (panel == null) return;
+            // over the podium the dim is lighter, so the confetti and the trophies still show round the card
+            var dim = panel.GetComponent<Image>();
+            if (dim != null) { var c = dim.color; c.a = podium ? 0.5f : 0.74f; dim.color = c; }
+            UiMotion.Show(panel, panel.transform.childCount > 0 ? panel.transform.GetChild(0) : null);
         }
 
         // ---------- online ----------
@@ -113,6 +156,7 @@ namespace KartCup
             verdict = r;
             var res = r.results;
             bool single = res.races == 1, final = res.final;
+            var room = client.Room;
             var mine = res.order.Find(o => o.id == client.MyId);
             int place = mine?.place ?? res.order.Count;
             int cupPlace = r.standings?.Find(s => s.id == client.MyId)?.place ?? 0;
@@ -138,6 +182,23 @@ namespace KartCup
                 primaryLabel.text = client.IsHost ? (final ? "RACE AGAIN" : "NEXT RACE") : "WAITING FOR HOST";
             }
             if (final) Haptics.Play(cupPlace == 1 ? Haptics.Kind.Win : Haptics.Kind.Tick);
+
+            // The podium, once per race: the room's top three (or the cup's, after its last race).
+            int key = room.round * 100 + res.race;
+            if (key != ceremonyFor)
+            {
+                ceremonyFor = key;
+                bool cupPodium = final && !single;
+                var top = cupPodium && r.standings != null
+                    ? r.standings.Take(3).Select(s => (s.id, s.name)).ToList()
+                    : res.order.Take(3).Select(o => (o.id, o.name)).ToList();
+                bool iWon = top.Count > 0 && top[0].id == client.MyId;
+                string heading = iWon ? (cupPodium ? "YOU TAKE THE CUP!" : "YOU WIN!")
+                    : top.Count > 0 ? $"{top[0].name.ToUpperInvariant()} {(cupPodium ? "TAKES THE CUP!" : "WINS!")}" : "";
+                var podium = top.Select(t => Podium(room.players.Find(p => p.id == t.id)?.character ?? -1, t.name)).ToList();
+                StopAllCoroutines();
+                StartCoroutine(Ceremony(podium, heading, 0.2f));
+            }
         }
 
         void OnlinePayouts(List<RoomClient.Payout> payouts) { if (verdict != null) { verdict.payouts = payouts; RefreshStatus(); } }
