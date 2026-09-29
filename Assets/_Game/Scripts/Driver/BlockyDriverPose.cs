@@ -19,6 +19,7 @@ namespace KartCup
         Quaternion wheelRest;
 
         [Range(-1, 1)] public float Steer;           // set by KartHooks from the kart's visual steer
+        public Transform Wheel => wheel;              // the podium hides it: nobody holds a trophy and a steering wheel
         float steerSmoothed, hitT, winT;
 
         /// Spawned karts bind at runtime; the editor-built prefabs keep their serialized reference.
