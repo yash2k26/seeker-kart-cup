@@ -1,6 +1,10 @@
 // Solana reads: RPC proxy, SGT check, .skr resolution, tx verification. Addresses from docs.solanamobile.com (re-verified 13 Sep 2026).
 import type { Env } from './index';
 import { json, bad, now } from './index';
+import { priceOf, grantsOf, type Currency } from './catalog';
+import { rates } from './prices';
+import { verifyPayment } from './payout';
+import { isSignature } from './auth';
 
 const TOKEN_2022 = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
 const SGT_MINT_AUTHORITY = 'GT2zuHVaZQYZSyQMgJPLzvkmyztfyXg2NJunqFp4p3A4';
@@ -21,10 +25,14 @@ export async function rpc(env: Env, method: string, params: unknown[]) {
   return j.result;
 }
 
-// The APK never holds an RPC key: it talks to /rpc, which forwards an allow-list of methods.
+// The APK never holds an RPC key: it talks to /rpc, which forwards an allow-list of methods, a few at a time.
+const RPC_MAX_CALLS = 8, RPC_MAX_BYTES = 64 * 1024;
 export async function rpcProxy(req: Request, env: Env) {
-  const body = await req.json<any>().catch(() => null);
+  const text = await req.text();
+  if (text.length > RPC_MAX_BYTES) return bad('request too large', 413);
+  let body: any = null; try { body = JSON.parse(text); } catch { /* bad json */ }
   const calls = Array.isArray(body) ? body : [body];
+  if (calls.length > RPC_MAX_CALLS) return bad('too many calls in one request', 413);
   if (!calls.every(c => c && RPC_ALLOW.has(c.method))) return bad('method not allowed', 403);
   const r = await fetch(env.HELIUS_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   return new Response(r.body, { status: r.status, headers: { 'content-type': 'application/json' } });
@@ -88,53 +96,66 @@ export async function getProfile(env: Env, wallet: string) {
 }
 
 // ---- landed-transaction verification (replay-proof via tx_log PRIMARY KEY) ----
-async function claimSignature(env: Env, signature: string, wallet: string, kind: string) {
+// Claim a signature only AFTER the transaction checked out for this wallet: a claim made first could be made by
+// anyone who read the signature on-chain, and it would lock the rightful payer out.
+/** Claim a payment signature for `wallet` and `kind`. Claiming it again for the same wallet and kind is the same claim
+ *  (a retry after a failure part-way must not find its own claim and call the payment used); what a claim buys is
+ *  single-use elsewhere (room_entries.signature UNIQUE, unlocks and memo rows keyed so a repeat changes nothing). */
+export async function claimSignature(env: Env, signature: string, wallet: string, kind: string) {
   const r = await env.DB.prepare("INSERT OR IGNORE INTO tx_log (signature, wallet, kind, status, created_at) VALUES (?1, ?2, ?3, 'pending', ?4)")
     .bind(signature, wallet, kind, now()).run();
-  return r.meta.changes > 0;
+  if (r.meta.changes > 0) return true;
+  const row = await env.DB.prepare('SELECT wallet, kind FROM tx_log WHERE signature = ?1').bind(signature).first<any>();
+  return !!row && row.wallet === wallet && row.kind === kind;
 }
-async function fetchTx(env: Env, signature: string) {
+/** Claimed by another wallet or for another purpose: answered from D1 before any RPC is spent on it. */
+export async function usedByOther(env: Env, signature: string, wallet: string, kind: string) {
+  const row = await env.DB.prepare('SELECT wallet, kind FROM tx_log WHERE signature = ?1').bind(signature).first<any>();
+  return !!row && (row.wallet !== wallet || row.kind !== kind);
+}
+export async function fetchTx(env: Env, signature: string) {
+  if (env.MOCK_CHAIN === '1') return null;          // the local smoke test: nothing leaves this machine
   return rpc(env, 'getTransaction', [signature, { encoding: 'jsonParsed', commitment: 'confirmed', maxSupportedTransactionVersion: 0 }]);
 }
-function instructions(tx: any): any[] {
+export function instructions(tx: any): any[] {
   return [...(tx.transaction.message.instructions ?? []), ...(tx.meta?.innerInstructions ?? []).flatMap((i: any) => i.instructions)];
 }
-const signedBy = (tx: any, wallet: string) => tx.transaction.message.accountKeys.some((k: any) => k.pubkey === wallet && k.signer);
+export const signedBy = (tx: any, wallet: string) => tx.transaction.message.accountKeys.some((k: any) => k.pubkey === wallet && k.signer);
 
 /** POST /v1/tx/confirm { signature, raceId } — memo "kc:pb:<raceId>" signed by the session wallet → results.memo_sig */
 export async function txConfirm(req: Request, env: Env, _ctx: ExecutionContext, wallet: string | null) {
   if (!wallet) return bad('unauthorized', 401);
   const { signature, raceId } = await req.json<any>().catch(() => ({}));
-  if (!signature || !raceId) return bad('signature and raceId required');
-  if (!(await claimSignature(env, signature, wallet, 'memo_pb'))) return bad('already processed', 409);
+  if (typeof signature !== 'string' || typeof raceId !== 'string' || signature.length > 128 || raceId.length > 64) return bad('signature and raceId required');
+  if (!isSignature(signature) && env.MOCK_CHAIN !== '1') return bad('not a transaction signature');
+  if (await usedByOther(env, signature, wallet, 'memo_pb')) return bad('already processed', 409);   // before the RPC: a replay costs nothing upstream
   const tx = await fetchTx(env, signature);
-  if (!tx) { await env.DB.prepare("DELETE FROM tx_log WHERE signature = ?1").bind(signature).run(); return json({ pending: true }, 202); }
+  if (!tx) return json({ pending: true }, 202);
   const memo = instructions(tx).find((i: any) => i.program === 'spl-memo')?.parsed;
   const ok = !tx.meta?.err && signedBy(tx, wallet) && memo === `kc:pb:${raceId}`;
-  await env.DB.prepare('UPDATE tx_log SET status = ?2, slot = ?3 WHERE signature = ?1').bind(signature, ok ? 'confirmed' : 'rejected', tx.slot).run();
   if (!ok) return bad('validation failed');
+  if (!(await claimSignature(env, signature, wallet, 'memo_pb'))) return bad('already processed', 409);
+  await env.DB.prepare("UPDATE tx_log SET status = 'confirmed', slot = ?2 WHERE signature = ?1").bind(signature, tx.slot).run();
   await env.DB.prepare('UPDATE results SET memo_sig = ?1 WHERE race_id = ?2 AND wallet = ?3').bind(signature, raceId, wallet).run();
   return json({ confirmed: true, slot: tx.slot });
 }
 
-/** POST /v1/purchase/verify { signature, sku, orderId } — SKR transferChecked to the treasury ATA + memo "kc:buy:<sku>:<orderId>" */
+/** POST /v1/purchase/verify { signature, sku, orderId, currency? } — a transfer of the catalog price to the treasury
+ *  (SOL to the owner, SKR to its ATA) plus memo "kc:buy:<sku>:<orderId>". Prices live in catalog.ts (+ PRICES_JSON). */
 export async function purchaseVerify(req: Request, env: Env, _ctx: ExecutionContext, wallet: string | null) {
   if (!wallet) return bad('unauthorized', 401);
-  const { signature, sku, orderId } = await req.json<any>().catch(() => ({}));
-  const prices: Record<string, string> = JSON.parse(env.PRICES_JSON || '{}');
-  if (!signature || !sku || !orderId || !prices[sku]) return bad('bad request');
-  if (!(await claimSignature(env, signature, wallet, 'purchase'))) return bad('already processed', 409);
-  const tx = await fetchTx(env, signature);
-  if (!tx) { await env.DB.prepare("DELETE FROM tx_log WHERE signature = ?1").bind(signature).run(); return json({ pending: true }, 202); }
-  const ixs = instructions(tx);
-  const memo = ixs.find((i: any) => i.program === 'spl-memo')?.parsed;
-  const xfer = ixs.find((i: any) => i.program === 'spl-token' && i.parsed?.type === 'transferChecked');
-  const amount = BigInt(xfer?.parsed?.info?.tokenAmount?.amount ?? 0);
-  const ok = !tx.meta?.err && signedBy(tx, wallet) && memo === `kc:buy:${sku}:${orderId}` &&
-    xfer?.parsed?.info?.mint === env.SKR_MINT && xfer?.parsed?.info?.destination === env.TREASURY_ATA && amount >= BigInt(prices[sku]);
-  await env.DB.prepare('UPDATE tx_log SET status = ?2, slot = ?3 WHERE signature = ?1').bind(signature, ok ? 'confirmed' : 'rejected', tx.slot).run();
-  if (!ok) return bad('validation failed');
-  await env.DB.prepare("INSERT OR IGNORE INTO unlocks (wallet, sku, source, signature, created_at) VALUES (?1, ?2, 'purchase', ?3, ?4)")
-    .bind(wallet, sku, signature, now()).run();
-  return json({ granted: sku });
+  const { signature, sku, orderId, currency } = await req.json<any>().catch(() => ({}));
+  const cur: Currency = currency === 'SOL' ? 'SOL' : 'SKR';
+  const price = sku ? priceOf(String(sku), cur, await rates(env), env.PRICES_JSON) : null;
+  if (typeof signature !== 'string' || signature.length > 128 || !sku || !orderId || price === null) return bad('bad request');
+  // The quote the player saw may be minutes old and the token moved: accept 90% of today's price (research/23 §F.1).
+  const floor = (price * 9n) / 10n;
+  if (String(orderId).length > 64 || String(sku).length > 64) return bad('bad request');
+  if (await usedByOther(env, signature, wallet, 'purchase')) return bad('signature already used');
+  const r = await verifyPayment(env, signature, wallet, `kc:buy:${sku}:${orderId}`, floor, cur, 'purchase');
+  if (!r.ok) return r.pending ? json({ pending: true }, 202) : bad(r.why);
+  const granted = grantsOf(String(sku));
+  await env.DB.batch(granted.map(g => env.DB.prepare("INSERT OR IGNORE INTO unlocks (wallet, sku, source, signature, created_at) VALUES (?1, ?2, 'purchase', ?3, ?4)")
+    .bind(wallet, g, signature, now())));
+  return json({ granted });
 }

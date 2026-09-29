@@ -18,6 +18,19 @@ export function bs58decode(s: string): Uint8Array {
 const b64 = (s: string) => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 const enc = new TextEncoder();
 
+export function bs58encode(bytes: Uint8Array): string {
+  let n = 0n; for (const b of bytes) n = n * 256n + BigInt(b);
+  let out = ''; while (n > 0n) { out = B58[Number(n % 58n)] + out; n /= 58n; }
+  for (const b of bytes) { if (b !== 0) break; out = '1' + out; }
+  return out;
+}
+
+/** A Solana transaction signature: base58 of 64 bytes. Anything else never reaches the RPC. */
+export function isSignature(s: unknown): boolean {
+  if (typeof s !== 'string' || s.length < 64 || s.length > 90) return false;
+  try { return bs58decode(s).length === 64; } catch { return false; }
+}
+
 export async function verifyEd25519(pubkeyB58: string, msg: Uint8Array, sig: Uint8Array): Promise<boolean> {
   try {
     const key = await crypto.subtle.importKey('raw', bs58decode(pubkeyB58), { name: 'Ed25519' }, false, ['verify']);
@@ -40,10 +53,12 @@ export async function signHmac(env: Env, payload: object): Promise<string> {
 }
 export async function readHmac<T = any>(env: Env, token: string | null | undefined): Promise<T | null> {
   if (!token || !token.includes('.')) return null;
-  const [body, sig] = token.split('.');
-  const ok = await crypto.subtle.verify('HMAC', await hmacKey(env, ['verify']), unb64u(sig), enc.encode(body));
-  if (!ok) return null;
-  return JSON.parse(new TextDecoder().decode(unb64u(body))) as T;
+  try {                                   // a malformed token is no token, never an error
+    const [body, sig] = token.split('.');
+    const ok = await crypto.subtle.verify('HMAC', await hmacKey(env, ['verify']), unb64u(sig), enc.encode(body));
+    if (!ok) return null;
+    return JSON.parse(new TextDecoder().decode(unb64u(body))) as T;
+  } catch { return null; }
 }
 export async function mintSession(env: Env, wallet: string, days = 30) {
   return signHmac(env, { w: wallet, e: now() + days * 86400 });

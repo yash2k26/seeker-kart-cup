@@ -7,10 +7,12 @@
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
     "db:local": "wrangler d1 migrations apply kartcup --local",
-    "db:remote": "wrangler d1 migrations apply kartcup --remote"
+    "db:remote": "wrangler d1 migrations apply kartcup --remote",
+    "test:referee": "esbuild scripts/referee-test.ts --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/referee-test.mjs && node node_modules/.cache/referee-test.mjs"
   },
   "dependencies": {
     "@onsol/tldparser": "0.6.7",
+    "@solana/spl-token": "0.4.15",
     "@solana/web3.js": "^1.98.4"
   },
   "devDependencies": {
