@@ -20,4 +20,6 @@ MonoBehaviour:
   accel: -1
   handling: -1
   weight: 0
+  turbo: 1
+  attack: -1
   blurb: Top speed, turns like a ferry.

@@ -20,4 +20,6 @@ MonoBehaviour:
   accel: 0
   handling: -1
   weight: -1
+  turbo: -1
+  attack: 1
   blurb: Bald, fast, and debugging at sixty frames a second.

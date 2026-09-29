@@ -20,4 +20,6 @@ MonoBehaviour:
   accel: 1
   handling: 2
   weight: -2
+  turbo: 0
+  attack: 0
   blurb: Threads corners nobody else sees.

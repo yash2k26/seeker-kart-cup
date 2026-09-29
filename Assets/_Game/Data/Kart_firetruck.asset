@@ -16,7 +16,8 @@ MonoBehaviour:
   displayName: Hotfix
   blurb: A fire truck. In a kart race. Yes.
   sku: kart.firetruck
-  speed: 0
-  accel: 0
-  handling: 0
-  weight: 0
+  speed: 3
+  turbo: 4
+  grip: 3
+  armor: 5
+  attack: 3

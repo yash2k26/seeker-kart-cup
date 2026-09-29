@@ -20,4 +20,6 @@ MonoBehaviour:
   accel: -1
   handling: 0
   weight: 2
+  turbo: -1
+  attack: 1
   blurb: Hard to move, harder to pass.

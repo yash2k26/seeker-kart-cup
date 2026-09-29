@@ -20,4 +20,6 @@ MonoBehaviour:
   accel: -1
   handling: 1
   weight: -1
+  turbo: 0
+  attack: 0
   blurb: Late braker, early apex.

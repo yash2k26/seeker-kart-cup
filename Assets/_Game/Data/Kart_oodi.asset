@@ -16,7 +16,8 @@ MonoBehaviour:
   displayName: Oodi
   blurb: Short wheelbase, quick hands.
   sku: 
-  speed: 0
-  accel: 0
-  handling: 0
-  weight: 0
+  speed: 2
+  turbo: 1
+  grip: 3
+  armor: 2
+  attack: 2

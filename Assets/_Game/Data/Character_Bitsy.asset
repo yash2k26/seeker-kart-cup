@@ -20,4 +20,6 @@ MonoBehaviour:
   accel: 1
   handling: -1
   weight: -1
+  turbo: 2
+  attack: -2
   blurb: All gas, some brakes.

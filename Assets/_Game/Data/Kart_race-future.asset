@@ -16,7 +16,8 @@ MonoBehaviour:
   displayName: Photon
   blurb: Low, wide, glued to the road.
   sku: kart.race-future
-  speed: 0
-  accel: 0
-  handling: 0
-  weight: 0
+  speed: 5
+  turbo: 4
+  grip: 5
+  armor: 2
+  attack: 2

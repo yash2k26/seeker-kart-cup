@@ -20,4 +20,6 @@ MonoBehaviour:
   accel: 0
   handling: 0
   weight: -1
+  turbo: 1
+  attack: -1
   blurb: Ships blocks faster than you can read them.

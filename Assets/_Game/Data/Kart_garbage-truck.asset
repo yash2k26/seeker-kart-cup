@@ -16,7 +16,8 @@ MonoBehaviour:
   displayName: Garbage Chain
   blurb: Hauls the whole mempool.
   sku: kart.garbage-truck
-  speed: 0
-  accel: 0
-  handling: 0
-  weight: 0
+  speed: 2
+  turbo: 3
+  grip: 3
+  armor: 5
+  attack: 5

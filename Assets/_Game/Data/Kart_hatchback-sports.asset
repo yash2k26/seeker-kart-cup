@@ -16,7 +16,8 @@ MonoBehaviour:
   displayName: Hot Hatch
   blurb: Point it and it goes.
   sku: kart.hatchback-sports
-  speed: 0
-  accel: 0
-  handling: 0
-  weight: 0
+  speed: 4
+  turbo: 3
+  grip: 3
+  armor: 2
+  attack: 2

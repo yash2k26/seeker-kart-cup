@@ -20,4 +20,6 @@ MonoBehaviour:
   accel: 1
   handling: 1
   weight: -2
+  turbo: -1
+  attack: 1
   blurb: Knows every dev on the grid. Waves at all of them.

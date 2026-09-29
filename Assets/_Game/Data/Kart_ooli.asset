@@ -16,7 +16,8 @@ MonoBehaviour:
   displayName: Ooli
   blurb: Sits flat through the sweepers.
   sku: 
-  speed: 0
-  accel: 0
-  handling: 0
-  weight: 0
+  speed: 3
+  turbo: 2
+  grip: 2
+  armor: 2
+  attack: 1

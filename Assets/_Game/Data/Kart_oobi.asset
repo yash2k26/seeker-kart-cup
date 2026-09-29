@@ -16,7 +16,8 @@ MonoBehaviour:
   displayName: Oobi
   blurb: The one everybody learns on.
   sku: 
-  speed: 0
-  accel: 0
-  handling: 0
-  weight: 0
+  speed: 2
+  turbo: 2
+  grip: 2
+  armor: 2
+  attack: 2
