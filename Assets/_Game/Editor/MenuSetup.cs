@@ -187,8 +187,11 @@ public static class MenuSetup
 
         // The rim glows cyan (the film's LED strips), a warm key and a cool fill pick the kart out of the night, and
         // the lighthouse turns out past the palms.
-        var glow = AssetDatabase.LoadAssetAtPath<Material>(Art + "Materials/Stud_Glow.mat");
-        if (glow != null) Ring(podium, "Rim", 3.42f, 3.6f, 0.115f, glow);
+        // its own glow, dimmer than the road studs': on the phone their material bloomed the ring out to white
+        var glow = ContentSetup.LoadOrCreate(Art + "Materials/Rim_Glow.mat", Shader.Find("Universal Render Pipeline/Unlit"));
+        glow.SetColor("_BaseColor", new Color(0.10f, 0.75f, 1f) * 1.35f);
+        EditorUtility.SetDirty(glow);
+        Ring(podium, "Rim", 3.42f, 3.6f, 0.115f, glow);
         Spot("KeyLight", new Vector3(6f, 7f, -4f), new Vector3(0, 1f, 0), new Color(1f, 0.82f, 0.58f), 48f, 55f);
         Spot("FillLight", new Vector3(-7f, 5f, 6f), new Vector3(0, 1f, 0), new Color(0.7f, 0.8f, 1f), 18f, 70f);
         Lighthouse(new Vector3(-55f, 0f, 120f));
