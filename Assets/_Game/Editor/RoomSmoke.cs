@@ -19,7 +19,10 @@ public static class RoomSmoke
     static int stage, failures;
     static string code;
     static System.Diagnostics.Process bot;
-    static bool driving, sawRemote, remoteMoved, sawRacing, sawCountdown;
+    static bool driving, sawRemote, remoteMoved, sawRacing, sawCountdown, sawIntro;
+    static double podiumAt;
+    static int podiumRacers;
+    static string podiumTitle;
     static Vector3 remoteStart;
     static int lastLogged = -1, lastClockLog = -1;
     static float maxClockErr = float.MinValue;
@@ -38,7 +41,7 @@ public static class RoomSmoke
         Cup.End();
         EditorSceneManager.OpenScene("Assets/_Game/Scenes/Menu.unity", OpenSceneMode.Single);
         start = EditorApplication.timeSinceStartup; stage = 0; failures = 0;
-        driving = sawRemote = remoteMoved = sawRacing = sawCountdown = false; lastLogged = -1; lastClockLog = -1; maxClockErr = float.MinValue;
+        driving = sawRemote = remoteMoved = sawRacing = sawCountdown = sawIntro = false; podiumAt = -1; podiumRacers = 0; podiumTitle = null; lastLogged = -1; lastClockLog = -1; maxClockErr = float.MinValue;
         EditorApplication.update += Tick;
         EditorApplication.EnterPlaymode();
     }
@@ -75,8 +78,8 @@ public static class RoomSmoke
             case 3:
                 Race(client, t);
                 return;
-            case 4:
-                Verify(client);
+            case 4:   // the room's verdict is in: the podium plays, then the card comes back over it
+                Ceremony(client, t);
                 return;
         }
     }
@@ -130,7 +133,19 @@ public static class RoomSmoke
         if (remote != null && !sawRemote) { sawRemote = true; remoteStart = remote.transform.position; Check("the bot has a remote kart on the grid", true); }
         if (sawRemote && !remoteMoved && remote != null && Vector3.Distance(remote.transform.position, remoteStart) > 1f)
         { remoteMoved = true; Check("remote kart moves from network states", true); }
-        if (!sawCountdown && race.state == RaceManager.State.Countdown) { sawCountdown = true; Check("countdown started from the room clock", true); }
+        var show = PodiumShow.Instance;
+        if (!sawIntro && show != null && show.Active && race.state == RaceManager.State.Idle)
+        {
+            sawIntro = true;
+            Check("the prize shot is up while the grid waits", true);
+            Check("a free room races for gold and bragging rights", Texts().Contains("RACE FOR GOLD") && Texts().Contains("BRAGGING RIGHTS"), string.Join(" | ", Texts()));
+        }
+        if (!sawCountdown && race.state == RaceManager.State.Countdown)
+        {
+            sawCountdown = true;
+            Check("countdown started from the room clock", true);
+            Check("the prize shot came first and gives way to the 3-2-1", sawIntro && (show == null || !show.Active));
+        }
         if (!sawRacing && race.state == RaceManager.State.Racing) { sawRacing = true; Check("GO", true); }
         // The room refuses a race clock more than a second ahead of its own. The Worker runs on this machine, so the
         // system clock IS the server clock: log how far our race clock (and the clock fit behind it) is from the truth.
@@ -159,8 +174,27 @@ public static class RoomSmoke
         if (t - stageAt > 170) Fail("no results after 170 s");
     }
 
+    static List<string> Texts() => Object.FindObjectsByType<TMP_Text>(FindObjectsSortMode.None).Select(x => x.text).ToList();
+
+    static void Ceremony(RoomClient client, double t)
+    {
+        var show = PodiumShow.Instance;
+        if (podiumAt < 0 && show != null && show.Active)
+        {
+            podiumAt = t;
+            podiumRacers = Object.FindObjectsByType<PodiumPose>(FindObjectsSortMode.None).Length;
+            podiumTitle = Texts().FirstOrDefault(x => x.EndsWith("!"));
+        }
+        var dim = Object.FindFirstObjectByType<ResultsPanel>()?.transform.Find("Dim");
+        bool card = dim != null && dim.gameObject.activeInHierarchy;
+        if (podiumAt > 0 && card && t - podiumAt > 3) { Verify(client); return; }
+        if (t - stageAt > 20) Verify(client);
+    }
+
     static void Verify(RoomClient client)
     {
+        Check("the podium played with both racers", podiumRacers == 2, $"racers {podiumRacers}");
+        Check("the podium says YOU WIN!", podiumTitle == "YOU WIN!", podiumTitle ?? "<none>");
         var r = client.LastResults;
         Check("results arrived", r?.results != null);
         if (r?.results != null)

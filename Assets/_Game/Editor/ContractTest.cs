@@ -41,6 +41,7 @@ public static class ContractTest
         EditorSceneManager.OpenScene($"Assets/_Game/Scenes/Race{track}.unity", OpenSceneMode.Single);
         start = EditorApplication.timeSinceStartup;
         driving = false;
+        introAt = countdownAt = podiumAt = cardAt = introFrame = podiumFrame = -1; podiumRacers = 0;
         EditorApplication.update += Tick;
         EditorApplication.EnterPlaymode();
     }
@@ -53,6 +54,7 @@ public static class ContractTest
 
         var race = Object.FindFirstObjectByType<RaceManager>();
         if (race == null || race.Player == null) return;
+        Flow(race, t);
 
         // Hand the player kart to the waypoint follower so it completes real laps through the real checkpoints.
         if (!driving)
@@ -87,18 +89,63 @@ public static class ContractTest
         }
         bool done = race.Player.finished;
         if (!done && t < 150) return;
-        // RaceSession sends 0.6 s after the line; wait for the Worker's answer (up to 10 s).
+        // RaceSession sends 0.6 s after the line; wait for the Worker's answer (up to 10 s), and for the podium and
+        // the results card that follows it.
         var s = Object.FindFirstObjectByType<RaceSession>();
         if (done && finishedAt < 0) finishedAt = t;
         if (done && s != null && s.LastSubmit == null && t - finishedAt < 10) return;
+        if (done && t - finishedAt < 9) return;
 
         EditorApplication.update -= Tick;
         Report(race, done, t);
         EditorApplication.Exit(0);
     }
 
+    // ---- the ceremony around the race: prize shot, 3-2-1, race, podium, results card ----
+    static double introAt = -1, countdownAt = -1, podiumAt = -1, cardAt = -1, introFrame = -1, podiumFrame = -1;
+    static int podiumRacers;
+
+    static void Flow(RaceManager race, double t)
+    {
+        var show = PodiumShow.Instance;
+        bool active = show != null && show.Active;
+        if (introAt < 0 && active && race.state == RaceManager.State.Idle) { introAt = t; Debug.Log($"[contract] flow: prize shot at {t:F1}s"); }
+        if (introAt > 0 && introFrame < 0 && t - introAt > 2.2) { introFrame = t; Frame("flow-intro"); }
+        if (countdownAt < 0 && race.state == RaceManager.State.Countdown) { countdownAt = t; Debug.Log($"[contract] flow: 3-2-1 at {t:F1}s, prize shot still up: {active}"); }
+        if (race.Player.finished && podiumAt < 0 && active)
+        {
+            podiumAt = t;
+            podiumRacers = Object.FindObjectsByType<PodiumPose>(FindObjectsSortMode.None).Length;
+            Debug.Log($"[contract] flow: podium at {t:F1}s with {podiumRacers} racers");
+        }
+        if (podiumAt > 0 && podiumFrame < 0 && t - podiumAt > 2.5) { podiumFrame = t; Frame("flow-podium"); }
+        var card = Object.FindFirstObjectByType<ResultsPanel>();
+        var dim = card != null ? card.transform.Find("Dim") : null;
+        if (podiumAt > 0 && cardAt < 0 && dim != null && dim.gameObject.activeInHierarchy) { cardAt = t; Debug.Log($"[contract] flow: results card at {t:F1}s"); }
+    }
+
+    /// What the topmost camera sees (the podium's while a shot is up), without the overlay UI.
+    static void Frame(string name)
+    {
+        var cam = Object.FindObjectsByType<Camera>(FindObjectsSortMode.None).Where(c => c.enabled).OrderByDescending(c => c.depth).FirstOrDefault();
+        if (cam == null) return;
+        int w = 1600, h = 720;
+        var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 };
+        var prevTarget = cam.targetTexture; cam.targetTexture = rt; cam.Render(); cam.targetTexture = prevTarget;
+        var prev = RenderTexture.active; RenderTexture.active = rt;
+        var tex = new Texture2D(w, h, TextureFormat.RGB24, false);
+        tex.ReadPixels(new Rect(0, 0, w, h), 0, 0); tex.Apply();
+        RenderTexture.active = prev;
+        System.IO.Directory.CreateDirectory("Builds");
+        System.IO.File.WriteAllBytes($"Builds/{name}.png", tex.EncodeToPNG());
+        Debug.Log($"[contract] flow: wrote Builds/{name}.png from {cam.name}");
+    }
+
     static void Report(RaceManager race, bool finished, double t)
     {
+        Check("the prize shot plays before the race", introAt > 0 && countdownAt > introAt + 3.0, $"shot {introAt:F1}s, 3-2-1 {countdownAt:F1}s");
+        Check("the podium plays after the finish, with three racers", podiumAt > 0 && podiumRacers == 3, $"podium {podiumAt:F1}s, racers {podiumRacers}");
+        Check("the results card follows the podium", cardAt > podiumAt + 3.0, $"podium {podiumAt:F1}s, card {cardAt:F1}s");
         var session = Object.FindFirstObjectByType<RaceSession>();
         if (session == null) { Debug.LogError("[contract] FAIL: no RaceSession in the race scene"); return; }
 
