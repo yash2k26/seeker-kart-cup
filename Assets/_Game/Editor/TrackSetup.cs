@@ -56,6 +56,19 @@ public static partial class TrackSetup
         if (Application.isBatchMode) EditorApplication.Exit(0);
     }
 
+    /// One circuit only (-track N, 1-based like the scenes), for iterating on a map's look: a third of the time.
+    public static void BuildTrack()
+    {
+        int track = 1;
+        var args = System.Environment.GetCommandLineArgs();
+        for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-track") int.TryParse(args[i + 1], out track);
+        int index = Mathf.Clamp(track - 1, 0, Tracks.Count - 1);
+        var theme = System.Array.Find(Themes, t => t.id == Tracks.At(index).id);
+        BuildOne(theme, index);
+        Debug.Log($"[track] built {Tracks.At(index).name} only");
+        if (Application.isBatchMode) EditorApplication.Exit(0);
+    }
+
     static void BuildOne(Theme theme, int index)
     {
         V = theme; Index = index;
@@ -298,7 +311,9 @@ public static partial class TrackSetup
     static GameObject Road()
     {
         var unlit = Shader.Find("KartCup/Unlit Colormap");
-        var roadMat = LoadOrCreate(Art + "Materials/Road.mat", unlit, new Color(0.40f, 0.40f, 0.43f));
+        var roadMat = RoadMaterial();
+        arc = new float[centre.Length];
+        for (int i = 1; i < centre.Length; i++) arc[i] = arc[i - 1] + Vector3.Distance(centre[i - 1], centre[i]);
         var kerbMat = LoadOrCreate(Art + "Materials/Kerb.mat", unlit, new Color(0.93f, 0.93f, 0.95f));
 
         var redMat = LoadOrCreate(Art + "Materials/KerbRed.mat", unlit, new Color(0.80f, 0.20f, 0.18f));
@@ -306,21 +321,23 @@ public static partial class TrackSetup
         var darkMat = LoadOrCreate(Art + "Materials/RoadDark.mat", unlit, new Color(0.18f, 0.18f, 0.20f));
 
         var root = new GameObject("Track");
-        var road = Strip("Road", root.transform, roadMat, -HalfWidth, HalfWidth, 0.02f);
-        road.AddComponent<MeshCollider>();
-        var surface = road.AddComponent<GroundSurface>();
-        surface.props = AssetDatabase.LoadAssetAtPath<GroundSurfacePreset>(PKP + "Prefabs/GroundSurfacePresets/Default Road.asset");
+        var preset = AssetDatabase.LoadAssetAtPath<GroundSurfacePreset>(PKP + "Prefabs/GroundSurfacePresets/Default Road.asset");
+        foreach (var road in Strips("Road", root.transform, roadMat, -HalfWidth, HalfWidth, 0.02f, metres: true))
+        {
+            road.AddComponent<MeshCollider>();
+            road.AddComponent<GroundSurface>().props = preset;
+        }
 
         // kerbs in alternating red/white blocks, the way a real circuit reads at speed
-        Strip("KerbL", root.transform, kerbMat, -HalfWidth - Kerb, -HalfWidth, 0.03f);
-        Strip("KerbR", root.transform, kerbMat, HalfWidth, HalfWidth + Kerb, 0.03f);
-        Strip("KerbLRed", root.transform, redMat, -HalfWidth - Kerb, -HalfWidth, 0.035f, 4, 4);
-        Strip("KerbRRed", root.transform, redMat, HalfWidth, HalfWidth + Kerb, 0.035f, 4, 4, 4);
+        Strips("KerbL", root.transform, kerbMat, -HalfWidth - Kerb, -HalfWidth, 0.03f);
+        Strips("KerbR", root.transform, kerbMat, HalfWidth, HalfWidth + Kerb, 0.03f);
+        Strips("KerbLRed", root.transform, redMat, -HalfWidth - Kerb, -HalfWidth, 0.035f, 4, 4);
+        Strips("KerbRRed", root.transform, redMat, HalfWidth, HalfWidth + Kerb, 0.035f, 4, 4, 4);
 
         // dashed centre line and solid edge lines
-        Strip("CentreLine", root.transform, lineMat, -0.35f, 0.35f, 0.035f, 5, 7);
-        Strip("EdgeL", root.transform, lineMat, -HalfWidth + 0.3f, -HalfWidth + 0.75f, 0.035f);
-        Strip("EdgeR", root.transform, lineMat, HalfWidth - 0.75f, HalfWidth - 0.3f, 0.035f);
+        Strips("CentreLine", root.transform, lineMat, -0.35f, 0.35f, 0.035f, 5, 7);
+        Strips("EdgeL", root.transform, lineMat, -HalfWidth + 0.3f, -HalfWidth + 0.75f, 0.035f);
+        Strips("EdgeR", root.transform, lineMat, HalfWidth - 0.75f, HalfWidth - 0.3f, 0.035f);
 
         // start/finish chequer: eight columns across the road, two rows deep
         for (int col = 0; col < 8; col++)
@@ -336,7 +353,7 @@ public static partial class TrackSetup
     /// `phase` shifts the pattern, and `start`/`count` restrict it to a stretch — that covers kerb blocks,
     /// the dashed centre line and the start chequer without a texture between them.
     static GameObject Strip(string name, Transform parent, Material mat, float from, float to, float height,
-                            int on = 0, int off = 0, int phase = 0, int start = 0, int count = 0)
+                            int on = 0, int off = 0, int phase = 0, int start = 0, int count = 0, bool metres = false, Mesh container = null)
     {
         int n = centre.Length;
         var verts = new System.Collections.Generic.List<Vector3>();
@@ -347,13 +364,14 @@ public static partial class TrackSetup
         for (int k = 0; k < span; k++)
         {
             int i = Wrap(start + k, n);
-            if (on > 0 && off > 0 && ((k + phase) % (on + off)) >= on) continue;
+            if (on > 0 && off > 0 && ((start + k + phase) % (on + off)) >= on) continue;   // the lap's rhythm, whatever piece this is
             int j = Wrap(i + 1, n);
             int v = verts.Count;
             foreach (var (sample, side) in new[] { (i, from), (i, to), (j, from), (j, to) })
             {
                 verts.Add(centre[sample] + right[sample] * side + Vector3.up * height);
-                uvs.Add(new Vector2(0.03f, 0.5f));      // flat colour from the colormap
+                // metres (across, along) for a textured strip; otherwise one flat colour off the colormap
+                uvs.Add(metres ? new Vector2(side, sample == i ? arc[i] : arc[i] + Vector3.Distance(centre[i], centre[j])) : new Vector2(0.03f, 0.5f));
                 norms.Add(Vector3.up);
             }
             // wound so the face points up
@@ -361,8 +379,10 @@ public static partial class TrackSetup
         }
         var mesh = new Mesh { name = name, indexFormat = UnityEngine.Rendering.IndexFormat.UInt32, vertices = verts.ToArray(), uv = uvs.ToArray(), normals = norms.ToArray(), triangles = tris.ToArray() };
         mesh.RecalculateBounds();
+        if (metres) mesh.RecalculateTangents();          // the road's normal map needs them
         Directory.CreateDirectory(MeshDir);
-        AssetDatabase.CreateAsset(mesh, $"{MeshDir}/{name}.asset");
+        if (container != null) AssetDatabase.AddObjectToAsset(mesh, container);      // a strip's pieces share one asset file
+        else AssetDatabase.CreateAsset(mesh, $"{MeshDir}/{name}.asset");
 
         var go = new GameObject(name);
         go.transform.SetParent(parent, false);
@@ -370,6 +390,27 @@ public static partial class TrackSetup
         go.AddComponent<MeshRenderer>().sharedMaterial = mat;
         GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic | StaticEditorFlags.OccluderStatic);
         return go;
+    }
+
+    /// A strip in Chunks pieces round the lap, so a phone lights each piece by its own nearest lamps (it caps a
+    /// renderer at eight lights). The first piece keeps the plain name: the probes look for "Road".
+    const int Chunks = 12;
+    static float[] arc;      // metres along the lap at each sample, for textured strips
+    static List<GameObject> Strips(string name, Transform parent, Material mat, float from, float to, float height,
+                                   int on = 0, int off = 0, int phase = 0, bool metres = false)
+    {
+        var list = new List<GameObject>();
+        Mesh container = null;                       // the first piece's asset holds the rest as sub-assets
+        int n = centre.Length, per = (n + Chunks - 1) / Chunks;
+        for (int k = 0; k < Chunks; k++)
+        {
+            int start = k * per, count = Mathf.Min(per, n - start);
+            if (count <= 0) break;
+            var piece = Strip(k == 0 ? name : $"{name}_{k:00}", parent, mat, from, to, height, on, off, phase, start, count, metres, container);
+            if (k == 0) container = piece.GetComponent<MeshFilter>().sharedMesh;
+            list.Add(piece);
+        }
+        return list;
     }
 
     static BasicWaypoint Waypoints()
@@ -471,12 +512,23 @@ public static partial class TrackSetup
 
     static void Environment()
     {
-        // Sky: Unity's procedural skybox, one material per map, with the sun disc following the directional light.
+        // Sky: Unity's procedural skybox, one material per map, with the sun disc following the directional light;
+        // or, after dark, a photographed sky cube (the teaser's moonrise) turned so the moon hangs where the theme says.
         var sky = LoadOrCreate(Art + $"Materials/Sky_{V.id}.mat", Shader.Find("Skybox/Procedural"), Color.white);
-        sky.shader = Shader.Find("Skybox/Procedural");
-        sky.SetColor("_SkyTint", V.skyTint); sky.SetColor("_GroundColor", V.horizon);
-        sky.SetFloat("_Exposure", V.exposure); sky.SetFloat("_AtmosphereThickness", V.atmosphere);
-        sky.SetFloat("_SunSize", V.sunSize); sky.SetFloat("_SunSizeConvergence", V.sunConvergence);
+        if (!string.IsNullOrEmpty(V.sky))
+        {
+            sky.shader = Shader.Find("Skybox/Cubemap");
+            sky.SetTexture("_Tex", AssetDatabase.LoadAssetAtPath<Cubemap>(Art + $"Textures/Sky/{V.sky}.png"));
+            sky.SetColor("_Tint", new Color(0.5f, 0.5f, 0.5f));           // this shader doubles its tint
+            sky.SetFloat("_Exposure", V.skyExposure); sky.SetFloat("_Rotation", V.skyRotation);
+        }
+        else
+        {
+            sky.shader = Shader.Find("Skybox/Procedural");
+            sky.SetColor("_SkyTint", V.skyTint); sky.SetColor("_GroundColor", V.horizon);
+            sky.SetFloat("_Exposure", V.exposure); sky.SetFloat("_AtmosphereThickness", V.atmosphere);
+            sky.SetFloat("_SunSize", V.sunSize); sky.SetFloat("_SunSizeConvergence", V.sunConvergence);
+        }
         EditorUtility.SetDirty(sky);
         RenderSettings.skybox = sky;
         // Gradient ambient: sky from above, a bounce from the ground colour below — flat ambient is what made
@@ -496,6 +548,11 @@ public static partial class TrackSetup
         sun.color = V.sunColor;
         sun.shadowStrength = 0.72f; sun.shadowBias = 0.06f; sun.shadowNormalBias = 0.5f;
         RenderSettings.sun = sun;
+        if (V.night)
+        {
+            sun.shadowStrength = 0.6f;                   // moon shadows stay soft-edged and open
+            RenderSettings.reflectionIntensity = 0.2f;   // the wet road mirrors the sky, but the lamps have to win
+        }
 
         // Terrain: the theme's heightfield, painted per face, on the "KartCup/Terrain" shader (albedo = tint x vertex
         // colour). If that shader is not imported yet the map still builds, on Simple Lit in the palette's mid tone.
@@ -510,6 +567,9 @@ public static partial class TrackSetup
             mat.shader = terrainShader;
             mat.SetColor("_BaseColor", Color.white); mat.SetFloat("_ShadowTint", 0.5f);
             mat.SetFloat("_Wrap", V.id == "speedway" ? 0.55f : 0.3f);   // a 17 deg sun barely grazes a flat field: wrap the lambert so dusk stays readable
+            var detail = string.IsNullOrEmpty(V.groundDetail) ? null : Tex("Surfaces/" + V.groundDetail);
+            mat.SetTexture("_DetailMap", detail);
+            mat.SetFloat("_DetailTile", V.groundDetailTile); mat.SetFloat("_DetailStrength", detail != null ? 0.85f : 0f);
         }
         else
         {
@@ -524,6 +584,17 @@ public static partial class TrackSetup
         // the origin at the island's shoreline, so the lake (well inside it) gets the caustics without the surf.
         if (!float.IsNaN(V.sea)) Water("Water", new Vector3(0, V.sea, 0), 200f);
         if (V.lakeRadius > 0f) Water("Lake", new Vector3(V.lake.x, -1.3f, V.lake.y), V.lakeRadius * 0.3f);
+
+        // After dark the karts spawn with their lamps lit (RaceSpawner reads this marker).
+        if (V.night)
+        {
+            var night = new GameObject("Night").AddComponent<NightScene>();
+            new SerializedObject(night).Do(s =>
+            {
+                s.FindProperty("lens").objectReferenceValue = Emissive("Headlight_Lens", new Color(1f, 0.95f, 0.85f), 3f);
+                s.FindProperty("tail").objectReferenceValue = Emissive("Tail_Lens", new Color(1f, 0.12f, 0.08f), 2.4f);
+            });
+        }
     }
 
     static void Water(string name, Vector3 pos, float scale)
@@ -532,7 +603,7 @@ public static partial class TrackSetup
         water.name = name;
         water.transform.position = pos;
         water.transform.localScale = new Vector3(scale, 1, scale);
-        water.GetComponent<MeshRenderer>().sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(Art + "Materials/Water.mat");
+        water.GetComponent<MeshRenderer>().sharedMaterial = WaterMaterial();
         Object.DestroyImmediate(water.GetComponent<Collider>());
     }
 
@@ -960,17 +1031,24 @@ public static partial class TrackSetup
         return go;
     }
 
-    /// Powerslide's own item box ships a built-in-pipeline material (pink under URP): hide its mesh and
-    /// put the Kenney box in its place, keeping the prefab's trigger and cooldown logic.
+    /// Powerslide's own item box ships a built-in-pipeline material (pink under URP). ItemGiver shows and hides its
+    /// own renderer as the box is taken and respawns, so the Kenney box has to BE that renderer: the prefab's mesh
+    /// and material are swapped in place (a box hidden under a child came back at runtime and never blinked out).
     static void Reskin(GameObject go, string fbxPath, Material mat, float scale)
     {
-        foreach (var r in go.GetComponentsInChildren<MeshRenderer>(true)) r.enabled = false;
         var art = AssetDatabase.LoadAssetAtPath<GameObject>(fbxPath);
-        if (art == null) return;
-        var visual = (GameObject)PrefabUtility.InstantiatePrefab(art, go.transform);
-        visual.transform.localPosition = Vector3.zero;
-        visual.transform.localScale = Vector3.one * scale;
-        foreach (var r in visual.GetComponentsInChildren<MeshRenderer>()) r.sharedMaterial = mat;
+        var mesh = art != null ? art.GetComponentInChildren<MeshFilter>()?.sharedMesh : null;
+        var filter = go.GetComponent<MeshFilter>();
+        var renderer = go.GetComponent<MeshRenderer>();
+        if (mesh == null || filter == null || renderer == null)
+        {
+            Debug.LogWarning("[track] item box: no mesh to swap in, hiding it");
+            foreach (var r in go.GetComponentsInChildren<MeshRenderer>(true)) r.enabled = false;
+            return;
+        }
+        filter.sharedMesh = mesh;
+        renderer.sharedMaterial = mat;
+        go.transform.localScale = Vector3.one * scale;
     }
 
     /// What a prop does when a kart reaches it.
@@ -1044,6 +1122,48 @@ public static partial class TrackSetup
         float outward = Vector3.Dot(go.transform.position - trackPoint, rightVec) * side;
         float need = clearance + radius;
         if (outward < need) go.transform.position += rightVec * (side * (need - outward));
+    }
+
+    static Texture2D Tex(string name) => AssetDatabase.LoadAssetAtPath<Texture2D>(Art + $"Textures/{name}.png");
+
+    /// The road's own material per map: the asphalt tile (Poly Haven, CC0) on the PBR road shader, wet after dark.
+    static Material RoadMaterial()
+    {
+        var shader = Shader.Find("KartCup/Wet Road");
+        if (shader == null)
+        {
+            Debug.LogWarning("[track] KartCup/Wet Road shader missing: road on Simple Lit");
+            return LoadOrCreate(Art + "Materials/Road.mat", Shader.Find("Universal Render Pipeline/Simple Lit"), new Color(0.26f, 0.26f, 0.29f));
+        }
+        Directory.CreateDirectory(MeshDir);
+        var m = LoadOrCreate($"{MeshDir}/Road_{V.id}.mat", shader, Color.white);
+        m.shader = shader;
+        m.SetTexture("_BaseMap", Tex("Surfaces/asphalt_diff")); m.SetTexture("_BumpMap", Tex("Surfaces/asphalt_nor"));
+        m.SetTexture("_RoughMap", Tex("Surfaces/asphalt_rough")); m.SetTexture("_PuddleMap", Tex("Surfaces/puddles"));
+        m.SetFloat("_Tile", 3f); m.SetFloat("_PuddleTile", 38f); m.SetFloat("_BumpScale", V.night ? 0.7f : 1f);
+        m.SetFloat("_Wet", V.wet); m.SetFloat("_Puddles", 0.65f);
+        m.SetFloat("_LaneOffset", HalfWidth * 0.5f); m.SetFloat("_LaneHalf", 3.4f);
+        m.SetColor("_Tint", V.night ? new Color(1.15f, 1.15f, 1.2f) : new Color(0.75f, 0.75f, 0.78f));   // the tile is dark; night lifts it for the lamps
+        EditorUtility.SetDirty(m);
+        return m;
+    }
+
+    /// The shared day sea, or the theme's own copy of it (the night sea is darker, with the moon's glitter on it).
+    static Material WaterMaterial()
+    {
+        string path = Art + $"Materials/{V.water}.mat";
+        if (V.water != "Water" && AssetDatabase.LoadAssetAtPath<Material>(path) == null) AssetDatabase.CopyAsset(Art + "Materials/Water.mat", path);
+        var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (m != null && V.night)
+        {
+            m.SetColor("_DeepColor", new Color(0.02f, 0.05f, 0.10f)); m.SetColor("_ShallowColor", new Color(0.05f, 0.13f, 0.20f));
+            m.SetColor("_SurfColor", new Color(0.45f, 0.55f, 0.62f));
+            float yaw = (V.sun.y + 180f) * Mathf.Deg2Rad;             // the moon is where the light comes from
+            m.SetVector("_MoonDir", new Vector4(Mathf.Sin(yaw), Mathf.Cos(yaw), 0, 0));
+            m.SetColor("_Glitter", new Color(1f, 0.85f, 0.6f)); m.SetFloat("_GlitterStrength", 1.6f); m.SetFloat("_GlitterWidth", 0.12f);
+            EditorUtility.SetDirty(m);
+        }
+        return m;
     }
 
     static Material LoadOrCreate(string path, Shader s, Color tint)

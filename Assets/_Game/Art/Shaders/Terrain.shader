@@ -9,6 +9,9 @@ Shader "KartCup/Terrain"
         _ShadowTint ("Shadow brightness", Range(0,1)) = 0.45
         _Wrap ("Light wrap", Range(0,1)) = 0.28
         _AmbientBoost ("Ambient boost", Range(0,2)) = 1
+        _DetailMap ("Detail (world tiled)", 2D) = "gray" {}
+        _DetailTile ("Detail tile (m)", Float) = 7
+        _DetailStrength ("Detail strength", Range(0,1)) = 0
     }
     SubShader
     {
@@ -23,9 +26,13 @@ Shader "KartCup/Terrain"
             #pragma fragment frag
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
+            #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+            #pragma multi_compile_fragment _ _CLUSTER_LIGHT_LOOP
             #pragma multi_compile_fog
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+
+            TEXTURE2D(_DetailMap); SAMPLER(sampler_DetailMap);
 
             // Every pass must declare this identically, floats only: a half here and a float there shifts the
             // offsets and the SRP Batcher hands one material's constants to everything using the shader.
@@ -34,6 +41,8 @@ Shader "KartCup/Terrain"
                 float _ShadowTint;
                 float _Wrap;
                 float _AmbientBoost;
+                float _DetailTile;
+                float _DetailStrength;
             CBUFFER_END
 
             struct A { float4 positionOS : POSITION; float3 normalOS : NORMAL; float4 colour : COLOR; };
@@ -61,6 +70,9 @@ Shader "KartCup/Terrain"
             float4 frag (V i) : SV_Target
             {
                 float4 albedo = i.colour * _BaseColor;
+                // a world-tiled detail (sand grain) over the per-face colour, so the big flat faces read up close
+                float3 detail = SAMPLE_TEXTURE2D(_DetailMap, sampler_DetailMap, i.positionWS.xz / _DetailTile).rgb;
+                albedo.rgb *= lerp(1.0, detail * 2.0, _DetailStrength);
                 float3 n = normalize(i.normalWS);
 
                 float4 shadowCoord = TransformWorldToShadowCoord(i.positionWS);
@@ -71,6 +83,18 @@ Shader "KartCup/Terrain"
                 float shadow = lerp(_ShadowTint, 1.0, main.shadowAttenuation);
                 float3 ambient = SampleSH(n) * _AmbientBoost;
                 float3 colour = albedo.rgb * (ambient + main.color * ndl * shadow);
+                #ifdef _ADDITIONAL_LIGHTS
+                // The lamp posts' pools on the ground beside the road. URP's loop macros cover both light paths:
+                // per-object lists (the phone's Forward) and the clustered list (Forward+), which reads `inputData`.
+                InputData inputData = (InputData)0;
+                inputData.positionWS = i.positionWS;
+                inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(i.positionCS);
+                uint lights = GetAdditionalLightsCount();
+                LIGHT_LOOP_BEGIN(lights)
+                    Light l = GetAdditionalLight(lightIndex, i.positionWS);
+                    colour += albedo.rgb * l.color * l.distanceAttenuation * saturate(dot(n, l.direction) * (1 - _Wrap) + _Wrap);
+                LIGHT_LOOP_END
+                #endif
 
                 colour = MixFog(colour, i.fog);
                 return float4(colour, albedo.a);
@@ -96,6 +120,8 @@ Shader "KartCup/Terrain"
                 float _ShadowTint;
                 float _Wrap;
                 float _AmbientBoost;
+                float _DetailTile;
+                float _DetailStrength;
             CBUFFER_END
 
             float3 _LightDirection;

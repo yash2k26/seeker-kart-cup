@@ -72,6 +72,20 @@ public sealed class GameAssetImportRules : AssetPostprocessor
                 ps.maxTextureSize = 2048; ps.format = TextureImporterFormat.ASTC_6x6;
             }
         }
+        else if (In("Art/Textures/Surfaces"))
+        {
+            // Poly Haven PBR tiles (CC0) that the road and ground shaders lay in metres: they repeat, and a road seen
+            // at a grazing angle smears without anisotropy. Normal and roughness maps are data, not colour.
+            bool normal = assetPath.EndsWith("_nor.png");
+            t.textureType = normal ? TextureImporterType.NormalMap : TextureImporterType.Default;
+            t.sRGBTexture = !normal && !assetPath.EndsWith("_rough.png") && !assetPath.EndsWith("puddles.png");
+            t.wrapMode = TextureWrapMode.Repeat;
+            t.mipmapEnabled = true;
+            t.filterMode = FilterMode.Trilinear;
+            t.anisoLevel = 4;
+            ps.maxTextureSize = 1024;
+            ps.format = TextureImporterFormat.ASTC_6x6;
+        }
         else if (In("Art/Textures/Sky"))
         {
             t.textureShape = TextureImporterShape.TextureCube;   // 2:1 equirect -> Latitude-Longitude cube

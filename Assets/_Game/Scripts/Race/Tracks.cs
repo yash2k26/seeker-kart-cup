@@ -17,7 +17,7 @@ namespace KartCup
 
         public static readonly Def[] All =
         {
-            new("beach",    "Palm Bay",        "TROPICAL ISLAND",  "Wide sweepers along the surf. Run wide onto the sand and pay for it.",            1),
+            new("beach",    "Palm Bay",        "THE COAST AT NIGHT", "Wide sweepers under the lamps, the lighthouse sweeping the bay. Run wide onto the sand and pay for it.", 1),
             new("alpine",   "Frost Peak",      "ALPINE PASS",      "Hairpins up the pass. Brake early: the cabins are closer than they look.",        2),
             new("forest",   "Pine Ridge",      "MOUNTAIN FOREST",  "Tight and technical through the pines. Every corner hides the next one.",         3),
             new("speedway", "Sunset Speedway", "STADIUM CIRCUIT",  "Two long straights and a chicane under the floodlights. Pure top speed.",         2),

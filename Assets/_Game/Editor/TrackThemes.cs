@@ -27,6 +27,12 @@ public static partial class TrackSetup
         // Per-map post overrides on a copy of the shared profile: the shared split-toning (warm highlights) is
         // right for a beach and wrong for snow, and dusk needs more exposure and a lower bloom threshold.
         public System.Action<VolumeProfile> post;
+        // After dark (Palm Bay): a photographed sky cube in place of the procedural one, the sun fields driving the
+        // moon, a wet road, sodium lamps every lampEvery metres, cyan road studs and the lighthouse. The ground can
+        // carry a detail tile (Art/Textures/Surfaces) so its flat faces read as sand up close.
+        public bool night, studs, lighthouse;
+        public string sky, water = "Water", groundDetail;
+        public float skyRotation, skyExposure = 1f, wet, lampEvery, groundDetailTile = 7f;
     }
 
     static readonly Theme[] Themes =
@@ -42,10 +48,27 @@ public static partial class TrackSetup
                 return 3.2f + 4.8f * TerrainGen.Fbm(x, z, 1f / 120f, 3) - 15f * TerrainGen.Step(395f, 445f, r);
             },
             palette = BeachPalette, ground = new Color(0.78f, 0.68f, 0.46f), sea = -0.9f,
-            sun = new Vector3(46, -38, 0), sunColor = new Color(1f, 0.96f, 0.88f), sunIntensity = 1.0f,
-            skyTint = new Color(0.46f, 0.60f, 0.78f), horizon = new Color(0.72f, 0.86f, 0.92f), exposure = 1.3f, atmosphere = 0.78f, sunSize = 0.04f, sunConvergence = 5f,
-            ambientSky = new Color(0.30f, 0.37f, 0.46f), ambientEquator = new Color(0.26f, 0.26f, 0.25f), ambientGround = new Color(0.20f, 0.17f, 0.13f),
-            fog = new Color(0.72f, 0.86f, 0.92f), fogStart = 220, fogEnd = 420, farClip = 400,
+            // After dark, the teaser's coast: the moonrise sky turned so the moon hangs over the sea ahead-left of the
+            // start straight, the same moon lighting everything, and fog in the sky's own horizon colour.
+            // The cube's centre column faces +Z and _Rotation turns the sky the other way: the image's moon (36 deg
+            // right of centre) lands at yaw 30, and the moonlight comes from there.
+            night = true, sky = "skybox-moonrise", skyRotation = 6f, skyExposure = 0.9f,
+            sun = new Vector3(26, -150, 0), sunColor = new Color(0.62f, 0.72f, 1f), sunIntensity = 0.7f,
+            ambientSky = new Color(0.16f, 0.20f, 0.30f), ambientEquator = new Color(0.12f, 0.15f, 0.22f), ambientGround = new Color(0.05f, 0.05f, 0.07f),
+            fog = new Color(0.22f, 0.27f, 0.33f), fogStart = 60, fogEnd = 430, farClip = 470,
+            water = "Water_night", wet = 1f, lampEvery = 36f, studs = true, lighthouse = true, groundDetail = "sand_diff",
+            post = p =>
+            {
+                // The teaser's grade: filmic roll-off, teal shadows under warm lamps, bloom on every practical, a
+                // little grain and fringe. The base profile (LookSetup) carries every component; this only retunes.
+                if (p.TryGet(out Tonemapping tone)) tone.mode.value = TonemappingMode.ACES;
+                if (p.TryGet(out ColorAdjustments g)) { g.postExposure.value = 0.75f; g.contrast.value = 14f; g.saturation.value = 10f; g.colorFilter.value = new Color(0.94f, 0.97f, 1f); }
+                if (p.TryGet(out SplitToning split)) { split.shadows.value = new Color(0.10f, 0.36f, 0.52f); split.highlights.value = new Color(1f, 0.80f, 0.58f); split.balance.value = -12f; }
+                if (p.TryGet(out Bloom bloom)) { bloom.threshold.value = 0.85f; bloom.intensity.value = 1.3f; bloom.scatter.value = 0.72f; }
+                if (p.TryGet(out Vignette vignette)) vignette.intensity.value = 0.34f;
+                if (p.TryGet(out FilmGrain grain)) grain.intensity.value = 0.22f;
+                if (p.TryGet(out ChromaticAberration fringe)) fringe.intensity.value = 0.06f;
+            },
         },
         // Frost Peak: the hairpin layout in a valley floor that rolls 8-15 m, with mountains from r ~290 out.
         new()

@@ -117,6 +117,24 @@ public static class PodiumSetup
         var rain = Particles(root.transform, "Rain", confettiMat, quad, rain: true);
         rain.transform.localPosition = new Vector3(0, 9f, 0.5f);
 
+        // Stage light: the ceremony plays in the race scene, and after dark the coast's moon is not enough to see a
+        // face by. Two warm spots from the front corners, no shadows.
+        foreach (float side in new[] { -1f, 1f })
+        {
+            var l = new GameObject(side < 0 ? "StageLightL" : "StageLightR").AddComponent<Light>();
+            l.transform.SetParent(root.transform, false);
+            l.transform.localPosition = new Vector3(6f * side, 7.5f, -8f);
+            l.transform.LookAt(root.transform.position + new Vector3(0, 1.6f, 0));
+            l.type = LightType.Spot; l.spotAngle = 85f; l.innerSpotAngle = 50f; l.range = 30f; l.intensity = 110f;   // a 10 m throw
+            l.color = new Color(1f, 0.95f, 0.88f); l.shadows = LightShadows.None;
+        }
+        var wash = new GameObject("StageWash").AddComponent<Light>();        // a cool wash up the backdrop and over the blocks
+        wash.transform.SetParent(root.transform, false);
+        wash.transform.localPosition = new Vector3(0, 9f, -9f);
+        wash.transform.LookAt(root.transform.position + new Vector3(0, 4f, 3.6f));
+        wash.type = LightType.Spot; wash.spotAngle = 75f; wash.innerSpotAngle = 40f; wash.range = 32f; wash.intensity = 60f;
+        wash.color = new Color(0.85f, 0.92f, 1f); wash.shadows = LightShadows.None;
+
         var camGo = new GameObject("PodiumCam");
         camGo.transform.SetParent(root.transform, false);
         camGo.transform.localPosition = new Vector3(0, 3.2f, -11.5f);

@@ -16,6 +16,11 @@ Shader "KartCup/Water Unlit"
         _ShoreRadius ("Shore radius", Float) = 250
         _ShoreWidth ("Shore foam width", Float) = 26
         _ShoreWobble ("Shore wobble (amp,freq,speed)", Vector) = (14, 0.035, 0.5, 0)
+        _SurfColor ("Surf", Color) = (0.92, 0.98, 1.0, 1)
+        _MoonDir ("Moon direction (x, z)", Vector) = (0.7, 0.7, 0, 0)
+        _Glitter ("Moon glitter", Color) = (1, 0.85, 0.6, 1)
+        _GlitterStrength ("Glitter strength", Float) = 0
+        _GlitterWidth ("Glitter width", Float) = 0.12
     }
     SubShader
     {
@@ -37,10 +42,13 @@ Shader "KartCup/Water Unlit"
                 half4 _DeepColor, _ShallowColor;
                 float _WaveHeight, _WaveFreq, _WaveSpeed, _ShoreRadius, _ShoreWidth;
                 float4 _ShoreWobble;
+                half4 _SurfColor, _Glitter;
+                float4 _MoonDir;
+                float _GlitterStrength, _GlitterWidth;
             CBUFFER_END
 
             struct A { float4 positionOS : POSITION; float2 uv : TEXCOORD0; float4 color : COLOR; };
-            struct V { float4 positionCS : SV_POSITION; float2 uvA : TEXCOORD0; float2 uvB : TEXCOORD1; half foam : TEXCOORD2; half fog : TEXCOORD3; half shore : TEXCOORD4; };
+            struct V { float4 positionCS : SV_POSITION; float2 uvA : TEXCOORD0; float2 uvB : TEXCOORD1; half foam : TEXCOORD2; half fog : TEXCOORD3; half shore : TEXCOORD4; float2 worldXZ : TEXCOORD5; };
 
             V vert (A i)
             {
@@ -60,6 +68,7 @@ Shader "KartCup/Water Unlit"
                 float ring = length(w.xz);
                 float wobble = sin(atan2(w.z, w.x) * (_ShoreWobble.y * 100.0) + _Time.y * _ShoreWobble.z) * _ShoreWobble.x;
                 o.shore = saturate(1.0 - abs(ring - (_ShoreRadius + wobble)) / max(1.0, _ShoreWidth));
+                o.worldXZ = w.xz;
                 o.fog = ComputeFogFactor(o.positionCS.z);
                 return o;
             }
@@ -73,7 +82,11 @@ Shader "KartCup/Water Unlit"
                 c = lerp(c, 1.0h, i.foam * step(0.6h, a * b));
                 // Surf: brightest right at the sand, breaking up into the caustic bands as it runs out to sea.
                 half surf = i.shore * i.shore;
-                c = lerp(c, half3(0.92h, 0.98h, 1.0h), saturate(surf * (0.55h + 0.45h * bands)));
+                c = lerp(c, _SurfColor.rgb, saturate(surf * (0.55h + 0.45h * bands)));
+                // The moon's path on the water: the caustic bands catch it along the line of sight toward the moon.
+                float2 toPixel = normalize(i.worldXZ - _WorldSpaceCameraPos.xz);
+                half path = smoothstep(1.0 - _GlitterWidth, 1.0, dot(toPixel, normalize(_MoonDir.xy)));
+                c += _Glitter.rgb * (path * _GlitterStrength * (0.25h + bands) * (0.5h + 0.5h * b));
                 c = MixFog(c, i.fog);
                 return half4(c, 1);
             }

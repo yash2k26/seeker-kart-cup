@@ -268,6 +268,10 @@ public static partial class TrackSetup
             if (Mathf.Abs(turn) < 7f) continue;
             Place(root, Art + "Models/Props/ToyCar/item-cone.fbx", toycar, centre[i] + right[i] * (HalfWidth - 0.6f) * -Mathf.Sign(turn), 0, 1.6f);
         }
+
+        // after dark (TrackNight.cs): the lamps down the road and the studs along it
+        SodiumLamps(root);
+        Studs(root);
     }
 
     static void DressBeach(Transform root, System.Random rnd)
@@ -279,12 +283,14 @@ public static partial class TrackSetup
         int n = centre.Length;
 
         StartLine(root, 5, null);
+        Lighthouse(root);
         Groves(root, rnd, "Pirate", palms, 7f, 11f, Solid.Trunk, clutter, 1.4f, Solid.Solid, 1.1f);
         Cover(root, rnd, "Pirate", new[] { "patch-sand", "patch-sand-foliage", "patch-sand" }, 110, 5f, 10f, 4f, 60f, byWidth: true);
-        Rhythm(root, "Pirate", "flag-high-pennant", 40f, 5.4f, 1.2f);
+        // no pennant flags: after dark the lamps are the rhythm down the straights
 
-        // Headlands: rock stacks on the outside of the two tightest corners, the tower on the first, so you aim at
-        // something through the lap. The wreck sits off the second one; the dock on the shore past the start.
+        // Headlands: rock stacks on the outside of the two tightest corners, the lighthouse out to sea off the first
+        // (TrackNight.cs), so you aim at something through the lap. The wreck sits off the second one; the dock on
+        // the shore past the start.
         var tight = Tightest();
         for (int k = 0; k < Mathf.Min(2, tight.Count); k++)
         {
@@ -296,8 +302,7 @@ public static partial class TrackSetup
                               (float)rnd.NextDouble() * 360f, 4f + (float)rnd.NextDouble() * 3.5f, Solid.Solid, (float)(rnd.NextDouble() * 8 - 4));
                 PushClear(go, centre[i], right[i], c.outside, Clear);
             }
-            if (k == 0) Prop(root, "Pirate", "tower-complete-large", Beside(c.apex, c.outside, edge + 30f), Yaw(right[c.apex] * -c.outside), 26f, Solid.Solid);
-            else
+            if (k == 1)
             {
                 var a = Mathf.Atan2(centre[c.apex].x, centre[c.apex].z);
                 Prop(root, "Pirate", "ship-wreck", new Vector3(Mathf.Sin(a) * 455f, -0.6f, Mathf.Cos(a) * 455f), a * Mathf.Rad2Deg + 140f, 22f);

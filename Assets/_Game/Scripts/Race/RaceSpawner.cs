@@ -128,6 +128,7 @@ namespace KartCup
             def.ApplyTo(kart);
             garage?.Find(kartId)?.ApplyTo(kart);
             if (isPlayer) CharacterDef.Paint(go, Paints.ColorFor(def)); else def.ApplyLivery(go);
+            if (NightScene.Instance != null) go.AddComponent<Headlights>().Init(kart, isPlayer);   // lamps lit after dark
 
             var progress = go.AddComponent<KartProgress>();
             progress.racerName = def.displayName;
