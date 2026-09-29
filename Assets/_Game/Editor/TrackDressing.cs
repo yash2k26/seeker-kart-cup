@@ -250,6 +250,7 @@ public static partial class TrackSetup
         var root = new GameObject("Dressing").transform;
         var rnd = new System.Random(V.seed);
         props = 0; propTris = 0;
+        PlanTunnel();                      // the lamps and the dressing keep out of its way
         switch (V.id)
         {
             case "beach": DressBeach(root, rnd); break;
@@ -269,9 +270,10 @@ public static partial class TrackSetup
             Place(root, Art + "Models/Props/ToyCar/item-cone.fbx", toycar, centre[i] + right[i] * (HalfWidth - 0.6f) * -Mathf.Sign(turn), 0, 1.6f);
         }
 
-        // after dark (TrackNight.cs): the lamps down the road and the studs along it
+        // after dark (TrackNight.cs): the lamps down the road, the studs along it, and the tunnel over the straight
         SodiumLamps(root);
         Studs(root);
+        Tunnel(root, rnd);
     }
 
     static void DressBeach(Transform root, System.Random rnd)

@@ -14,6 +14,7 @@ public static class Playtest
     static double start, captureAt = -1;
     static int shot, track = 1, cam = -1;
     static bool camSet, noHud, vista, mobile;
+    static string look = "Lighthouse";
     static int prevQuality;
     static readonly double[] shotTimes = { 5, 12, 22, 34 };
 
@@ -35,6 +36,8 @@ public static class Playtest
         noHud = args.Contains("-nohud");     // a clean frame of the world, no HUD over it
         vista = args.Contains("-vista");     // and, per shot, a second frame from the player's spot toward the lighthouse
         mobile = args.Contains("-mobile");   // the phone's quality tier (Forward, eight lights per object), restored on exit
+        look = "Lighthouse";
+        for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-look") look = args[i + 1];   // what the vista frames look at
         prevQuality = QualitySettings.GetQualityLevel();
         if (mobile) QualitySettings.SetQualityLevel(0, true);
         EditorSceneManager.OpenScene($"Assets/_Game/Scenes/Race{track}.unity", OpenSceneMode.Single);
@@ -112,16 +115,19 @@ public static class Playtest
         Canvas.ForceUpdateCanvases();
         Shoot(cam, name);
 
-        var lighthouse = GameObject.Find("Lighthouse");
+        var lighthouse = GameObject.Find(look);
         var player = Object.FindFirstObjectByType<RaceManager>()?.Player;
         if (!vista || lighthouse == null || player == null) return;
         var go = new GameObject("VistaCam");
         var vc = go.AddComponent<Camera>();
         vc.CopyFrom(cam);
         go.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>().renderPostProcessing = true;
-        var at = lighthouse.transform.position + Vector3.up * 20f;
+        var bounds = lighthouse.GetComponentInChildren<Renderer>()?.bounds ?? new Bounds(lighthouse.transform.position, Vector3.one);
+        var at = look == "Lighthouse" ? lighthouse.transform.position + Vector3.up * 20f : bounds.center;
         var toward = (at - player.transform.position); toward.y = 0; toward.Normalize();
-        var from = player.transform.position + Vector3.up * 16f + toward * 30f;     // over the grandstands
+        // the lighthouse from over the grandstands; anything else from 45 m short of it, 14 m up
+        var from = look == "Lighthouse" ? player.transform.position + Vector3.up * 16f + toward * 30f
+                                        : at + Vector3.Cross(Vector3.up, toward) * 55f - toward * 40f + Vector3.up * 16f;   // a three-quarter view of it
         go.transform.position = from; go.transform.LookAt(at);
         vc.fieldOfView = 46f;
         Shoot(vc, name + "-vista");

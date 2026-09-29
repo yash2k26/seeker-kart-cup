@@ -30,7 +30,7 @@ public static partial class TrackSetup
         // After dark (Palm Bay): a photographed sky cube in place of the procedural one, the sun fields driving the
         // moon, a wet road, sodium lamps every lampEvery metres, cyan road studs and the lighthouse. The ground can
         // carry a detail tile (Art/Textures/Surfaces) so its flat faces read as sand up close.
-        public bool night, studs, lighthouse;
+        public bool night, studs, lighthouse, tunnel;
         public string sky, water = "Water", groundDetail;
         public float skyRotation, skyExposure = 1f, wet, lampEvery, groundDetailTile = 7f;
     }
@@ -56,7 +56,7 @@ public static partial class TrackSetup
             sun = new Vector3(26, -150, 0), sunColor = new Color(0.62f, 0.72f, 1f), sunIntensity = 0.7f,
             ambientSky = new Color(0.16f, 0.20f, 0.30f), ambientEquator = new Color(0.12f, 0.15f, 0.22f), ambientGround = new Color(0.05f, 0.05f, 0.07f),
             fog = new Color(0.22f, 0.27f, 0.33f), fogStart = 60, fogEnd = 430, farClip = 470,
-            water = "Water_night", wet = 1f, lampEvery = 36f, studs = true, lighthouse = true, groundDetail = "sand_diff",
+            water = "Water_night", wet = 1f, lampEvery = 36f, studs = true, lighthouse = true, tunnel = true, groundDetail = "sand_diff",
             post = p =>
             {
                 // The teaser's grade: filmic roll-off, teal shadows under warm lamps, bloom on every practical, a

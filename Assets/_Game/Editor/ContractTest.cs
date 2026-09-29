@@ -41,7 +41,7 @@ public static class ContractTest
         EditorSceneManager.OpenScene($"Assets/_Game/Scenes/Race{track}.unity", OpenSceneMode.Single);
         start = EditorApplication.timeSinceStartup;
         driving = false;
-        introAt = countdownAt = podiumAt = cardAt = introFrame = podiumFrame = -1; podiumRacers = 0;
+        introAt = countdownAt = podiumAt = cardAt = introFrame = podiumFrame = -1; podiumRacers = 0; tunnelFrame = false;
         EditorApplication.update += Tick;
         EditorApplication.EnterPlaymode();
     }
@@ -103,6 +103,7 @@ public static class ContractTest
 
     // ---- the ceremony around the race: prize shot, 3-2-1, race, podium, results card ----
     static double introAt = -1, countdownAt = -1, podiumAt = -1, cardAt = -1, introFrame = -1, podiumFrame = -1;
+    static bool tunnelFrame;
     static int podiumRacers;
 
     static void Flow(RaceManager race, double t)
@@ -111,6 +112,13 @@ public static class ContractTest
         bool active = show != null && show.Active;
         if (introAt < 0 && active && race.state == RaceManager.State.Idle) { introAt = t; Debug.Log($"[contract] flow: prize shot at {t:F1}s"); }
         if (introAt > 0 && introFrame < 0 && t - introAt > 2.2) { introFrame = t; Frame("flow-intro"); }
+        // one frame from inside the tunnel, if the map has one: the race camera, mid-drive
+        if (!tunnelFrame && race.state == RaceManager.State.Racing)
+        {
+            var tunnel = GameObject.Find("Tunnel");
+            var inside = tunnel != null && tunnel.GetComponent<Renderer>() != null && tunnel.GetComponent<Renderer>().bounds.Contains(race.Player.transform.position);
+            if (inside && Vector3.Distance(race.Player.transform.position, tunnel.GetComponent<Renderer>().bounds.center) < 22f) { tunnelFrame = true; Frame("flow-tunnel"); }
+        }
         if (countdownAt < 0 && race.state == RaceManager.State.Countdown) { countdownAt = t; Debug.Log($"[contract] flow: 3-2-1 at {t:F1}s, prize shot still up: {active}"); }
         if (race.Player.finished && podiumAt < 0 && active)
         {

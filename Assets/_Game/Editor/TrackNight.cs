@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using KartCup;
 using UnityEditor;
 using UnityEngine;
@@ -53,6 +54,7 @@ public static partial class TrackSetup
         int n = centre.Length, step = Mathf.Max(1, Samples(V.lampEvery)), count = 0;
         for (int i = Samples(9f); i < n; i += step)
         {
+            if (InTunnel(i)) continue;
             var c = CornerAt(i);
             float side = c.HasValue ? c.Value.outside : 1f;      // `right` points into the island: +1 is the land side
             Lamp(root, i, side, pole, glow, ref count);
@@ -224,6 +226,171 @@ public static partial class TrackSetup
         Debug.Log($"[track] lighthouse {Vector3.Distance(site, centre[apex]):F0} m off the corner at sample {apex}");
     }
 
+    // ---------- the tunnel ----------
+    static int tunnelStart = -1, tunnelCount;
+    const float TunnelLength = 96f;
+
+    /// The straight that carries the tunnel: the longest run of road clear of the start area, if it is long enough.
+    static void PlanTunnel()
+    {
+        tunnelStart = -1;
+        if (!V.tunnel) return;
+        int n = centre.Length, need = Samples(TunnelLength) + 6, best = 0, bestStart = -1, run = 0;
+        for (int i = 0; i < n * 2; i++)
+        {
+            int s = i % n;
+            bool clear = !CornerAt(s).HasValue && Mathf.Min(s, n - s) > Samples(70f);   // the gantry and the stands own the start
+            if (!clear) { run = 0; continue; }
+            run++;
+            if (run > best) { best = run; bestStart = Wrap(i - run + 1, n); }
+        }
+        if (best < need) { Debug.Log($"[track] no straight long enough for the tunnel ({best} samples, {need} needed)"); return; }
+        tunnelCount = Samples(TunnelLength);
+        tunnelStart = Wrap(bestStart + (best - tunnelCount) / 2, n);
+    }
+
+    static bool InTunnel(int i) => tunnelStart >= 0 && Wrap(i - tunnelStart, centre.Length) < tunnelCount;
+
+    /// The film's coast tunnel: an arched concrete tube over the straight, sodium light bars down the crown every
+    /// twelve metres (real spot lights: eight is what a road piece can take), cyan guidance strips along both walls,
+    /// and concrete portals with rock piled over them. The walls stand 2.5 m past the kerbs, so nothing solid is
+    /// inside the run-off; whatever the dressing had put in its way is cleared.
+    static void Tunnel(Transform root, System.Random rnd)
+    {
+        if (tunnelStart < 0) return;
+        int n = centre.Length;
+        float W = HalfWidth + Kerb + 2.5f, WallH = 5.6f, Crown = 3.6f, T = 1.0f;   // half width, straight wall, arch over it, thickness
+        var lit = Shader.Find("Universal Render Pipeline/Lit");
+        var concrete = LoadOrCreate(Art + "Materials/Tunnel_Concrete.mat", lit, Color.white);
+        concrete.SetTexture("_BaseMap", Tex("Surfaces/concrete_diff")); concrete.SetTexture("_BumpMap", Tex("Surfaces/concrete_nor"));
+        concrete.EnableKeyword("_NORMALMAP"); concrete.SetFloat("_Smoothness", 0.3f); concrete.SetColor("_BaseColor", new Color(0.8f, 0.8f, 0.82f));
+        concrete.SetTextureScale("_BaseMap", Vector2.one / 2.7f);
+        EditorUtility.SetDirty(concrete);
+        var rock = Plain("Tunnel_Rock", new Color(0.30f, 0.29f, 0.28f));
+
+        // the profile: vertical walls, then a flattened arch, as (across, up) in metres
+        var profile = new List<Vector2> { new(-W, 0f), new(-W, WallH) };
+        var outer = new List<Vector2> { new(-W - T, 0f), new(-W - T, WallH) };
+        for (int k = 1; k < 12; k++)
+        {
+            float a = Mathf.PI * (1f - k / 12f);
+            profile.Add(new Vector2(Mathf.Cos(a) * W, WallH + Mathf.Sin(a) * Crown));
+            outer.Add(new Vector2(Mathf.Cos(a) * (W + T), WallH + Mathf.Sin(a) * (Crown + T)));
+        }
+        profile.Add(new Vector2(W, WallH)); profile.Add(new Vector2(W, 0f));
+        outer.Add(new Vector2(W + T, WallH)); outer.Add(new Vector2(W + T, 0f));
+        var along = new float[profile.Count]; for (int k = 1; k < profile.Count; k++) along[k] = along[k - 1] + Vector2.Distance(profile[k], profile[k - 1]);
+
+        var mb = new MeshBuilder();
+        const int Inner = 0, Outer = 1;
+        Vector3 At(int i, Vector2 p) => centre[i] + right[i] * p.x + Vector3.up * p.y;
+        for (int k = 0; k < tunnelCount; k++)
+        {
+            int i = Wrap(tunnelStart + k, n), j = Wrap(i + 1, n);
+            float u0 = arc[i], u1 = arc[i] + Vector3.Distance(centre[i], centre[j]);
+            var axisI = centre[i] + Vector3.up * WallH * 0.6f;
+            for (int q = 0; q < profile.Count - 1; q++)
+            {
+                var a = At(i, profile[q]); var b = At(i, profile[q + 1]); var c = At(j, profile[q + 1]); var d = At(j, profile[q]);
+                mb.QuadToward(Inner, a, b, c, d, axisI - (a + b + c + d) / 4f, new Vector2(along[q], u0), new Vector2(along[q + 1], u0), new Vector2(along[q + 1], u1), new Vector2(along[q], u1));
+                var oa = At(i, outer[q]); var ob = At(i, outer[q + 1]); var oc = At(j, outer[q + 1]); var od = At(j, outer[q]);
+                mb.QuadToward(Outer, oa, ob, oc, od, (oa + ob + oc + od) / 4f - axisI);
+            }
+            // portal faces: the ring between the two profiles at each end
+            if (k == 0 || k == tunnelCount - 1)
+            {
+                int e = k == 0 ? i : j; var toward = Forward(e) * (k == 0 ? -1f : 1f);
+                for (int q = 0; q < profile.Count - 1; q++)
+                    mb.QuadToward(Outer, At(e, profile[q]), At(e, profile[q + 1]), At(e, outer[q + 1]), At(e, outer[q]), toward);
+            }
+        }
+        var tube = mb.Finish("Tunnel", root, new[] { concrete, rock });
+        GameObjectUtility.SetStaticEditorFlags(tube, StaticEditorFlags.BatchingStatic);
+        Count(tube);
+        // Only the walls collide: a kart never reaches the roof, and TrackProbe's sweep (a kart's height and more) would.
+        var walls = new MeshBuilder();
+        for (int k = 0; k < tunnelCount; k++)
+        {
+            int i = Wrap(tunnelStart + k, n), j = Wrap(i + 1, n);
+            foreach (float side in new[] { -1f, 1f })
+                walls.QuadToward(0, At(i, new Vector2(W * side, 0f)), At(i, new Vector2(W * side, WallH)), At(j, new Vector2(W * side, WallH)), At(j, new Vector2(W * side, 0f)), right[i] * -side);
+        }
+        var wallGo = walls.Finish("TunnelWalls", root, new Material[0]);
+        Object.DestroyImmediate(wallGo.GetComponent<MeshRenderer>());
+        wallGo.AddComponent<MeshCollider>().sharedMesh = wallGo.GetComponent<MeshFilter>().sharedMesh;
+
+        // light bars down the crown, and the guidance strips
+        var glow = Emissive("Lamp_Glow", Sodium, 3.2f);
+        var cyan = Emissive("Stud_Glow", Cyan, 3f);
+        var quad = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
+        int lights = 0;
+        for (float m = 6f; m < TunnelLength - 4f; m += 12f)
+        {
+            int i = Wrap(tunnelStart + Samples(m), n);
+            var bar = new GameObject($"TunnelLight{lights++}").transform;
+            bar.SetParent(root, false);
+            bar.SetPositionAndRotation(centre[i] + Vector3.up * (WallH + Crown - 0.35f), Quaternion.LookRotation(Forward(i), Vector3.up));
+            Part(bar, "Glass", quad, glow, Vector3.zero, new Vector3(2.6f, 0.5f, 1f), Quaternion.Euler(-90, 0, 0));
+            var light = new GameObject("Light").AddComponent<Light>();
+            light.transform.SetParent(bar, false);
+            light.transform.localRotation = Quaternion.Euler(90, 0, 0);
+            light.type = LightType.Spot; light.color = Sodium; light.intensity = 240f; light.range = 26f;
+            light.spotAngle = 145f; light.innerSpotAngle = 60f; light.shadows = LightShadows.None;   // wide, so the walls catch it too
+        }
+        var strips = new MeshBuilder();
+        for (int k = 0; k < tunnelCount; k++)
+        {
+            int i = Wrap(tunnelStart + k, n), j = Wrap(i + 1, n);
+            foreach (float side in new[] { -1f, 1f })
+            {
+                float x = (W - 0.06f) * side;
+                var a = At(i, new Vector2(x, 1.15f)); var b = At(i, new Vector2(x, 1.25f)); var c = At(j, new Vector2(x, 1.25f)); var d = At(j, new Vector2(x, 1.15f));
+                strips.QuadToward(0, a, b, c, d, right[i] * -side);
+            }
+        }
+        strips.Finish("TunnelStrips", root, new[] { cyan });
+
+        // clear whatever the dressing had put where the tube now stands
+        int cleared = 0;
+        foreach (Transform child in root.Cast<Transform>().ToArray())
+        {
+            if (child.name.StartsWith("Tunnel") || child.name.StartsWith("Studs")) continue;
+            var p = child.position; int nearest = 0; float bestSq = float.MaxValue;
+            for (int i = 0; i < n; i++) { float sq = (centre[i].x - p.x) * (centre[i].x - p.x) + (centre[i].z - p.z) * (centre[i].z - p.z); if (sq < bestSq) { bestSq = sq; nearest = i; } }
+            int k = Wrap(nearest - tunnelStart, n);
+            if (k < tunnelCount + 2 && Mathf.Sqrt(bestSq) < W + 9f) { Object.DestroyImmediate(child.gameObject); cleared++; }
+        }
+
+        // then bury the tube in rock, so it reads as a cut through a headland: stacks along both flanks, over the
+        // crown, and piled highest round the portals
+        var rocks = new[] { "rocks-sand-a", "rocks-sand-b", "rocks-sand-c" };
+        var pile = new GameObject("TunnelRock").transform;
+        pile.SetParent(root, false);
+        for (int k = 0; k <= tunnelCount; k += 3)
+        {
+            int i = Wrap(tunnelStart + k, n);
+            foreach (float side in new[] { -1f, 1f })
+            {
+                var p = At(i, new Vector2((W + 3f + (float)rnd.NextDouble() * 4f) * side, 0f));
+                Prop(pile, "Pirate", rocks[rnd.Next(rocks.Length)], new Vector3(p.x, -0.6f, p.z), (float)rnd.NextDouble() * 360f, 6f + (float)rnd.NextDouble() * 5f);
+            }
+            for (int c = 0; c < 2; c++)
+            {
+                var p = At(i, new Vector2(((float)rnd.NextDouble() - 0.5f) * 1.6f * W, 0f));
+                Prop(pile, "Pirate", rocks[rnd.Next(rocks.Length)], new Vector3(p.x, WallH + Crown - 3f, p.z), (float)rnd.NextDouble() * 360f, 5f + (float)rnd.NextDouble() * 5f);
+            }
+        }
+        foreach (int e in new[] { tunnelStart, Wrap(tunnelStart + tunnelCount, n) })
+            for (int r = 0; r < 9; r++)
+            {
+                float t = (r + 0.5f) / 9f;                       // across the portal, left to right
+                var p = At(e, new Vector2(Mathf.Lerp(-W - 2f, W + 2f, t), 0f)) + Forward(e) * ((float)rnd.NextDouble() * 6f - 3f);
+                bool crown = Mathf.Abs(t - 0.5f) < 0.3f;
+                Prop(pile, "Pirate", rocks[rnd.Next(rocks.Length)], new Vector3(p.x, crown ? WallH + Crown - 2f : -0.5f, p.z), (float)rnd.NextDouble() * 360f, 5f + (float)rnd.NextDouble() * 4f + (crown ? 5f : 0f));
+            }
+        Debug.Log($"[track] tunnel {TunnelLength:F0} m from sample {tunnelStart}, {lights} light bars, {cleared} props cleared from its path");
+    }
+
     static Material BeamMaterial(string name, float strength, float falloff, float edge)
     {
         var shader = Shader.Find("KartCup/Beam") ?? Shader.Find("Universal Render Pipeline/Unlit");
@@ -268,13 +435,26 @@ public static partial class TrackSetup
 
         List<int> Sub(int s) { while (subs.Count <= s) subs.Add(new List<int>()); return subs[s]; }
 
-        void Quad(int s, Vector3 a, Vector3 b, Vector3 c, Vector3 d)
+        void Quad(int s, Vector3 a, Vector3 b, Vector3 c, Vector3 d) => Quad(s, a, b, c, d, new Vector2(0.03f, 0.5f), new Vector2(0.03f, 0.5f), new Vector2(0.03f, 0.5f), new Vector2(0.03f, 0.5f));
+
+        void Quad(int s, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector2 ua, Vector2 ub, Vector2 uc, Vector2 ud)
         {
             var normal = Vector3.Cross(b - a, c - a).normalized;
             int i = v.Count;
             v.Add(a); v.Add(b); v.Add(c); v.Add(d);
-            for (int k = 0; k < 4; k++) { n.Add(normal); uv.Add(new Vector2(0.03f, 0.5f)); }
+            uv.Add(ua); uv.Add(ub); uv.Add(uc); uv.Add(ud);
+            for (int k = 0; k < 4; k++) n.Add(normal);
             Sub(s).AddRange(new[] { i, i + 1, i + 2, i, i + 2, i + 3 });
+        }
+
+        /// A quad wound to face `toward` (a direction from the face), whichever way its corners were listed.
+        public void QuadToward(int s, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 toward)
+            => QuadToward(s, a, b, c, d, toward, new Vector2(0.03f, 0.5f), new Vector2(0.03f, 0.5f), new Vector2(0.03f, 0.5f), new Vector2(0.03f, 0.5f));
+
+        public void QuadToward(int s, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 toward, Vector2 ua, Vector2 ub, Vector2 uc, Vector2 ud)
+        {
+            if (Vector3.Dot(Vector3.Cross(b - a, c - a), toward) >= 0f) Quad(s, a, b, c, d, ua, ub, uc, ud);
+            else Quad(s, a, d, c, b, ua, ud, uc, ub);
         }
 
         void Tri(int s, Vector3 a, Vector3 b, Vector3 c)
@@ -326,6 +506,7 @@ public static partial class TrackSetup
             mesh.subMeshCount = mats.Length;
             for (int s = 0; s < mats.Length; s++) mesh.SetTriangles(s < subs.Count ? subs[s] : new List<int>(), s);
             mesh.RecalculateBounds();
+            mesh.RecalculateTangents();      // for the normal-mapped concrete
             Directory.CreateDirectory(MeshDir);
             AssetDatabase.CreateAsset(mesh, $"{MeshDir}/{name}.asset");
             var go = new GameObject(name);
