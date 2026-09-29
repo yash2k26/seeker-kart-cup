@@ -116,22 +116,25 @@ public static class MenuSetup
     }
 
     // ---------- 3D backdrop ----------
+    /// The coast after dark, the same night as the race: Palm Bay's sky cube, moon, sea and grade, reused from what
+    /// TrackSetup built, with the kart on its turntable under a cyan rim and a warm key, the film's meet.
     static Transform Vista()
     {
-        RenderSettings.skybox = AssetDatabase.LoadAssetAtPath<Material>(Art + "Materials/Sky.mat");
+        RenderSettings.skybox = AssetDatabase.LoadAssetAtPath<Material>(Art + "Materials/Sky_beach.mat") ?? AssetDatabase.LoadAssetAtPath<Material>(Art + "Materials/Sky.mat");
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
-        RenderSettings.ambientSkyColor = new Color(0.30f, 0.37f, 0.46f);
-        RenderSettings.ambientEquatorColor = new Color(0.26f, 0.26f, 0.25f);
-        RenderSettings.ambientGroundColor = new Color(0.20f, 0.17f, 0.13f);
+        RenderSettings.ambientSkyColor = new Color(0.16f, 0.20f, 0.30f);
+        RenderSettings.ambientEquatorColor = new Color(0.12f, 0.15f, 0.22f);
+        RenderSettings.ambientGroundColor = new Color(0.05f, 0.05f, 0.07f);
         RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Linear;
-        RenderSettings.fogStartDistance = 60; RenderSettings.fogEndDistance = 220;
-        RenderSettings.fogColor = new Color(0.72f, 0.86f, 0.92f);
+        RenderSettings.fogStartDistance = 40; RenderSettings.fogEndDistance = 260;
+        RenderSettings.fogColor = new Color(0.22f, 0.27f, 0.33f);
+        RenderSettings.reflectionIntensity = 0.2f;
 
-        var sun = new GameObject("Sun").AddComponent<Light>();
+        var sun = new GameObject("Sun").AddComponent<Light>();     // the moon, where the race's is
         sun.type = LightType.Directional;
-        sun.transform.rotation = Quaternion.Euler(44, -40, 0);
-        sun.shadows = LightShadows.Soft; sun.intensity = 1.05f;
-        sun.color = new Color(1f, 0.96f, 0.88f); sun.shadowStrength = 0.7f;
+        sun.transform.rotation = Quaternion.Euler(26, -150, 0);
+        sun.shadows = LightShadows.Soft; sun.intensity = 0.7f;
+        sun.color = new Color(0.62f, 0.72f, 1f); sun.shadowStrength = 0.6f;
 
         var sand = GameObject.CreatePrimitive(PrimitiveType.Plane);
         sand.name = "Sand";
@@ -142,7 +145,7 @@ public static class MenuSetup
         water.name = "Water";
         water.transform.position = new Vector3(0, -0.6f, 0);
         water.transform.localScale = new Vector3(120, 1, 120);
-        water.GetComponent<MeshRenderer>().sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(Art + "Materials/Water.mat");
+        water.GetComponent<MeshRenderer>().sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(Art + "Materials/Water_night.mat") ?? AssetDatabase.LoadAssetAtPath<Material>(Art + "Materials/Water.mat");
         Object.DestroyImmediate(water.GetComponent<Collider>());
 
         var pirate = AssetDatabase.LoadAssetAtPath<Material>(Art + "Materials/Pirate.mat");
@@ -180,6 +183,14 @@ public static class MenuSetup
         EditorUtility.SetDirty(discMat);
         disc.GetComponent<MeshRenderer>().sharedMaterial = discMat;
 
+        // The rim glows cyan (the film's LED strips), a warm key and a cool fill pick the kart out of the night, and
+        // the lighthouse turns out past the palms.
+        var glow = AssetDatabase.LoadAssetAtPath<Material>(Art + "Materials/Stud_Glow.mat");
+        if (glow != null) Ring(podium, "Rim", 3.42f, 3.6f, 0.115f, glow);
+        Spot("KeyLight", new Vector3(6f, 7f, -4f), new Vector3(0, 1f, 0), new Color(1f, 0.82f, 0.58f), 48f, 55f);
+        Spot("FillLight", new Vector3(-7f, 5f, 6f), new Vector3(0, 1f, 0), new Color(0.7f, 0.8f, 1f), 18f, 70f);
+        Lighthouse(new Vector3(-55f, 0f, 120f));
+
         var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
         // Park it on the orbit so the scene reads correctly when opened or screenshotted; MenuBackdrop takes over at runtime.
         camGo.transform.position = new Vector3(7.9f, 3.6f, -6.9f);
@@ -202,8 +213,76 @@ public static class MenuSetup
 
         var volume = new GameObject("Post").AddComponent<UnityEngine.Rendering.Volume>();
         volume.isGlobal = true;
-        volume.sharedProfile = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.VolumeProfile>("Assets/Settings/PostProfile.asset");
+        volume.sharedProfile = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.VolumeProfile>("Assets/Settings/Post_beach.asset")
+                            ?? AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.VolumeProfile>("Assets/Settings/PostProfile.asset");
         return podium;
+    }
+
+    static void Spot(string name, Vector3 at, Vector3 target, Color colour, float intensity, float angle)
+    {
+        var l = new GameObject(name).AddComponent<Light>();
+        l.transform.position = at; l.transform.LookAt(target);
+        l.type = LightType.Spot; l.spotAngle = angle; l.innerSpotAngle = angle * 0.5f; l.range = 22f; l.intensity = intensity;
+        l.color = colour; l.shadows = LightShadows.None;
+    }
+
+    /// A flat ring on the turntable, facing up.
+    static void Ring(Transform parent, string name, float r0, float r1, float y, Material mat, int segs = 64)
+    {
+        var v = new Vector3[segs * 2]; var n = new Vector3[segs * 2]; var uv = new Vector2[segs * 2]; var t = new int[segs * 6];
+        for (int i = 0; i < segs; i++)
+        {
+            float a = i / (float)segs * Mathf.PI * 2f; var d = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a));
+            v[i * 2] = d * r0 + Vector3.up * y; v[i * 2 + 1] = d * r1 + Vector3.up * y;
+            n[i * 2] = n[i * 2 + 1] = Vector3.up; uv[i * 2] = uv[i * 2 + 1] = new Vector2(0.03f, 0.5f);
+            int j = (i + 1) % segs, k = i * 6;
+            t[k] = i * 2; t[k + 1] = j * 2 + 1; t[k + 2] = i * 2 + 1;
+            t[k + 3] = i * 2; t[k + 4] = j * 2; t[k + 5] = j * 2 + 1;
+        }
+        var mesh = new Mesh { name = name, vertices = v, normals = n, uv = uv, triangles = t };
+        mesh.RecalculateBounds();
+        Directory.CreateDirectory(Art + "Models/Props/Menu");
+        AssetDatabase.CreateAsset(mesh, Art + $"Models/Props/Menu/{name}.asset");
+        var go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        go.AddComponent<MeshFilter>().sharedMesh = mesh;
+        go.AddComponent<MeshRenderer>().sharedMaterial = mat;
+    }
+
+    /// Palm Bay's lighthouse, as TrackNight built it (mesh, materials, beams), placed out to sea and turning.
+    static void Lighthouse(Vector3 at)
+    {
+        const string dir = Art + "Models/Track/Race1/";
+        var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(dir + "Lighthouse.asset");
+        var core = AssetDatabase.LoadAssetAtPath<Mesh>(dir + "Beam_Core.asset");
+        var halo = AssetDatabase.LoadAssetAtPath<Mesh>(dir + "Beam_Halo.asset");
+        if (mesh == null || core == null || halo == null) { Debug.LogWarning("[menu] no lighthouse: build the race scenes first"); return; }
+        Material Mat(string m) => AssetDatabase.LoadAssetAtPath<Material>(Art + $"Materials/{m}.mat");
+        var root = new GameObject("Lighthouse").transform;
+        root.SetPositionAndRotation(at, Quaternion.LookRotation(new Vector3(-at.x, 0, -at.z).normalized, Vector3.up));   // its door faces the beach
+        var tower = new GameObject("Tower");
+        tower.transform.SetParent(root, false);
+        tower.AddComponent<MeshFilter>().sharedMesh = mesh;
+        tower.AddComponent<MeshRenderer>().sharedMaterials = new[] { "LH_Stone", "LH_Red", "LH_White", "LH_Trim", "LH_Glass", "LH_Door" }.Select(Mat).ToArray();
+        const float lampY = 22.05f;                        // TrackNight: the gallery deck + 1.55
+        var lamp = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        Object.DestroyImmediate(lamp.GetComponent<Collider>());
+        lamp.name = "Lamp"; lamp.transform.SetParent(root, false);
+        lamp.transform.localPosition = new Vector3(0, lampY, 0); lamp.transform.localScale = Vector3.one * 0.84f;
+        lamp.GetComponent<MeshRenderer>().sharedMaterial = Mat("LH_Lamp");
+        var rotor = new GameObject("Rotor").transform;
+        rotor.SetParent(root, false);
+        rotor.localPosition = new Vector3(0, lampY, 0);
+        rotor.gameObject.AddComponent<KartCup.Rotor>().period = 8f;
+        foreach (float yaw in new[] { 0f, 180f })
+            foreach (var (name, m, mat) in new[] { ("BeamCore", core, Mat("Beam_Core")), ("BeamHalo", halo, Mat("Beam_Halo")) })
+            {
+                var go = new GameObject(name);
+                go.transform.SetParent(rotor, false);
+                go.transform.localRotation = Quaternion.Euler(1.5f, yaw, 0);
+                go.AddComponent<MeshFilter>().sharedMesh = m;
+                go.AddComponent<MeshRenderer>().sharedMaterial = mat;
+            }
     }
 
     /// An alpha ramp, generated once and committed like any other sprite: left-to-right for the title plate,
