@@ -44,12 +44,14 @@ public static partial class TrackSetup
         // Drop any scene from a previous single-track build so the list cannot keep a stale "Race.unity".
         EditorBuildSettings.scenes = EditorBuildSettings.scenes
             .Where(s => !s.path.StartsWith("Assets/_Game/Scenes/Race")).ToArray();
+        Geometry.Clear();
         for (int i = 0; i < Tracks.Count; i++)
         {
             var theme = System.Array.Find(Themes, t => t.id == Tracks.At(i).id);
             if (theme == null) { Debug.LogError($"[track] no theme for track '{Tracks.At(i).id}'"); continue; }
             BuildOne(theme, i);
         }
+        WriteGeometry();
         Debug.Log($"[track] built {Tracks.Count} circuits");
         if (Application.isBatchMode) EditorApplication.Exit(0);
     }
@@ -69,6 +71,7 @@ public static partial class TrackSetup
         var road = Road();
         var waypoints = Waypoints();
         var checkpoints = Checkpoints();
+        Geometry[V.id] = GeometryJson(checkpoints);
         var grid = StartGrid();
         Barriers();
         Dressing();
@@ -387,6 +390,37 @@ public static partial class TrackSetup
         return list[0];
     }
 
+    // ---- the Worker's referee reads the same circuit the scene is built from (worker/src/tracks.json) ----
+    static readonly SortedDictionary<string, string> Geometry = new();
+    const float GateSlack = 6f;      // the gate trigger reaches this far past the kerb on each side (Checkpoints below)
+
+    static string N(float v) => v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// Centreline (x, z), road half-width, gate half-width and each gate's position and forward (x, z): what the
+    /// Worker needs to follow a kart round the lap from its streamed or uploaded positions.
+    static string GeometryJson(Checkpoint[] gates)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"{{\"lengthM\":{N(Length())},\"laps\":2,\"halfWidth\":{N(HalfWidth)},\"kerb\":{N(Kerb)},\"gateHalfWidth\":{N(HalfWidth + Kerb + GateSlack)},");
+        sb.Append("\"gates\":[");
+        for (int i = 0; i < gates.Length; i++)
+        {
+            var t = gates[i].transform; var f = t.forward;
+            sb.Append(i == 0 ? "" : ",").Append($"[{N(t.position.x)},{N(t.position.y)},{N(t.position.z)},{f.x.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)},{f.z.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)}]");
+        }
+        sb.Append("],\"centre\":[");
+        for (int i = 0; i < centre.Length; i++) sb.Append(i == 0 ? "" : ",").Append($"[{N(centre[i].x)},{N(centre[i].z)}]");
+        return sb.Append("]}").ToString();
+    }
+
+    static void WriteGeometry()
+    {
+        var path = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "worker", "src", "tracks.json"));
+        var body = string.Join(",\n", Geometry.Select(kv => $"\"{kv.Key}\":{kv.Value}"));
+        File.WriteAllText(path, "{\n" + body + "\n}\n");
+        Debug.Log($"[track] wrote the referee's geometry for {Geometry.Count} circuits to {path}");
+    }
+
     static Checkpoint[] Checkpoints()
     {
         const int count = 12;
@@ -400,7 +434,7 @@ public static partial class TrackSetup
             go.transform.SetPositionAndRotation(centre[s] + Vector3.up * 2f, Quaternion.LookRotation(Forward(s), Vector3.up));
             var box = go.AddComponent<BoxCollider>();
             box.isTrigger = true;
-            box.size = new Vector3((HalfWidth + Kerb + 6f) * 2f, 8f, 2f);
+            box.size = new Vector3((HalfWidth + Kerb + GateSlack) * 2f, 8f, 2f);
             var cp = go.AddComponent<Checkpoint>();
             cp.index = i;
             list[i] = cp;
