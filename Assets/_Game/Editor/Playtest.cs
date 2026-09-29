@@ -13,7 +13,8 @@ public static class Playtest
 {
     static double start, captureAt = -1;
     static int shot, track = 1, cam = -1;
-    static bool camSet;
+    static bool camSet, noHud, vista, mobile;
+    static int prevQuality;
     static readonly double[] shotTimes = { 5, 12, 22, 34 };
 
     [MenuItem("Build/Playtest 30s")]
@@ -31,6 +32,11 @@ public static class Playtest
         var args = System.Environment.GetCommandLineArgs();
         for (int i = 0; i < args.Length - 1; i++) { if (args[i] == "-track") int.TryParse(args[i + 1], out track); if (args[i] == "-cam") int.TryParse(args[i + 1], out cam); }
         camSet = false;
+        noHud = args.Contains("-nohud");     // a clean frame of the world, no HUD over it
+        vista = args.Contains("-vista");     // and, per shot, a second frame from the player's spot toward the lighthouse
+        mobile = args.Contains("-mobile");   // the phone's quality tier (Forward, eight lights per object), restored on exit
+        prevQuality = QualitySettings.GetQualityLevel();
+        if (mobile) QualitySettings.SetQualityLevel(0, true);
         EditorSceneManager.OpenScene($"Assets/_Game/Scenes/Race{track}.unity", OpenSceneMode.Single);
         start = EditorApplication.timeSinceStartup;
         shot = 0;
@@ -66,6 +72,7 @@ public static class Playtest
         EditorApplication.update -= Tick;
         Report(t);
         Debug.Log("[playtest] done");
+        if (mobile) QualitySettings.SetQualityLevel(prevQuality, true);
         EditorApplication.Exit(0);
     }
 
@@ -78,6 +85,9 @@ public static class Playtest
         var sources = Object.FindObjectsByType<AudioSource>(FindObjectsSortMode.None);
         Debug.Log($"[playtest] t={t:F0}s state={race.state} clock={race.raceTime:F1} racers={racers.Length} " +
                   $"audio={(audio != null ? "ok" : "MISSING")} sources={sources.Length} playing={sources.Count(s2 => s2.isPlaying)}");
+        if (race.Player != null)
+            foreach (var l in race.Player.GetComponentsInChildren<Light>())
+                Debug.Log($"[playtest]   light {l.name} {l.type} i={l.intensity} r={l.range} angle={l.spotAngle} at={l.transform.position} fwd={l.transform.forward}");
         foreach (var r in racers)
         {
             var kart = r.GetComponent<Kart>();
@@ -89,15 +99,37 @@ public static class Playtest
     {
         var cam = Camera.main;
         if (cam == null) return;
-        // Screen-space-overlay canvases never land in a RenderTexture: borrow the camera for the shot.
+        // Screen-space-overlay canvases never land in a RenderTexture: borrow the camera for the shot (or, with
+        // -nohud, leave them out for a clean frame of the world).
         foreach (var canvas in Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None))
         {
+            if (noHud) break;
             if (canvas.renderMode != RenderMode.ScreenSpaceOverlay) continue;
             canvas.renderMode = RenderMode.ScreenSpaceCamera;
             canvas.worldCamera = cam;
             canvas.planeDistance = 1f;
         }
         Canvas.ForceUpdateCanvases();
+        Shoot(cam, name);
+
+        var lighthouse = GameObject.Find("Lighthouse");
+        var player = Object.FindFirstObjectByType<RaceManager>()?.Player;
+        if (!vista || lighthouse == null || player == null) return;
+        var go = new GameObject("VistaCam");
+        var vc = go.AddComponent<Camera>();
+        vc.CopyFrom(cam);
+        go.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>().renderPostProcessing = true;
+        var at = lighthouse.transform.position + Vector3.up * 20f;
+        var toward = (at - player.transform.position); toward.y = 0; toward.Normalize();
+        var from = player.transform.position + Vector3.up * 16f + toward * 30f;     // over the grandstands
+        go.transform.position = from; go.transform.LookAt(at);
+        vc.fieldOfView = 46f;
+        Shoot(vc, name + "-vista");
+        Object.Destroy(go);
+    }
+
+    static void Shoot(Camera cam, string name)
+    {
         int w = 1780, h = 800;
         var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 };
         var prevTarget = cam.targetTexture;
