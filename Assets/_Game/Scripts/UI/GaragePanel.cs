@@ -6,9 +6,9 @@ using UnityEngine.UI;
 
 namespace KartCup
 {
-    /// The garage: every kart on the podium in turn, with what it costs, whether you own it, and one free test drive
-    /// before you decide. Paints sit under the kart as swatches. Everything here is cosmetic; the stats stay on the
-    /// drivers, so nothing you buy makes you faster than the racer beside you.
+    /// The garage: every kart on the podium in turn with its five powers, what it costs (the powers set the price),
+    /// whether you own it, and one free test drive before you decide. Paints sit under the kart as swatches. The
+    /// shop's other tab, ITEMS, sells what you take into a race.
     public sealed class GaragePanel : Carousel
     {
         [SerializeField] KartDatabase garage;
@@ -19,6 +19,7 @@ namespace KartCup
         [SerializeField] TMP_Text nameLabel, blurbLabel, priceLabel, statusLabel, primaryLabel, secondaryLabel;
         [SerializeField] Button primaryButton, secondaryButton;
         [SerializeField] Image[] swatches = System.Array.Empty<Image>();   // 0 = driver colour, then Paints.All
+        [SerializeField] StatBar[] powerBars = System.Array.Empty<StatBar>();   // SPEED, TURBO, GRIP, ARMOR, ATTACK
         [SerializeField] float baseYaw = 65f, spin = 14f;   // same turntable as CharacterCarousel
 
         GameObject current;
@@ -131,14 +132,17 @@ namespace KartCup
             {
                 if (nameLabel != null) nameLabel.text = def.displayName.ToUpperInvariant();
                 if (blurbLabel != null) blurbLabel.text = def.blurb;
-                if (priceLabel != null) priceLabel.text = def.IsFree ? "FREE" : owned ? "UNLOCKED" : Price(item);
+                if (priceLabel != null) priceLabel.text = def.IsFree ? $"FREE  ·  {def.Tier}" : owned ? $"UNLOCKED  ·  {def.Tier}" : $"LOCKED  ·  {KartPrice(item, def)}";
                 if (owned) SetButton(primaryLabel, primaryButton, selected ? "SELECTED" : "SELECT", !selected);
-                else SetButton(primaryLabel, primaryButton, item != null ? $"UNLOCK  ·  {Skr(item)}" : "…", item != null);
+                else SetButton(primaryLabel, primaryButton, item != null ? $"UNLOCK  ·  {Skr(item)}" : KartApi.Cfg == null ? "CONNECT TO BUY" : "…", item != null);
                 bool trial = !owned && !KartDatabase.TrialUsed(def.id);
                 SetButton(secondaryLabel, secondaryButton,
                     owned ? "" : trial ? "TEST DRIVE" : item != null && !string.IsNullOrEmpty(item.price.GetValueOrDefault("SOL")) ? $"PAY {Sol(item)}" : "",
                     !owned && (trial || item != null));
             }
+
+            for (int i = 0; i < powerBars.Length; i++)
+                if (powerBars[i] != null) powerBars[i].SetCount(i switch { 0 => def.speed, 1 => def.turbo, 2 => def.grip, 3 => def.armor, _ => def.attack });
 
             for (int i = 0; i < swatches.Length; i++)
             {
@@ -159,6 +163,8 @@ namespace KartCup
         static string Skr(KartApi.ShopItem i) => WalletFlow.Amount(i.price.GetValueOrDefault("SKR"), "SKR");
         static string Sol(KartApi.ShopItem i) => WalletFlow.Amount(i.price.GetValueOrDefault("SOL"), "SOL");
         static string Price(KartApi.ShopItem i) => i == null ? (KartApi.Cfg == null ? "PRICES LOADING…" : "NOT FOR SALE") : $"{Skr(i)}  ·  ≈ ${i.usd:0.00}" + (string.IsNullOrEmpty(i.price.GetValueOrDefault("SOL")) ? "  ·  SKR ONLY" : $"   or {Sol(i)}");
+        /// A kart's price reads offline too: the powers say what it costs before the Worker quotes it in SKR and SOL.
+        static string KartPrice(KartApi.ShopItem i, KartDef def) => i == null ? (KartApi.Cfg == null ? $"${def.Usd:0.00}  ·  {def.Tier}" : "NOT FOR SALE") : $"{Skr(i)}  ·  ≈ ${i.usd:0.00}  ·  {def.Tier}";
 
         public void Primary()
         {

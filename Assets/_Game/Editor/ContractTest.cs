@@ -42,6 +42,10 @@ public static class ContractTest
         start = EditorApplication.timeSinceStartup;
         driving = false;
         introAt = countdownAt = podiumAt = cardAt = introFrame = podiumFrame = -1; podiumRacers = 0; tunnelFrame = false;
+        // arm a starting item the way the shop does: one rocket in the pack, picked as the loadout
+        startItem = "<not checked>";
+        KartCup.Inventory.Add("rocket", 1); KartCup.Inventory.Loadout = "rocket";
+        packBefore = KartCup.Inventory.Count("rocket");
         EditorApplication.update += Tick;
         EditorApplication.EnterPlaymode();
     }
@@ -104,6 +108,8 @@ public static class ContractTest
     // ---- the ceremony around the race: prize shot, 3-2-1, race, podium, results card ----
     static double introAt = -1, countdownAt = -1, podiumAt = -1, cardAt = -1, introFrame = -1, podiumFrame = -1;
     static bool tunnelFrame;
+    static string startItem = "<not checked>";
+    static int packBefore;
     static int podiumRacers;
 
     static void Flow(RaceManager race, double t)
@@ -119,7 +125,12 @@ public static class ContractTest
             var inside = tunnel != null && tunnel.GetComponent<Renderer>() != null && tunnel.GetComponent<Renderer>().bounds.Contains(race.Player.transform.position);
             if (inside && Vector3.Distance(race.Player.transform.position, tunnel.GetComponent<Renderer>().bounds.center) < 22f) { tunnelFrame = true; Frame("flow-tunnel"); }
         }
-        if (countdownAt < 0 && race.state == RaceManager.State.Countdown) { countdownAt = t; Debug.Log($"[contract] flow: 3-2-1 at {t:F1}s, prize shot still up: {active}"); }
+        if (countdownAt < 0 && race.state == RaceManager.State.Countdown)
+        {
+            countdownAt = t; Debug.Log($"[contract] flow: 3-2-1 at {t:F1}s, prize shot still up: {active}");
+            var held = race.Player.GetComponent<ItemCaster>();
+            startItem = held != null && held.item != null && held.ammo > 0 ? held.item.itemName : "<none>";
+        }
         if (race.Player.finished && podiumAt < 0 && active)
         {
             podiumAt = t;
@@ -152,6 +163,8 @@ public static class ContractTest
     static void Report(RaceManager race, bool finished, double t)
     {
         Check("the prize shot plays before the race", introAt > 0 && countdownAt > introAt + 3.0, $"shot {introAt:F1}s, 3-2-1 {countdownAt:F1}s");
+        Check("the shop's starting item is on the kart at the grid, and out of the pack", startItem == "Rocket" && KartCup.Inventory.Count("rocket") == packBefore - 1, $"held {startItem}, pack {packBefore} -> {KartCup.Inventory.Count("rocket")}");
+        KartCup.Inventory.Loadout = "";
         Check("the podium plays after the finish, with three racers", podiumAt > 0 && podiumRacers == 3, $"podium {podiumAt:F1}s, racers {podiumRacers}");
         Check("the results card follows the podium", cardAt > podiumAt + 3.0, $"podium {podiumAt:F1}s, card {cardAt:F1}s");
         var session = Object.FindFirstObjectByType<RaceSession>();

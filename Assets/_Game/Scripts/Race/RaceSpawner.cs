@@ -56,6 +56,7 @@ namespace KartCup
             var race = RaceManager.Instance;
             if (race == null) yield break;
             var show = PodiumShow.Ensure();
+            Loadout(race);
             if (show == null) { race.BeginCountdown(); yield break; }
             race.Hold();
             show.Prizes("RACE FOR GOLD", Tracks.At(Cup.TrackIndex).name.ToUpperInvariant(), new[] { "1ST", "2ND", "3RD" });
@@ -63,6 +64,19 @@ namespace KartCup
             while (Time.time < until && !(Time.time > skippable && PodiumShow.Tapped())) yield return null;
             show.End();
             race.BeginCountdown();
+        }
+
+        /// The consumable the shop armed for this race: one out of its pack, handed to the player's kart on the grid.
+        static void Loadout(RaceManager race)
+        {
+            var player = race.Player; var pack = Inventory.Find(Inventory.Loadout);
+            var items = FindAnyObjectByType<ItemManager>();
+            if (player == null || pack == null || items == null) return;
+            var caster = player.GetComponent<ItemCaster>();
+            var item = items.GetItem(pack.item);
+            if (caster == null || item == null || !Inventory.Take(pack.id)) return;
+            caster.GiveItem(item, 1, true);
+            KartApi.Event("loadout", new { item = pack.id });
         }
 
         /// The driver prefab a character races as (the podium stands them up).

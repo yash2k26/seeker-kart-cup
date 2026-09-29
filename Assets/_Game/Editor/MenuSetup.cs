@@ -58,12 +58,13 @@ public static class MenuSetup
         var rooms = RoomsScreen(safe);
         var lobby = LobbyScreen(safe);
         var garage = GarageScreen(safe, podium, carousel);
+        var items = ItemsScreen(safe);
 
         var so = new SerializedObject(flow);
         so.FindProperty("roster").objectReferenceValue = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
         so.FindProperty("playLabel").objectReferenceValue = title.transform.Find("Plate/Play/PlayLabel")?.GetComponent<TMP_Text>();
         var panels = so.FindProperty("panels");
-        panels.arraySize = 8;
+        panels.arraySize = 9;
         panels.GetArrayElementAtIndex(0).objectReferenceValue = title;
         panels.GetArrayElementAtIndex(1).objectReferenceValue = select;
         panels.GetArrayElementAtIndex(2).objectReferenceValue = board;
@@ -72,6 +73,7 @@ public static class MenuSetup
         panels.GetArrayElementAtIndex(5).objectReferenceValue = rooms;
         panels.GetArrayElementAtIndex(6).objectReferenceValue = lobby;
         panels.GetArrayElementAtIndex(7).objectReferenceValue = garage;
+        panels.GetArrayElementAtIndex(8).objectReferenceValue = items;
         so.ApplyModifiedPropertiesWithoutUndo();
 
         new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
@@ -386,9 +388,9 @@ public static class MenuSetup
                           new Vector2(0, 1), new Vector2(48, -180), new Vector2(608, 120));
         blurb.textWrappingMode = TextWrappingModes.Normal;
 
-        var bars = new StatBar[4];
-        var labels = new[] { "SPEED", "ACCEL", "GRIP", "WEIGHT" };
-        for (int i = 0; i < 4; i++) bars[i] = StatRow(card, labels[i], -284 - i * 80);
+        var bars = new StatBar[6];
+        var labels = new[] { "SPEED", "ACCEL", "GRIP", "WEIGHT", "TURBO", "ATTACK" };
+        for (int i = 0; i < 6; i++) bars[i] = StatRow(card, labels[i], -268 - i * 56);
 
         var next = Button("Next", card, "NEXT", Accent, Paper, 52,
                           new Vector2(0.5f, 0), new Vector2(0, 64), new Vector2(560, 128));
@@ -414,6 +416,8 @@ public static class MenuSetup
         so.FindProperty("accelBar").objectReferenceValue = bars[1];
         so.FindProperty("handlingBar").objectReferenceValue = bars[2];
         so.FindProperty("weightBar").objectReferenceValue = bars[3];
+        so.FindProperty("turboBar").objectReferenceValue = bars[4];
+        so.FindProperty("attackBar").objectReferenceValue = bars[5];
         so.ApplyModifiedPropertiesWithoutUndo();
 
         UnityEditor.Events.UnityEventTools.AddPersistentListener(prevArrow.onClick, carousel.Previous);
@@ -728,23 +732,28 @@ public static class MenuSetup
         card.offsetMin = new Vector2(64, 112); card.offsetMax = new Vector2(744, -152);
         Design.AsCard(card, Panel);
 
-        var nameLabel = Label("Name", card, display, "PHOTON", 104, Paper, TextAlignmentOptions.Left,
-                              new Vector2(0, 1), new Vector2(48, -52), new Vector2(624, 116));
-        nameLabel.enableAutoSizing = true; nameLabel.fontSizeMin = 64; nameLabel.fontSizeMax = 104;
-        var blurb = Label("Blurb", card, body, "", 34, Muted, TextAlignmentOptions.TopLeft,
-                          new Vector2(0, 1), new Vector2(48, -176), new Vector2(608, 100));
+        var nameLabel = Label("Name", card, display, "PHOTON", 96, Paper, TextAlignmentOptions.Left,
+                              new Vector2(0, 1), new Vector2(48, -44), new Vector2(624, 100));
+        nameLabel.enableAutoSizing = true; nameLabel.fontSizeMin = 60; nameLabel.fontSizeMax = 96;
+        var blurb = Label("Blurb", card, body, "", 30, Muted, TextAlignmentOptions.TopLeft,
+                          new Vector2(0, 1), new Vector2(48, -136), new Vector2(608, 60));
         blurb.textWrappingMode = TextWrappingModes.Normal;
-        var price = Label("Price", card, body, "", 34, Paper, TextAlignmentOptions.Left,
-                          new Vector2(0, 1), new Vector2(48, -290), new Vector2(624, 44));
+
+        // the five powers; their total is the price (KartPricing), and a locked kart shows what it would cost
+        var powerBars = new StatBar[5];
+        var powerNames = new[] { "SPEED", "TURBO", "GRIP", "ARMOR", "ATTACK" };
+        for (int i = 0; i < 5; i++) powerBars[i] = StatRow(card, powerNames[i], -200 - i * 44, size: 26);
+        var price = Label("Price", card, body, "", 30, Paper, TextAlignmentOptions.Left,
+                          new Vector2(0, 1), new Vector2(48, -428), new Vector2(624, 36));
 
         // paint swatches: the driver's own colour, then the four paints
-        var swatchCap = Label("PaintCap", card, body, "PAINT", 28, Muted, TextAlignmentOptions.Left,
-                              new Vector2(0, 1), new Vector2(48, -352), new Vector2(200, 40));
+        var swatchCap = Label("PaintCap", card, body, "PAINT", 26, Muted, TextAlignmentOptions.Left,
+                              new Vector2(0, 1), new Vector2(48, -474), new Vector2(200, 36));
         swatchCap.characterSpacing = 6f;
         var swatches = new Image[1 + Paints.All.Length];
         for (int i = 0; i < swatches.Length; i++)
         {
-            var rt = Rect("Swatch" + i, card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(180 + i * 92, -372), new Vector2(72, 72));
+            var rt = Rect("Swatch" + i, card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(180 + i * 76, -466), new Vector2(56, 56));
             rt.pivot = new Vector2(0, 1);
             swatches[i] = Design.AsPill(rt, Color.white);
             var b = rt.gameObject.AddComponent<Button>();
@@ -752,16 +761,21 @@ public static class MenuSetup
             UnityEditor.Events.UnityEventTools.AddIntPersistentListener(b.onClick, garage.Swatch, i);
         }
 
-        var status = Label("Status", card, body, "", 28, Muted, TextAlignmentOptions.TopLeft,
-                           new Vector2(0, 1), new Vector2(48, -452), new Vector2(608, 72));   // two short lines fit above TEST DRIVE
-        status.textWrappingMode = TextWrappingModes.Normal;
+        var status = Label("Status", card, body, "", 24, Muted, TextAlignmentOptions.TopLeft,
+                           new Vector2(0, 1), new Vector2(48, -522), new Vector2(608, 28));   // one short line above TEST DRIVE
 
-        var secondary = Button("Secondary", card, "TEST DRIVE", Slate, Paper, 40,
-                               new Vector2(0.5f, 0), new Vector2(0, 214), new Vector2(560, 104));
+        var secondary = Button("Secondary", card, "TEST DRIVE", Slate, Paper, 36,
+                               new Vector2(0.5f, 0), new Vector2(0, 176), new Vector2(560, 92));
         UnityEditor.Events.UnityEventTools.AddPersistentListener(secondary.onClick, garage.Secondary);
-        var primary = Button("Primary", card, "UNLOCK", Accent, Paper, 48,
-                             new Vector2(0.5f, 0), new Vector2(0, 64), new Vector2(560, 128));
+        var primary = Button("Primary", card, "UNLOCK", Accent, Paper, 44,
+                             new Vector2(0.5f, 0), new Vector2(0, 56), new Vector2(560, 108));
         UnityEditor.Events.UnityEventTools.AddPersistentListener(primary.onClick, garage.Primary);
+
+        // the shop's other tab
+        var itemsTab = Button("ItemsTab", screen.transform, "ITEMS  >", Slate, Paper, 32,
+                              new Vector2(1, 1), new Vector2(-64, -36), new Vector2(240, 88));
+        itemsTab.GetComponent<RectTransform>().pivot = new Vector2(1, 1);
+        Wire(itemsTab, nameof(ScreenFlow.ShowItems));
 
         var back = Button("Back", screen.transform, "BACK", Slate, Paper, 32,
                           new Vector2(0, 1), new Vector2(64, -36), new Vector2(200, 88));
@@ -789,6 +803,65 @@ public static class MenuSetup
         so.FindProperty("primaryButton").objectReferenceValue = primary;
         so.FindProperty("secondaryButton").objectReferenceValue = secondary;
         Fill(so.FindProperty("swatches"), swatches.Cast<Object>().ToArray());
+        Fill(so.FindProperty("powerBars"), powerBars.Cast<Object>().ToArray());
+        so.ApplyModifiedPropertiesWithoutUndo();
+        return screen;
+    }
+
+    /// The shop's items tab: five packs of race consumables, how many of each you hold, and the one you start with.
+    static GameObject ItemsScreen(RectTransform parent)
+    {
+        var screen = Rect("Items", parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject;
+        var panel = screen.AddComponent<ItemsPanel>();
+        var card = Rect("Card", screen.transform, Vector2.zero, new Vector2(0, 1), Vector2.zero, Vector2.zero);
+        card.pivot = new Vector2(0, 0.5f);
+        card.offsetMin = new Vector2(64, 112); card.offsetMax = new Vector2(744, -152);
+        Design.AsCard(card, Panel);
+
+        Label("Name", card, display, "ITEMS", 96, Paper, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(48, -40), new Vector2(624, 96));
+        var blurb = Label("Blurb", card, body, "", 26, Muted, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(48, -142), new Vector2(608, 56));
+        blurb.textWrappingMode = TextWrappingModes.Normal;
+        var loadout = Chip("Loadout", card, "START WITH:  NOTHING", new Vector2(0, -198), out var loadoutLabel);
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(loadout.onClick, panel.CycleLoadout);
+
+        var packs = Inventory.Packs;
+        var rows = new Button[packs.Length]; var rowLabels = new TMP_Text[packs.Length]; var rowPrices = new TMP_Text[packs.Length];
+        for (int i = 0; i < packs.Length; i++)
+        {
+            var rt = Rect("Row" + i, card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -302 - i * 50), new Vector2(600, 44));
+            rt.pivot = new Vector2(0, 1);
+            Design.AsRow(rt, Design.Ink700);
+            rows[i] = rt.gameObject.AddComponent<Button>();
+            rt.gameObject.AddComponent<PressFeel>();
+            UnityEditor.Events.UnityEventTools.AddIntPersistentListener(rows[i].onClick, panel.Focus, i);
+            rowLabels[i] = Label("Label", rt, strong, packs[i].name.ToUpperInvariant(), 26, Paper, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(20, 0), new Vector2(400, 40));
+            rowPrices[i] = Label("Price", rt, body, "", 24, Muted, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-20, 0), new Vector2(180, 40));
+        }
+
+        var secondary = Button("Secondary", card, "PAY", Slate, Paper, 36, new Vector2(0.5f, 0), new Vector2(0, 176), new Vector2(560, 92));
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(secondary.onClick, panel.Secondary);
+        var primary = Button("Primary", card, "UNLOCK", Accent, Paper, 44, new Vector2(0.5f, 0), new Vector2(0, 56), new Vector2(560, 108));
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(primary.onClick, panel.Primary);
+
+        var back = Button("Back", screen.transform, "BACK", Slate, Paper, 32, new Vector2(0, 1), new Vector2(64, -36), new Vector2(200, 88));
+        back.GetComponent<RectTransform>().pivot = new Vector2(0, 1);
+        Wire(back, nameof(ScreenFlow.ShowTitle));
+        var kartsTab = Button("KartsTab", screen.transform, "<  KARTS", Slate, Paper, 32, new Vector2(1, 1), new Vector2(-64, -36), new Vector2(240, 88));
+        kartsTab.GetComponent<RectTransform>().pivot = new Vector2(1, 1);
+        Wire(kartsTab, nameof(ScreenFlow.ShowGarage));
+
+        var so = new SerializedObject(panel);
+        Fill(so.FindProperty("rows"), rows.Cast<Object>().ToArray());
+        Fill(so.FindProperty("rowLabels"), rowLabels.Cast<Object>().ToArray());
+        Fill(so.FindProperty("rowPrices"), rowPrices.Cast<Object>().ToArray());
+        so.FindProperty("blurbLabel").objectReferenceValue = blurb;
+        so.FindProperty("loadoutLabel").objectReferenceValue = loadoutLabel;
+        so.FindProperty("primaryLabel").objectReferenceValue = primary.GetComponentInChildren<TMP_Text>();
+        so.FindProperty("secondaryLabel").objectReferenceValue = secondary.GetComponentInChildren<TMP_Text>();
+        so.FindProperty("primaryButton").objectReferenceValue = primary;
+        so.FindProperty("secondaryButton").objectReferenceValue = secondary;
+        so.FindProperty("rowIdle").colorValue = Design.Ink700;
+        so.FindProperty("rowFocus").colorValue = Design.Ink600;
         so.ApplyModifiedPropertiesWithoutUndo();
         return screen;
     }
@@ -838,9 +911,9 @@ public static class MenuSetup
     }
 
     // ---------- builders ----------
-    static StatBar StatRow(RectTransform card, string label, float y, int pips = 5)
+    static StatBar StatRow(RectTransform card, string label, float y, int pips = 5, float size = 32f)
     {
-        var text = Label(label + "Label", card, body, label, 32, Muted, TextAlignmentOptions.Left,
+        var text = Label(label + "Label", card, body, label, size, Muted, TextAlignmentOptions.Left,
                          new Vector2(0, 1), new Vector2(48, y), new Vector2(240, 48));
         text.characterSpacing = 6f;
         var row = Rect(label + "Bar", card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(300, y - 6), new Vector2(380, 30));

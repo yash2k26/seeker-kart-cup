@@ -57,7 +57,7 @@ namespace KartCup
         [Serializable] public class RoomCreated { public string code, url; }
         [Serializable] public class PublicRoom { public string code, host, fee, currency; public int players, maxPlayers; public List<string> tracks = new(); public long createdAt; }
         [Serializable] public class PublicRooms { public List<PublicRoom> rooms = new(); }
-        [Serializable] public class ShopItem { public string sku, kind, name, blurb; public double usd; public bool skrOnly, onSale = true; public List<string> grants; public Dictionary<string, string> price = new(); }
+        [Serializable] public class ShopItem { public string sku, kind, name, blurb, item; public int qty; public double usd; public bool skrOnly, onSale = true; public List<string> grants; public Dictionary<string, int> powers; public Dictionary<string, string> price = new(); }
         [Serializable] public class ConfigDto
         {
             public string treasuryOwner, treasuryAta, skrMint;

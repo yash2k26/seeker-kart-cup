@@ -193,10 +193,11 @@ public static class MenuPreview
         {
             for (int j = 0; j < panels.arraySize; j++)
                 ((GameObject)panels.GetArrayElementAtIndex(j).objectReferenceValue).SetActive(i == j);
-            if (backdrop != null) backdrop.Snap(i == 1 || i == 7);     // LateUpdate never runs in edit mode either; the garage shares the select pose
+            if (backdrop != null) backdrop.Snap(i == 1 || i == 7 || i == 8);     // LateUpdate never runs in edit mode either; the shop shares the select pose
             // OnEnable does not run in edit mode: hand the sample/preview content to the panels that need it.
             if (i == 6) foreach (var lobby in Object.FindObjectsByType<LobbyPanel>(FindObjectsSortMode.None)) lobby.RefreshSample();
             if (i == 7) foreach (var garage in Object.FindObjectsByType<GaragePanel>(FindObjectsSortMode.None)) garage.ShowInEditor(KartSetup.Karts.Length - 1);
+            if (i == 8) foreach (var shop in Object.FindObjectsByType<ItemsPanel>(FindObjectsSortMode.None)) shop.ShowInEditor(0);
             if (i != 7 && carousel != null) carousel.SetVisible(true);
             foreach (var img in Object.FindObjectsByType<Image>(FindObjectsSortMode.None))
                 if (img.name == "Single" || img.name == "Cell0")

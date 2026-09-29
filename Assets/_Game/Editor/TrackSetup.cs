@@ -103,7 +103,8 @@ public static partial class TrackSetup
         input.mobileDriftHoldSteer = 0.55f;
         EditorUtility.SetDirty(input);
 
-        Instantiate(PKP + "Prefabs/Items/Items.prefab", "Items");
+        // our item set (ItemSetup) if it has been built, else Powerslide's four
+        Instantiate(File.Exists(Prefabs + "Items/Items.prefab") ? Prefabs + "Items/Items.prefab" : PKP + "Prefabs/Items/Items.prefab", "Items");
 
         var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
         var cam = camGo.AddComponent<Camera>();
@@ -710,34 +711,38 @@ public static partial class TrackSetup
         bool fresh = db == null;
         if (fresh) { db = ScriptableObject.CreateInstance<CharacterDatabase>(); AssetDatabase.CreateAsset(db, dir + "Characters.asset"); }
 
-        // name, kart, driver, speed, accel, handling, weight  (pips sum to 0 so nobody is strictly better)
-        // Existing rows keep whatever was hand-tuned in their asset; new names are appended, so a roster that grows
-        // (Chase and Beeman arrived on 28 Sep 2026) never resets the select-screen order or the saved character index.
-        var rows = new (string name, string kart, string driver, int sp, int ac, int hd, int wt, string blurb)[]
+        // name, kart, driver, speed, accel, handling, weight, turbo, attack  (six pips that sum to 0 so nobody is
+        // strictly better: a shape, not an edge). This table is the roster's stats; the tint stays LookSetup's. New
+        // names are appended, so a roster that grows (Chase and Beeman arrived on 28 Sep 2026) never resets the
+        // select-screen order or the saved character index.
+        var rows = new (string name, string kart, string driver, int sp, int ac, int hd, int wt, int tb, int at, string blurb)[]
         {
-            ("Toly",     "oodi", "Toly",   1,  0,  0, -1, "Ships blocks faster than you can read them."),
-            ("Mert",     "ooli", "Mert",   0,  2,  0, -2, "Indexes every corner before he takes it."),
-            ("Akshay",   "oobi", "Akshay", 2, -1, -1,  0, "Top speed, turns like a ferry."),
-            ("Emmett",   "oopi", "Emmett", -1, 1,  2, -2, "Threads corners nobody else sees."),
-            ("Bitsy",    "oozi", "Bitsy",  1,  1, -1, -1, "All gas, some brakes."),
-            ("Pip",      "oodi", "Pip",   -1, -1,  0,  2, "Hard to move, harder to pass."),
-            ("Runa",     "ooli", "Runa",   0,  1,  1, -2, "Never lifts."),
-            ("Vee",      "oopi", "Vee",    1, -1,  1, -1, "Late braker, early apex."),
-            ("Chase",    "oozi", "Chase",  0,  1,  1, -2, "Knows every dev on the grid. Waves at all of them."),
-            ("Beeman",   "oobi", "Beeman", 2,  0, -1, -1, "Bald, fast, and debugging at sixty frames a second."),
+            ("Toly",     "oodi", "Toly",   1,  0,  0, -1,  1, -1, "Ships blocks faster than you can read them."),
+            ("Mert",     "ooli", "Mert",   0,  2,  0, -2, -1,  1, "Indexes every corner before he takes it."),
+            ("Akshay",   "oobi", "Akshay", 2, -1, -1,  0,  1, -1, "Top speed, turns like a ferry."),
+            ("Emmett",   "oopi", "Emmett", -1, 1,  2, -2,  0,  0, "Threads corners nobody else sees."),
+            ("Bitsy",    "oozi", "Bitsy",  1,  1, -1, -1,  2, -2, "All gas, some brakes."),
+            ("Pip",      "oodi", "Pip",   -1, -1,  0,  2, -1,  1, "Hard to move, harder to pass."),
+            ("Runa",     "ooli", "Runa",   0,  1,  1, -2, -1,  1, "Never lifts."),
+            ("Vee",      "oopi", "Vee",    1, -1,  1, -1,  0,  0, "Late braker, early apex."),
+            ("Chase",    "oozi", "Chase",  0,  1,  1, -2, -1,  1, "Knows every dev on the grid. Waves at all of them."),
+            ("Beeman",   "oobi", "Beeman", 2,  0, -1, -1, -1,  1, "Bald, fast, and debugging at sixty frames a second."),
         };
         var defs = (db.characters ?? System.Array.Empty<CharacterDef>()).Where(d => d != null).ToList();
         foreach (var r in rows)
         {
-            if (defs.Any(d => d.displayName == r.name)) continue;
-            var path = dir + $"Character_{r.name}.asset";
-            var def = AssetDatabase.LoadAssetAtPath<CharacterDef>(path);
-            if (def == null) { def = ScriptableObject.CreateInstance<CharacterDef>(); def.name = r.name; AssetDatabase.CreateAsset(def, path); }
+            var def = defs.FirstOrDefault(d => d.displayName == r.name);
+            if (def == null)
+            {
+                var path = dir + $"Character_{r.name}.asset";
+                def = AssetDatabase.LoadAssetAtPath<CharacterDef>(path);
+                if (def == null) { def = ScriptableObject.CreateInstance<CharacterDef>(); def.name = r.name; AssetDatabase.CreateAsset(def, path); }
+                defs.Add(def);
+                Debug.Log($"[track] roster: added {r.name}");
+            }
             def.displayName = r.name; def.kartId = r.kart; def.driverId = r.driver; def.blurb = r.blurb;
-            def.speed = r.sp; def.accel = r.ac; def.handling = r.hd; def.weight = r.wt;
+            def.speed = r.sp; def.accel = r.ac; def.handling = r.hd; def.weight = r.wt; def.turbo = r.tb; def.attack = r.at;
             EditorUtility.SetDirty(def);
-            defs.Add(def);
-            Debug.Log($"[track] roster: added {r.name}");
         }
         db.characters = defs.ToArray();
         EditorUtility.SetDirty(db);

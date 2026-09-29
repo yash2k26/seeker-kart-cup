@@ -17,7 +17,7 @@ namespace KartCup
         [SerializeField] CharacterDatabase roster;
         [SerializeField] TMP_Text playLabel;      // says CONTINUE CUP when one is half-run
 
-        const int Select = 1, Track = 4, Rooms = 5, Lobby = 6, Garage = 7;
+        const int Select = 1, Track = 4, Rooms = 5, Lobby = 6, Garage = 7, Items = 8;
 
         /// Set before loading the menu: open straight into the lobby (rematch) or join a code (invite link).
         public static bool PendingLobby;
@@ -93,7 +93,7 @@ namespace KartCup
             }
             current = panel;
             lastShow = Time.unscaledTime;
-            if (backdrop != null) backdrop.Focused = panel == Select || panel == Garage;   // hold a composed angle while a kart is on show; the track panel covers the vista
+            if (backdrop != null) backdrop.Focused = panel == Select || panel == Garage || panel == Items;   // hold a composed angle while a kart is on show; the track panel covers the vista
             if (silent) return;
             Haptics.Play(Haptics.Kind.Tick);
             AudioDirector.Instance?.Click();
@@ -107,6 +107,7 @@ namespace KartCup
         public void ShowRooms() => Show(Rooms);
         public void ShowLobby() => Show(Lobby);
         public void ShowGarage() => Show(Garage);
+        public void ShowItems() => Show(Items);
 
         /// Starts a NEW cup — every track, or the one chosen on the track panel — with the selected character.
         /// Continuing an existing cup goes through ContinueCup.

@@ -7,26 +7,48 @@ import { baseUnits, type Rates } from './prices';
 export type Currency = 'SOL' | 'SKR';
 export const DECIMALS: Record<Currency, number> = { SOL: 9, SKR: 6 };
 
-export type Sku = { sku: string; kind: 'kart' | 'paint' | 'bundle'; name: string; blurb: string; usd: number; skrOnly?: boolean; grants?: string[]; until?: string };
+export type Powers = { speed: number; turbo: number; grip: number; armor: number; attack: number };
+export type Sku = { sku: string; kind: 'kart' | 'paint' | 'bundle' | 'item'; name: string; blurb: string; usd: number; skrOnly?: boolean; grants?: string[]; until?: string;
+                    powers?: Powers; item?: string; qty?: number };
 
-// research/23: sell karts and paint, never drivers (they carry the stat pips; three are real people) and never stats.
-// Three rungs — paint $0.99, Street kart $2.99, Hero kart $4.99 — and two bundles: the Founder's Pack is the intended
-// purchase, the Full Garage is the anchor that makes it look sane. Karts are cosmetic: same speed as every free kart.
+/** A kart's price follows its powers: five of 0..5 pips, and the total lands on a rung. The phone carries the same
+ *  table and rule (KartSetup.cs, KartPricing.cs), so a card reads right before the Worker has quoted it. */
+export function usdForPowers(p: Powers): number {
+  const total = p.speed + p.turbo + p.grip + p.armor + p.attack;
+  return total <= 11 ? 0 : total <= 15 ? 2.99 : total <= 19 ? 4.99 : 7.99;
+}
+const kart = (id: string, name: string, blurb: string, speed: number, turbo: number, grip: number, armor: number, attack: number): Sku => {
+  const powers = { speed, turbo, grip, armor, attack };
+  return { sku: 'kart.' + id, kind: 'kart', name, blurb, powers, usd: usdForPowers(powers) };
+};
+const pack = (id: string, item: string, name: string, blurb: string, qty: number, usd: number): Sku =>
+  ({ sku: `item.${id}${qty}`, kind: 'item', name, blurb, item, qty, usd });
+
+// research/23: sell karts, paint and what you take into a race, never drivers (three are real people). Paint $0.99;
+// karts by their powers, Street $2.99 and Hero $4.99; packs of three race items at $0.49; and two bundles: the
+// Founder's Pack is the intended purchase, the Full Garage is the anchor that makes it look sane.
 export const CATALOG: Sku[] = [
   { sku: 'paint.sunset',   kind: 'paint', name: 'Sunset',   blurb: 'Ember fading to gold.',                    usd: 0.99 },
   { sku: 'paint.midnight', kind: 'paint', name: 'Midnight', blurb: 'Deep navy, gloss black trim.',             usd: 0.99 },
   { sku: 'paint.rally',    kind: 'paint', name: 'SKR Rally', blurb: 'Seeker violet. Only ever sold for SKR.',  usd: 0.99, skrOnly: true },
   { sku: 'paint.white',    kind: 'paint', name: 'White',    blurb: 'Clean white. Shows every scratch.',       usd: 0.99 },
 
-  { sku: 'kart.taxi',             kind: 'kart', name: 'Mempool',   blurb: 'Takes everyone for a ride.',            usd: 2.99 },
-  { sku: 'kart.van',              kind: 'kart', name: 'Airdrop',   blurb: 'Delivers. Eventually.',                 usd: 2.99 },
-  { sku: 'kart.hatchback-sports', kind: 'kart', name: 'Hot Hatch', blurb: 'Point it and it goes.',                 usd: 2.99 },
-  { sku: 'kart.police',           kind: 'kart', name: 'Slasher',   blurb: 'Enforces the racing line.',             usd: 2.99 },
+  // SPEED, TURBO, GRIP, ARMOR, ATTACK — Street karts total 14, Hero karts 18 (the free five total 10)
+  kart('taxi',             'Mempool',       'Takes everyone for a ride.',            3, 3, 2, 3, 3),
+  kart('van',              'Airdrop',       'Delivers. Eventually.',                 2, 3, 2, 4, 3),
+  kart('hatchback-sports', 'Hot Hatch',     'Point it and it goes.',                 4, 3, 3, 2, 2),
+  kart('police',           'Slasher',       'Enforces the racing line.',             3, 3, 3, 2, 3),
+  kart('firetruck',        'Hotfix',        'A fire truck. In a kart race. Yes.',    3, 4, 3, 5, 3),
+  kart('garbage-truck',    'Garbage Chain', 'Hauls the whole mempool.',              2, 3, 3, 5, 5),
+  kart('tractor',          'Yield Farmer',  'Slow off the line, unstoppable after.', 2, 5, 3, 5, 3),
+  kart('race-future',      'Photon',        'Low, wide, glued to the road.',         5, 4, 5, 2, 2),
 
-  { sku: 'kart.firetruck',     kind: 'kart', name: 'Hotfix',       blurb: 'A fire truck. In a kart race. Yes.',    usd: 4.99 },
-  { sku: 'kart.garbage-truck', kind: 'kart', name: 'Garbage Chain', blurb: 'Hauls the whole mempool.',             usd: 4.99 },
-  { sku: 'kart.tractor',       kind: 'kart', name: 'Yield Farmer', blurb: 'Slow off the line, unstoppable after.', usd: 4.99 },
-  { sku: 'kart.race-future',   kind: 'kart', name: 'Photon',       blurb: 'Low, wide, glued to the road.',         usd: 4.99 },
+  // packs: the item name is the ItemManager's, the count is credited to the phone's inventory when the purchase verifies
+  pack('rocket',  'Rocket',      'Rockets x3',  'Straight, fast, no manners.',                3, 0.49),
+  pack('homing',  'Homing Item', 'Homing x3',   'Finds the kart ahead and turns it round.',   3, 0.49),
+  pack('bomb',    'Bomb',        'Bombs x3',    'Drops behind you. Waits.',                   3, 0.49),
+  pack('nitro',   'Nitro',       'Nitro x3',    'A turbo with the lid off.',                  3, 0.49),
+  pack('bouncer', 'Bouncer',     'Bouncers x3', 'Off the walls until it finds someone.',      3, 0.49),
 
   { sku: 'bundle.founder', kind: 'bundle', name: "Founder's Pack", blurb: 'Photon, Hotfix, Mempool, Slasher, two paints and the Founder badge. Sold once, never again.',
     usd: 9.99, until: '2027-01-10T00:00:00Z', grants: ['kart.race-future', 'kart.firetruck', 'kart.taxi', 'kart.police', 'paint.sunset', 'paint.midnight', 'badge.founder'] },

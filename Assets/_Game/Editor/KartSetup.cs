@@ -15,22 +15,24 @@ public static class KartSetup
     public static readonly string[] Karts = { "oobi", "oodi", "ooli", "oopi", "oozi",
                                               "taxi", "van", "hatchback-sports", "police", "firetruck", "garbage-truck", "tractor", "race-future" };
 
-    // id, shown name, blurb, sku ("" = free). Names and blurbs mirror worker/src/catalog.ts, which holds the prices.
-    static readonly (string id, string name, string blurb, string sku)[] Garage =
+    // id, shown name, blurb, sku ("" = free), then the five powers (0..5): SPEED, TURBO, GRIP, ARMOR, ATTACK. The free
+    // five total 10, Street karts 14, Hero karts 18, and the total sets the price (KartPricing). worker/src/catalog.ts
+    // carries the same table and rule, so the Worker quotes what the card shows offline.
+    static readonly (string id, string name, string blurb, string sku, int sp, int tb, int gr, int ar, int at)[] Garage =
     {
-        ("oobi", "Oobi", "The one everybody learns on.", ""),
-        ("oodi", "Oodi", "Short wheelbase, quick hands.", ""),
-        ("ooli", "Ooli", "Sits flat through the sweepers.", ""),
-        ("oopi", "Oopi", "Big tyres, big attitude.", ""),
-        ("oozi", "Oozi", "All gas, some brakes.", ""),
-        ("taxi", "Mempool", "Takes everyone for a ride.", "kart.taxi"),
-        ("van", "Airdrop", "Delivers. Eventually.", "kart.van"),
-        ("hatchback-sports", "Hot Hatch", "Point it and it goes.", "kart.hatchback-sports"),
-        ("police", "Slasher", "Enforces the racing line.", "kart.police"),
-        ("firetruck", "Hotfix", "A fire truck. In a kart race. Yes.", "kart.firetruck"),
-        ("garbage-truck", "Garbage Chain", "Hauls the whole mempool.", "kart.garbage-truck"),
-        ("tractor", "Yield Farmer", "Slow off the line, unstoppable after.", "kart.tractor"),
-        ("race-future", "Photon", "Low, wide, glued to the road.", "kart.race-future"),
+        ("oobi", "Oobi", "The one everybody learns on.", "",                              2, 2, 2, 2, 2),
+        ("oodi", "Oodi", "Short wheelbase, quick hands.", "",                             2, 1, 3, 2, 2),
+        ("ooli", "Ooli", "Sits flat through the sweepers.", "",                           3, 2, 2, 2, 1),
+        ("oopi", "Oopi", "Big tyres, big attitude.", "",                                  2, 2, 2, 3, 1),
+        ("oozi", "Oozi", "All gas, some brakes.", "",                                     2, 3, 1, 2, 2),
+        ("taxi", "Mempool", "Takes everyone for a ride.", "kart.taxi",                    3, 3, 2, 3, 3),
+        ("van", "Airdrop", "Delivers. Eventually.", "kart.van",                           2, 3, 2, 4, 3),
+        ("hatchback-sports", "Hot Hatch", "Point it and it goes.", "kart.hatchback-sports", 4, 3, 3, 2, 2),
+        ("police", "Slasher", "Enforces the racing line.", "kart.police",                 3, 3, 3, 2, 3),
+        ("firetruck", "Hotfix", "A fire truck. In a kart race. Yes.", "kart.firetruck",   3, 4, 3, 5, 3),
+        ("garbage-truck", "Garbage Chain", "Hauls the whole mempool.", "kart.garbage-truck", 2, 3, 3, 5, 5),
+        ("tractor", "Yield Farmer", "Slow off the line, unstoppable after.", "kart.tractor", 2, 5, 3, 5, 3),
+        ("race-future", "Photon", "Low, wide, glued to the road.", "kart.race-future",    5, 4, 5, 2, 2),
     };
 
     [MenuItem("Build/Assemble Karts")]
@@ -197,7 +199,7 @@ public static class KartSetup
             var def = AssetDatabase.LoadAssetAtPath<KartCup.KartDef>(path);
             if (def == null) { def = ScriptableObject.CreateInstance<KartCup.KartDef>(); AssetDatabase.CreateAsset(def, path); }
             def.id = g.id; def.displayName = g.name; def.blurb = g.blurb; def.sku = g.sku;
-            def.speed = def.accel = def.handling = def.weight = 0;   // cosmetic: the stats live on the drivers
+            def.speed = g.sp; def.turbo = g.tb; def.grip = g.gr; def.armor = g.ar; def.attack = g.at;
             EditorUtility.SetDirty(def);
             defs.Add(def);
         }
@@ -206,7 +208,7 @@ public static class KartSetup
         if (db == null) { db = ScriptableObject.CreateInstance<KartCup.KartDatabase>(); AssetDatabase.CreateAsset(db, dbPath); }
         db.karts = defs.ToArray();
         EditorUtility.SetDirty(db);
-        Debug.Log($"[karts] garage: {defs.Count} karts ({defs.Count(d => !d.IsFree)} for sale)");
+        Debug.Log($"[karts] garage: {defs.Count} karts ({defs.Count(d => !d.IsFree)} for sale): " + string.Join(", ", defs.Select(d => $"{d.displayName} {d.Total} pips {d.Tier}")));
     }
 
     static Transform Find(Transform root, string name) =>

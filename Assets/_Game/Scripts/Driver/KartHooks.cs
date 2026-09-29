@@ -15,6 +15,8 @@ namespace KartCup
         Rigidbody rb;
         ItemCaster caster;
         Item heldItem;
+        KartPowers powers;
+        int knownAmmo, castFrame = -1;
 
         public void Bind(Kart k, BlockyDriverPose pose, bool player)
         {
@@ -26,7 +28,24 @@ namespace KartCup
             k.collisionEvent.AddListener((point, normal) => OnCollision());
 
             caster = GetComponent<ItemCaster>();
+            powers = GetComponent<KartPowers>();
             if (caster != null && player) caster.castEvent.AddListener(() => AudioDirector.Instance?.UseItem());
+            if (caster != null) caster.castEvent.AddListener(() => castFrame = Time.frameCount);
+        }
+
+        /// The ATTACK power: the projectile this kart just fired flies harder. A projectile does not say who fired it,
+        /// so the one that appeared beside the kart on the frame of the cast is taken to be ours.
+        void LateUpdate()
+        {
+            if (castFrame != Time.frameCount || powers == null || Mathf.Abs(powers.attack - 1f) < 0.01f) return;
+            foreach (var shot in FindObjectsByType<SpawnedProjectileItem>(FindObjectsSortMode.None))
+            {
+                if (shot.GetComponent<PoweredShot>() != null || (shot.transform.position - transform.position).sqrMagnitude > 16f) continue;
+                shot.gameObject.AddComponent<PoweredShot>();
+                shot.targetSpeed *= powers.attack; shot.accel *= powers.attack;
+                var srb = shot.GetComponent<Rigidbody>();
+                if (srb != null && rb != null) srb.linearVelocity = rb.linearVelocity + (srb.linearVelocity - rb.linearVelocity) * powers.attack;
+            }
         }
 
         void Update()
@@ -35,9 +54,14 @@ namespace KartCup
             if (driver != null) driver.Steer = kart.GetVisualSteer();
 
             // the item box has no event of its own: notice the slot filling instead
-            if (isPlayer && caster != null && caster.item != heldItem)
+            if (caster != null)
             {
-                if (caster.item != null && heldItem == null) AudioDirector.Instance?.Pickup();
+                if (caster.ammo > knownAmmo)
+                {
+                    if (isPlayer) AudioDirector.Instance?.Pickup();
+                    if (powers != null && powers.bonusAmmo > 0) caster.ammo += powers.bonusAmmo;   // ATTACK: a shot on the house
+                }
+                knownAmmo = caster.ammo;
                 heldItem = caster.item;
             }
             if (isPlayer && CameraFeel.Instance != null && rb != null)

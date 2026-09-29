@@ -15,7 +15,7 @@ namespace KartCup
         [SerializeField] GameObject[] kartPrefabs;
         [SerializeField] GameObject[] driverPrefabs;
         [SerializeField] TMP_Text nameLabel, blurbLabel;
-        [SerializeField] StatBar speedBar, accelBar, handlingBar, weightBar;
+        [SerializeField] StatBar speedBar, accelBar, handlingBar, weightBar, turboBar, attackBar;
         // The podium is a turntable: it turns steadily (degrees per second) with the kart standing on it. Swaying the
         // kart alone over bare sand read as floating. Time-based, so the garage and this screen never jump between them.
         [SerializeField] float baseYaw = 65f, spin = 14f;
@@ -74,6 +74,8 @@ namespace KartCup
             accelBar?.Set(def.accel);
             handlingBar?.Set(def.handling);
             weightBar?.Set(def.weight);
+            turboBar?.Set(def.turbo);
+            attackBar?.Set(def.attack);
         }
 
         /// A display-only kart with its driver on the podium: no physics, no input, no race components, tyres grounded,
