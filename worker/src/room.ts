@@ -29,7 +29,7 @@ const CONTROL_BURST = 10, CONTROL_PER_S = 2;   // frames that write storage, the
 const LOBBY_TTL_MS = 30 * 60_000;      // a room nobody starts
 const EMPTY_TTL_MS = 5 * 60_000;       // a room everybody left
 const LOAD_TIMEOUT_MS = 30_000;        // slow phone loading the track
-const COUNTDOWN_LEAD_MS = 4_500;       // GET READY buffer + 3-2-1
+const COUNTDOWN_LEAD_MS = 8_000;       // the prize-pool shot (about 5 s) then 3-2-1, on every phone at once
 const FINISH_GRACE_MS = 60_000;        // after the first finisher, the rest have this long
 const RACE_CAP_MS = 6 * 60_000;
 const RESULTS_MS = 25_000;             // between races of a cup: the host may go on sooner; after this the room does
