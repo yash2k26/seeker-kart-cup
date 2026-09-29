@@ -163,14 +163,26 @@ public static partial class TrackSetup
     static UnityEngine.Rendering.VolumeProfile PostProfile()
     {
         const string basePath = "Assets/Settings/PostProfile.asset";
-        if (V.post == null) return AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.VolumeProfile>(basePath);
+        var basis = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.VolumeProfile>(basePath);
+        if (V.post == null) return basis;
+        // The map's own copy keeps its GUID across builds: deleting and re-copying the asset gave it a new one every
+        // time, so a scene committed without its .meta pointed at nothing and the map lost its grade.
         string path = $"Assets/Settings/Post_{V.id}.asset";
-        AssetDatabase.DeleteAsset(path);
-        AssetDatabase.CopyAsset(basePath, path);          // the copy carries the components as sub-assets
         var profile = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.VolumeProfile>(path);
+        if (profile == null) { profile = ScriptableObject.CreateInstance<UnityEngine.Rendering.VolumeProfile>(); AssetDatabase.CreateAsset(profile, path); }
+        foreach (var c in profile.components.ToArray()) { profile.components.Remove(c); if (c != null) Object.DestroyImmediate(c, true); }
+        foreach (var c in basis.components)
+        {
+            var copy = Object.Instantiate(c);
+            copy.name = c.GetType().Name; copy.hideFlags = HideFlags.HideInHierarchy;
+            AssetDatabase.AddObjectToAsset(copy, profile);
+            profile.components.Add(copy);
+        }
         V.post(profile);
+        profile.isDirty = true;
         foreach (var c in profile.components) EditorUtility.SetDirty(c);
         EditorUtility.SetDirty(profile);
+        AssetDatabase.SaveAssets();
         return profile;
     }
 
