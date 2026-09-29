@@ -21,12 +21,14 @@ public static class RoomSmoke
     static System.Diagnostics.Process bot;
     static bool driving, sawRemote, remoteMoved, sawRacing, sawCountdown;
     static Vector3 remoteStart;
-    static int lastLogged = -1;
+    static int lastLogged = -1, lastClockLog = -1;
+    static float maxClockErr = float.MinValue;
     static readonly Queue<string> botLines = new();
 
     [MenuItem("Build/Room Smoke")]
     public static void Run()
     {
+        EditorUtility.audioMasterMute = true;   // a headless test run must not play the game's sound through the laptop
         if (!EditorSettings.enterPlayModeOptionsEnabled || EditorSettings.enterPlayModeOptions != EnterPlayModeOptions.DisableDomainReload)
         {
             EditorSettings.enterPlayModeOptionsEnabled = true;
@@ -36,7 +38,7 @@ public static class RoomSmoke
         Cup.End();
         EditorSceneManager.OpenScene("Assets/_Game/Scenes/Menu.unity", OpenSceneMode.Single);
         start = EditorApplication.timeSinceStartup; stage = 0; failures = 0;
-        driving = sawRemote = remoteMoved = sawRacing = sawCountdown = false; lastLogged = -1;
+        driving = sawRemote = remoteMoved = sawRacing = sawCountdown = false; lastLogged = -1; lastClockLog = -1; maxClockErr = float.MinValue;
         EditorApplication.update += Tick;
         EditorApplication.EnterPlaymode();
     }
@@ -44,6 +46,7 @@ public static class RoomSmoke
     static void Tick()
     {
         if (!EditorApplication.isPlaying) return;
+        AudioListener.volume = 0f;   // and silent in play mode too, whatever the game's settings set it to
         double t = EditorApplication.timeSinceStartup - start;
         lock (botLines) while (botLines.Count > 0) Debug.Log("[roomsmoke] " + botLines.Dequeue());
         var client = RoomClient.Instance;
@@ -129,6 +132,22 @@ public static class RoomSmoke
         { remoteMoved = true; Check("remote kart moves from network states", true); }
         if (!sawCountdown && race.state == RaceManager.State.Countdown) { sawCountdown = true; Check("countdown started from the room clock", true); }
         if (!sawRacing && race.state == RaceManager.State.Racing) { sawRacing = true; Check("GO", true); }
+        // The room refuses a race clock more than a second ahead of its own. The Worker runs on this machine, so the
+        // system clock IS the server clock: log how far our race clock (and the clock fit behind it) is from the truth.
+        if (race.state == RaceManager.State.Racing && client.Room?.startAt is long startAt && (int)(t * 2) != lastClockLog)
+        {
+            lastClockLog = (int)(t * 2);
+            double truth = (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - startAt) / 1000.0;
+            var f = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var sw = (System.Diagnostics.Stopwatch)typeof(RoomClient).GetField("clock", f).GetValue(client);
+            double offset = (double)typeof(RoomClient).GetField("offsetMs", f).GetValue(client);
+            long bestRtt = (long)typeof(RoomClient).GetField("bestRtt", f).GetValue(client);
+            double trueOffset = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - sw.ElapsedMilliseconds;
+            float err = (float)(NetRace.RaceSeconds - truth);
+            maxClockErr = Mathf.Max(maxClockErr, err);
+            if ((int)t % 10 == 0 || err > 0.5f)
+                Debug.Log($"[roomsmoke] clock: race clock {NetRace.RaceSeconds:F2} s vs truth {truth:F2} s (err {err:+0.00;-0.00}) · fit offset err {offset - trueOffset:+0;-0} ms · best rtt {bestRtt} ms · unscaled-vs-stopwatch {Time.unscaledTimeAsDouble * 1000 - sw.ElapsedMilliseconds:F0} ms");
+        }
         int tenSeconds = (int)((t - stageAt) / 10);
         if (tenSeconds >= 2 && tenSeconds != lastLogged && race.Player != null)
         {

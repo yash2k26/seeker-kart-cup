@@ -129,7 +129,7 @@ namespace KartCup
 
         /// A transfer of `amount` base units of SOL or SKR to the treasury with `memo`, signed in the wallet.
         /// Returns the signature, or null when nothing was sent (declined, no funds, offline). Signs the player in first if needed.
-        public async Awaitable<string> Pay(string memo, ulong amount, string currency, string what)
+        public async Awaitable<string> Pay(string memo, ulong amount, string currency, string what, Action beforeSigning = null)
         {
             if (Busy) return null;
             Busy = true;
@@ -154,6 +154,7 @@ namespace KartCup
                     tx.Add(TokenProgram.TransferChecked(src, new PublicKey(cfg.treasuryAta), amount, 6, me, mint));
                 }
                 tx.Add(MemoProgram.NewMemoV2(memo, me));
+                beforeSigning?.Invoke();                    // the last moment before money may move
                 var sig = await SignAndSend(tx);
                 if (sig != null) KartApi.Event("pay", new { what, currency, amount, sig });
                 return sig;
@@ -186,13 +187,28 @@ namespace KartCup
             return true;
         }
 
-        /// Lobby: pay the room's entry fee and hand the signature to the room, which verifies it on-chain.
+        /// Lobby: pay the room's entry fee and hand the signature to the room, which verifies it on-chain. The room is
+        /// told first that we are paying (it holds the seat while the wallet app is open), and the signature is written
+        /// down before it is sent, so it reaches the room however the socket or the seat fared meanwhile.
         public async Awaitable<bool> PayEntry(RoomClient.RoomState room)
         {
             if (room == null || !room.IsPaid) return false;
-            var sig = await Pay($"kc:entry:{room.code}:{room.round}", ulong.Parse(room.fee), room.currency, "entry");
-            if (sig == null) return false;
-            RoomClient.Instance?.Send(new { t = "pay", signature = sig });
+            string attempt = null;
+            var sig = await Pay($"kc:entry:{room.code}:{room.round}", ulong.Parse(room.fee), room.currency, "entry", () =>
+            {
+                attempt = PendingEntries.Attempt(room.code, room.round, KartApi.SessionWallet);
+                RoomClient.Instance?.Send(new { t = "paying" });
+            });
+            if (sig == null)
+            {
+                // nothing was sent (declined, no funds, offline): release the seat hold and forget the attempt
+                PendingEntries.Forget(attempt);
+                if (attempt != null) RoomClient.Instance?.Send(new { t = "paying", off = true });
+                return false;
+            }
+            PendingEntries.Add(room.code, room.round, sig, KartApi.SessionWallet);
+            PendingEntries.Forget(attempt);
+            _ = PendingEntries.Deliver(sig);
             Status("Entry sent · verifying on-chain…");
             return true;
         }

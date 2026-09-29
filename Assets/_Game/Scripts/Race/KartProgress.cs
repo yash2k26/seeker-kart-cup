@@ -39,9 +39,9 @@ namespace KartCup
             // The Worker counts the intermediate gates per lap; the start line is reported through OnLap instead.
             if (cp.index != 0) { if (isPlayer) RaceSession.Instance?.OnCheckpoint(); return; }
 
-            if (lap > 0) lapTimes.Add(race.raceTime - lapStart);    // crossing the line completes a lap
+            if (lap > 0) lapTimes.Add(race.Now - lapStart);         // crossing the line completes a lap
             if (lap > 0 && isPlayer) RaceSession.Instance?.OnLap();
-            lapStart = race.raceTime;
+            lapStart = race.Now;
             lap++;
             if (isPlayer && lap > 1 && lap <= race.totalLaps) AudioDirector.Instance?.Lap(lap == race.totalLaps);
             if (lap > race.totalLaps) race.Finish(this);

@@ -13,7 +13,7 @@ namespace KartCup
         [SerializeField] TMP_Text codeLabel, infoLabel, poolLabel, prizeLabel, playersLabel, statusLabel, primaryLabel;
         [SerializeField] Button primaryButton;
 
-        enum Mode { None, Pay, Verifying, Start, Ready }
+        enum Mode { None, Pay, Verifying, Closed, Start, Ready }
         Mode mode;
         bool attested;
 
@@ -76,7 +76,7 @@ namespace KartCup
             // the one button
             int here = r.players.Count(p => p.connected);
             var unpaid = r.players.Where(p => p.connected && !p.paid).Select(p => p.name).ToList();
-            if (r.IsPaid && me != null && !me.paid) { mode = me.paying ? Mode.Verifying : Mode.Pay; }
+            if (r.IsPaid && me != null && !me.paid) { mode = me.paying ? Mode.Verifying : me.canPay ? Mode.Pay : Mode.Closed; }
             else if (host) mode = Mode.Start;
             else mode = Mode.Ready;
 
@@ -86,15 +86,17 @@ namespace KartCup
                 {
                     Mode.Pay => $"PAY ENTRY {WalletFlow.Amount(r.fee, r.currency)}",
                     Mode.Verifying => "VERIFYING…",
+                    Mode.Closed => "ENTRY CLOSED",
                     Mode.Start => "START RACE",
                     _ => me != null && me.ready ? "READY ✓" : "READY",
                 };
-            if (primaryButton != null) primaryButton.interactable = mode switch { Mode.Verifying => false, Mode.Start => canStart, _ => true };
+            if (primaryButton != null) primaryButton.interactable = mode switch { Mode.Verifying => false, Mode.Closed => false, Mode.Start => canStart, _ => true };
 
             if (statusLabel != null && (string.IsNullOrEmpty(statusLabel.text) || statusLabel.text.StartsWith("Waiting") || statusLabel.text.StartsWith("Everyone") || statusLabel.text.StartsWith("Invite")))
                 statusLabel.text = here < 2 ? "Invite a friend — you need at least 2 racers"
                     : r.IsPaid && unpaid.Count > 0 ? $"Waiting for {string.Join(", ", unpaid)} to pay in"
                     : host ? "Everyone's in. Start when ready." : "Waiting for the host to start";
+            if (mode == Mode.Closed && statusLabel != null) statusLabel.text = "You've left this room twice — join another one";
         }
 
         static string FeeNote(RoomClient.RoomState r)

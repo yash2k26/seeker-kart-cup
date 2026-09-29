@@ -22,9 +22,14 @@ namespace KartCup
         Kart myKart;
         KartProgress me;
         readonly Dictionary<string, RemoteKart> remotes = new();
-        double goAt = -1;
+        double goAt = -1, finishedAt = -1;
         bool countdownStarted, finishSent;
         float sendTimer;
+        int boundRound = -1, boundRace = -1;                        // the room race this scene is
+        // The last few seconds of states: sent again after a reconnect, so the room's referee still sees the stretch
+        // (the finish line, often) that went by while the socket was down. The room ignores any it already has.
+        readonly Queue<(float tm, object msg)> recent = new();
+        const float KeepSeconds = 30f;             // a reconnect within this leaves the referee no gap at all
 
         public void Bind(RoomClient c, RaceManager r, Kart mine, KartProgress myProgress, IEnumerable<RemoteKart> others)
         {
@@ -41,10 +46,13 @@ namespace KartCup
             RoomClient.RemoteFinished += OnRemoteFinished;
             RoomClient.ResultsReceived += OnResults;
             RoomClient.Closed += OnClosed;
+            RoomClient.Welcomed += OnWelcomed;
 
             race.Hold();
-            // A late `countdown` (we loaded after it went out) is recovered from the snapshot the room keeps sending.
-            if (client.Room?.startAt is long startAt && client.Room.state == "countdown") OnCountdown(client.ServerToLocalUnscaled(startAt));
+            boundRound = client.Room?.round ?? -1; boundRace = client.Room?.raceIndex ?? -1;
+            // A late `countdown` (we loaded after it went out, or it went out while the socket was down) is recovered
+            // from the snapshot the room keeps sending.
+            RecoverCountdown();
             client.Send(new { t = "loaded" });
         }
 
@@ -55,11 +63,18 @@ namespace KartCup
             RoomClient.RemoteFinished -= OnRemoteFinished;
             RoomClient.ResultsReceived -= OnResults;
             RoomClient.Closed -= OnClosed;
+            RoomClient.Welcomed -= OnWelcomed;
             HitStop.Online = false;
             if (Instance == this) Instance = null;
         }
 
         void OnCountdown(double localGo) { goAt = localGo; }
+
+        void RecoverCountdown()
+        {
+            var room = client.Room;
+            if (goAt < 0 && room?.startAt is long startAt && (room.state == "countdown" || room.state == "racing")) OnCountdown(client.ServerToLocalUnscaled(startAt));
+        }
 
         void Update()
         {
@@ -71,30 +86,62 @@ namespace KartCup
             }
             if (!countdownStarted) return;
 
+            // The room's referee follows our kart from these states, so it must see the line crossed: send the position
+            // the moment we finish, keep streaming for a second, and report the finish half a second after the line.
+            if (me != null && me.finished && finishedAt < 0) { finishedAt = Time.unscaledTimeAsDouble; SendState(); sendTimer = 1f / SendHz; }
+            bool streaming = me != null && (!me.finished || Time.unscaledTimeAsDouble < finishedAt + 1.0);
             sendTimer -= Time.unscaledDeltaTime;
-            if (sendTimer <= 0f && myKart != null && me != null && !me.finished)
-            {
-                sendTimer = 1f / SendHz;
-                var rb = myKart.rb;
-                var rot = myKart.rotator != null ? myKart.rotator.rotation : myKart.transform.rotation;
-                var v = rb.linearVelocity;
-                client.Send(new
-                {
-                    t = "s",
-                    p = new[] { R(rb.position.x), R(rb.position.y), R(rb.position.z) },
-                    r = new[] { R(rot.x, 4), R(rot.y, 4), R(rot.z, 4), R(rot.w, 4) },
-                    v = new[] { R(v.x), R(v.y), R(v.z) },
-                    st = R(myKart.GetVisualSteer(), 2),
-                    lap = me.lap, cp = me.checkpointIndex, sc = R(me.score, 3),
-                    tm = R(RaceSeconds, 3),
-                });
-            }
+            if (sendTimer <= 0f && myKart != null && streaming) { sendTimer = 1f / SendHz; SendState(); }
 
-            if (me != null && me.finished && !finishSent)
+            if (me != null && me.finished && !finishSent && Time.unscaledTimeAsDouble >= finishedAt + 0.5)
             {
                 finishSent = true;
-                client.Send(new { t = "fin", ms = Mathf.RoundToInt(me.finishTime * 1000f), laps = me.lapTimes.Select(l => Mathf.RoundToInt(l * 1000f)).ToArray() });
+                SendFin();
             }
+        }
+
+        void SendFin() => client.Send(new { t = "fin", ms = Mathf.RoundToInt(me.finishTime * 1000f), laps = me.lapTimes.Select(l => Mathf.RoundToInt(l * 1000f)).ToArray() });
+
+        /// Back after a reconnect: what the room may have missed while the socket was down goes again. (Send drops
+        /// frames on a closed socket, so a `loaded`, the `countdown`, states or a `fin` in the gap never arrived.) Only for
+        /// the room race this scene is: a results card still up from the last race must not say `loaded` for the next.
+        void OnWelcomed()
+        {
+            var room = client.Room;
+            if (room == null || room.round != boundRound || room.raceIndex != boundRace) return;
+            if (room.state == "loading") client.Send(new { t = "loaded" });
+            RecoverCountdown();
+            if (room.state != "racing" && room.state != "countdown") return;
+            // Everything missed, oldest first: every third state beyond the last 3 s (5 Hz is plenty for the referee),
+            // every state of the last 3 s.
+            float newest = recent.Count > 0 ? recent.Last().tm : 0f; int i = 0;
+            foreach (var (tm, msg) in recent) if (i++ % 3 == 0 || tm > newest - 3f) client.Send(msg);
+            var mine = client.Me;
+            if (finishSent && mine != null && mine.finishMs == null && !mine.dnf) SendFin();
+        }
+
+        void SendState()
+        {
+            if (myKart == null || me == null) return;
+            var rb = myKart.rb;
+            var rot = myKart.rotator != null ? myKart.rotator.rotation : myKart.transform.rotation;
+            var v = rb.linearVelocity;
+            float tm = RaceSeconds;
+            var msg = new
+            {
+                t = "s",
+                p = new[] { R(rb.position.x), R(rb.position.y), R(rb.position.z) },
+                r = new[] { R(rot.x, 4), R(rot.y, 4), R(rot.z, 4), R(rot.w, 4) },
+                v = new[] { R(v.x), R(v.y), R(v.z) },
+                st = R(myKart.GetVisualSteer(), 2),
+                lap = me.lap, cp = me.checkpointIndex, sc = R(me.score, 3),
+                tm = R(tm, 3),
+            };
+            // Only on a socket the room has welcomed: a state it cannot place is dropped, and one taken ahead of the
+            // re-send after a reconnect would hide the states the re-send carries.
+            if (client.Ready) client.Send(msg);
+            recent.Enqueue((tm, msg));
+            while (recent.Count > 0 && recent.Peek().tm < tm - KeepSeconds) recent.Dequeue();
         }
 
         static float R(float v, int digits = 2) => (float)System.Math.Round(v, digits);

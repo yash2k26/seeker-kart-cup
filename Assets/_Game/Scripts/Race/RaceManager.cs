@@ -39,7 +39,7 @@ namespace KartCup
         {
             checkpoints = checkpoints.Where(c => c != null).OrderBy(c => c.index).ToArray();
             Rescan();
-            if (!RoomClient.InRoom) BeginCountdown();   // online, NetRace holds the grid until the room's GO
+            if (!RoomClient.InRaceRoom) BeginCountdown();   // online, NetRace holds the grid until the room's GO
         }
 
         /// Call after spawning or despawning karts.
@@ -102,7 +102,10 @@ namespace KartCup
                     break;
 
                 case State.Racing:
-                    raceTime += Time.deltaTime;
+                    // Online, the race runs on the room's clock (unscaled time since the shared GO), the same clock the
+                    // room's referee times the drive by. Summing Time.deltaTime loses time on every frame hitch longer
+                    // than maximumDeltaTime, and a finish that far off the room's clock is thrown out as a DNF.
+                    raceTime = goAt > 0 ? (float)(Time.unscaledTimeAsDouble - goAt) : raceTime + Time.deltaTime;
                     order.Sort((a, b) => b.score.CompareTo(a.score));
                     break;
             }
@@ -110,11 +113,16 @@ namespace KartCup
 
         public int PositionOf(KartProgress p) => order.IndexOf(p) + 1;
 
+        /// The race clock now. Online that is this frame's room clock, not the value Update left last frame: a gate or
+        /// the line is crossed in the physics steps that run before Update, and the finish-moment state the room's
+        /// referee times the crossing by carries this frame's clock.
+        public float Now => goAt > 0 && state != State.Idle && state != State.Countdown ? (float)(Time.unscaledTimeAsDouble - goAt) : raceTime;
+
         public void Finish(KartProgress p)
         {
             if (p.finished) return;
             p.finished = true;
-            p.finishTime = raceTime;
+            p.finishTime = Now;
             p.GetComponent<Kart>().active = false;
             onFinish.Invoke(p);
             if (p.isPlayer) state = State.Finished;

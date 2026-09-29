@@ -49,11 +49,13 @@ namespace KartCup
         /// The open-rooms list refreshes every few seconds while this panel is on screen. One request, no sockets.
         async Awaitable Poll(int generation)
         {
+            // Every 10 s, and less often while it fails: phones on one Wi-Fi share the Worker's per-address budget.
+            float every = 10f;
             while (generation == pollGeneration && isActiveAndEnabled)
             {
-                try { open = (await KartApi.OpenRooms())?.rooms ?? new List<KartApi.PublicRoom>(); ShowRooms(null); }
-                catch (System.Exception e) { open = new List<KartApi.PublicRoom>(); ShowRooms(e is KartApi.ApiException ? "Can't reach the room list right now" : "Offline"); }
-                await Awaitable.WaitForSecondsAsync(5f);
+                try { open = (await KartApi.OpenRooms())?.rooms ?? new List<KartApi.PublicRoom>(); ShowRooms(null); every = 10f; }
+                catch (System.Exception e) { open = new List<KartApi.PublicRoom>(); ShowRooms(e is KartApi.ApiException ? "Can't reach the room list right now" : "Offline"); every = Mathf.Min(every * 2f, 60f); }
+                await Awaitable.WaitForSecondsAsync(every);
             }
         }
 
@@ -137,8 +139,13 @@ namespace KartCup
 
         public void JoinTyped() { if (!busy) _ = Join(codeField != null ? codeField.text : ""); }
 
-        /// From an invite link: the code arrives already typed.
-        public void JoinFromLink(string code) { if (codeField != null) codeField.text = code; if (!busy) _ = Join(code); }
+        /// From an invite link: the code arrives already typed, and the player decides. A link must not drop anyone
+        /// into a room on its own: joining shows your name (and a signed-in wallet) to everyone in it.
+        public void JoinFromLink(string code)
+        {
+            if (codeField != null) codeField.text = code;
+            Say($"Invited to room {code}. Tap JOIN to race.");
+        }
 
         async Awaitable Join(string raw)
         {

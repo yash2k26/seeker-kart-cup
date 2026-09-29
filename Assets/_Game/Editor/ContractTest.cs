@@ -7,19 +7,22 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 
-// Drives the PLAYER kart with the AI follower and reports the exact payload the Worker would receive, so the
-// race-result contract can be checked without a phone and without a human holding the gas.
-// Run: Unity -batchmode -projectPath . -executeMethod ContractTest.Run -logFile -   (no -quit: it exits itself)
+// Drives the PLAYER kart with the AI follower and sends the result to a local Worker exactly as the phone would:
+// times, laps, checkpoints and the 5 Hz path. It passes only if the Worker's referee (worker/src/referee.ts) believes
+// a real physics drive, so it catches a referee that would refuse honest racers, not just a malformed payload.
+// Run: cd worker && npx wrangler dev --port 8787   then   ./tools/unity.sh ContractTest.Run [-track N] [-worker URL]
 public static class ContractTest
 {
     static double start;
     static bool driving;
     static int lastCrumb = -1;
     static int totalMsAtFinish = -1;
+    static double finishedAt = -1;
 
     [MenuItem("Build/Contract Test")]
     public static void Run()
     {
+        EditorUtility.audioMasterMute = true;   // a headless test run must not play the game's sound through the laptop
         if (!EditorSettings.enterPlayModeOptionsEnabled || EditorSettings.enterPlayModeOptions != EnterPlayModeOptions.DisableDomainReload)
         {
             EditorSettings.enterPlayModeOptionsEnabled = true;
@@ -29,8 +32,11 @@ public static class ContractTest
         // -track N drives circuit N instead of the first, so every circuit gets contract-checked, not just one.
         int track = 1;
         var args = System.Environment.GetCommandLineArgs();
-        for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-track") int.TryParse(args[i + 1], out track);
-        Debug.Log($"[contract] circuit {track}");
+        string worker = "http://127.0.0.1:8787";
+        for (int i = 0; i < args.Length - 1; i++) { if (args[i] == "-track") int.TryParse(args[i + 1], out track); if (args[i] == "-worker") worker = args[i + 1]; }
+        KartApi.BaseUrl = worker;       // the race session starts and submits against this Worker (domain reload is off: it sticks)
+        finishedAt = -1; totalMsAtFinish = -1;
+        Debug.Log($"[contract] circuit {track} against {worker}");
         Cup.End();             // same reason as Playtest: start every harness run from a clean cup
         EditorSceneManager.OpenScene($"Assets/_Game/Scenes/Race{track}.unity", OpenSceneMode.Single);
         start = EditorApplication.timeSinceStartup;
@@ -42,6 +48,7 @@ public static class ContractTest
     static void Tick()
     {
         if (!EditorApplication.isPlaying) return;
+        AudioListener.volume = 0f;   // and silent in play mode too, whatever the game's settings set it to
         double t = EditorApplication.timeSinceStartup - start;
 
         var race = Object.FindFirstObjectByType<RaceManager>();
@@ -80,6 +87,10 @@ public static class ContractTest
         }
         bool done = race.Player.finished;
         if (!done && t < 150) return;
+        // RaceSession sends 0.6 s after the line; wait for the Worker's answer (up to 10 s).
+        var s = Object.FindFirstObjectByType<RaceSession>();
+        if (done && finishedAt < 0) finishedAt = t;
+        if (done && s != null && s.LastSubmit == null && t - finishedAt < 10) return;
 
         EditorApplication.update -= Tick;
         Report(race, done, t);
@@ -102,15 +113,23 @@ public static class ContractTest
         Debug.Log($"[contract] lapMs   n={lapMs.Count} values={string.Join(",", lapMs)}");
         Debug.Log($"[contract] cpMs    n={cpMs.Count} first={(cpMs.Count > 0 ? cpMs[0] : -1)} last={(cpMs.Count > 0 ? cpMs[^1] : -1)}");
 
-        // The Worker's own rules, restated here so a mismatch fails loudly in this log (worker/src/race.ts TRACKS.beach).
-        const int wantLaps = 2, wantCheckpoints = 11, minLapMs = 12_000, minSegmentMs = 600;
-        Check("lap count", lapMs.Count == wantLaps, $"{lapMs.Count} != {wantLaps}");
-        Check("checkpoint count", cpMs.Count == wantCheckpoints * wantLaps, $"{cpMs.Count} != {wantCheckpoints * wantLaps}");
-        Check("lap under floor", lapMs.All(l => l >= minLapMs), $"min lap {(lapMs.Count > 0 ? lapMs.Min() : 0)} < {minLapMs}");
+        var path = (List<float[]>)typeof(RaceSession).GetField("path", flags).GetValue(session);
+        Check("lap count", lapMs.Count == race.totalLaps, $"{lapMs.Count} != {race.totalLaps}");
+        Check("checkpoint count", cpMs.Count == (gates - 1) * race.totalLaps, $"{cpMs.Count} != {(gates - 1) * race.totalLaps}");
         Check("checkpoints monotonic", cpMs.Zip(cpMs.Skip(1), (a, b) => b > a).All(x => x), "not strictly increasing");
         var gaps = cpMs.Select((c, i) => i == 0 ? c : c - cpMs[i - 1]).ToList();
-        Check("segment under floor", gaps.All(g => g >= minSegmentMs), $"min gap {(gaps.Count > 0 ? gaps.Min() : 0)} < {minSegmentMs}");
         Check("laps != total", totalMsAtFinish >= 0 && Mathf.Abs(lapMs.Sum() - totalMsAtFinish) <= 1500, $"sum {lapMs.Sum()} vs totalMs {totalMsAtFinish}");
+        // what the referee will look at: the fastest second of the drive, the fastest lap as an average speed
+        float best = 0f;
+        for (int i = 0, j = 0; i < path.Count; i++)
+        {
+            while (j < i && path[i][0] - path[j + 1][0] >= 1f) j++;
+            if (path[i][0] - path[j][0] < 1f) continue;
+            float d = 0f; for (int k = j + 1; k <= i; k++) d += Vector2.Distance(new Vector2(path[k][1], path[k][3]), new Vector2(path[k - 1][1], path[k - 1][3]));
+            best = Mathf.Max(best, d / (path[i][0] - path[j][0]));
+        }
+        Debug.Log($"[contract] path n={path.Count} · fastest 1 s {best:F1} m/s (referee cap 62) · Worker says: {session.LastSubmit ?? "<no answer>"}");
+        Check("the Worker's referee accepts the drive", session.LastSubmit == "accepted", session.LastSubmit ?? "no answer from the Worker");
         Debug.Log($"[contract] gaps min={(gaps.Count > 0 ? gaps.Min() : 0)} max={(gaps.Count > 0 ? gaps.Max() : 0)} · laps sum={totalMs} · totalMs {totalMsAtFinish}");
         Debug.Log($"[contract] cpMs all={string.Join(",", cpMs)}");
     }

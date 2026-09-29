@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
@@ -22,6 +23,11 @@ namespace KartCup
         public static bool InRoom => Instance != null && Instance.Room != null && Instance.Connected;
         /// The race scene reads this to decide between the solo grid and the room's roster.
         public static bool InRace => InRoom && (Instance.Room.state == "loading" || Instance.Room.state == "countdown" || Instance.Room.state == "racing");
+        /// In a room's race whether or not the socket is up this instant: a scene that starts during a reconnect is still
+        /// the room's race, not a solo one.
+        public static bool InRaceRoom => Instance != null && Instance.Room is { } r && (r.state == "loading" || r.state == "countdown" || r.state == "racing");
+        /// A member of a room (lobby, race or results), socket up or not.
+        public static bool Member => Instance != null && Instance.Room != null;
 
         // ---- events (main thread) ----
         public static event Action<RoomState> RoomChanged;
@@ -33,28 +39,39 @@ namespace KartCup
         public static event Action<List<Payout>> PayoutsChanged;
         public static event Action<string> Error;
         public static event Action<string> Closed;
+        public static event Action Welcomed;                                  // after every welcome, a reconnect's included
 
         public string Code { get; private set; }
         public string MyId { get; private set; }
         public RoomState Room { get; private set; }
         public ResultsMsg LastResults { get; private set; }
         public bool Connected => ws != null && ws.State == WebSocketState.Open;
+        /// Connected and welcomed on this socket: only then does the room know who we are.
+        public bool Ready => Connected && welcomed == true;
         public bool IsHost => Room != null && MyId != null && Room.hostId == MyId;
         public PlayerState Me => Room?.players?.Find(p => p.id == MyId);
         public int PingMs { get; private set; } = -1;
 
         ClientWebSocket ws;
         CancellationTokenSource cts;
-        readonly ConcurrentQueue<string> inbox = new();
+        readonly ConcurrentQueue<(string text, long at)> inbox = new();   // each message with the stopwatch time it arrived
         readonly SemaphoreSlim sendLock = new(1, 1);
         readonly Stopwatch clock = Stopwatch.StartNew();
         double offsetMs = double.NaN;                 // serverMs - localMs
+        // The last few pings: the least-delayed one's offset is the truest. Recent ones only, so the fit follows the
+        // network as it changes and recovers after the phone sleeps (its stopwatch may stop while the server's runs on).
+        readonly Queue<(long rtt, double sample)> pings = new();
+        const int PingWindow = 15;
+        // Stopwatch ms minus Time.unscaledTime ms. unscaledTime is the time the frame STARTED; in a heavy frame (the race
+        // scene's first) a handler runs most of a second later, so this reads too large by that delay. Its minimum over
+        // frames is the true relation, and every server time is mapped through that.
+        double swMinusUnscaled = double.PositiveInfinity;
         float pingTimer;
-        bool wantReconnect;
+        bool wantReconnect, reconnecting;
         int helloCharacter; string helloKart;
 
         // ---- DTOs ----
-        [Serializable] public class PlayerState { public string id, name, wallet, kart; public int character, points; public bool host, connected, ready, paid, paying, loaded, racing, dnf; public long? finishMs; public int? place; }
+        [Serializable] public class PlayerState { public string id, name, wallet, kart; public int character, points; public bool host, connected, ready, paid, paying, loaded, racing, dnf; public bool canPay = true; public long? finishMs; public int? place; }
         [Serializable] public class Standing { public string id, name; public int points, place; public long totalMs; }
         [Serializable] public class OrderRow { public string id, name; public long? ms; public int place, points; public bool dnf; }
         [Serializable] public class RaceResult { public int race, races; public string track; public bool final; public List<OrderRow> order = new(); }
@@ -120,15 +137,19 @@ namespace KartCup
                 while (socket.State == WebSocketState.Open && !ct.IsCancellationRequested)
                 {
                     var r = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), ct);
-                    if (r.MessageType == WebSocketMessageType.Close) break;
+                    if (r.MessageType == WebSocketMessageType.Close) { closeReason = r.CloseStatusDescription ?? ""; break; }
                     sb.Append(Encoding.UTF8.GetString(buffer, 0, r.Count));
                     if (!r.EndOfMessage) continue;
-                    inbox.Enqueue(sb.ToString()); sb.Clear();
+                    var text = sb.ToString(); sb.Clear();
+                    // The room timing our round trip: answer from this thread, before any frame can delay it.
+                    if (text.StartsWith("{\"t\":\"sp\",")) { _ = SendBytes(Encoding.UTF8.GetBytes("{\"t\":\"spr\"," + text.Substring(10))); continue; }
+                    inbox.Enqueue((text, clock.ElapsedMilliseconds));
                 }
             }
             catch (Exception e) when (!(e is OperationCanceledException)) { UnityEngine.Debug.LogWarning("[room] socket: " + e.Message); }
-            inbox.Enqueue("\u0000closed");
+            inbox.Enqueue(("\u0000closed|" + closeReason, clock.ElapsedMilliseconds));
         }
+        volatile string closeReason = "";
 
         public void Send(object o)
         {
@@ -147,10 +168,11 @@ namespace KartCup
 
         void Update()
         {
-            while (inbox.TryDequeue(out var text))
+            swMinusUnscaled = Math.Min(swMinusUnscaled, clock.ElapsedMilliseconds - Time.unscaledTimeAsDouble * 1000.0);
+            while (inbox.TryDequeue(out var item))
             {
-                if (text == "\u0000closed") { OnSocketClosed(); continue; }
-                try { Dispatch(JObject.Parse(text)); }
+                if (item.text.StartsWith("\u0000closed|")) { OnSocketClosed(item.text.Substring(8)); continue; }
+                try { Dispatch(JObject.Parse(item.text), item.at); }
                 catch (Exception e) { UnityEngine.Debug.LogWarning("[room] bad message: " + e.Message); }
             }
             if (Connected)
@@ -160,27 +182,35 @@ namespace KartCup
             }
         }
 
-        void Dispatch(JObject m)
+        void Dispatch(JObject m, long at)
         {
             switch ((string)m["t"])
             {
                 case "welcome":
                     MyId = (string)m["id"];
-                    NoteServerTime((long)m["serverNow"], 0);
+                    NoteServerTime((long)m["serverNow"], at, -1);
                     SetRoom(m["room"]);
                     welcomed = true;
+                    _ = PendingEntries.Flush();          // any entry payment the room may not have heard of yet
+                    Welcomed?.Invoke();
                     break;
                 case "room": SetRoom(m["room"]); break;
                 case "pong":
                 {
-                    long c = (long)m["c"], s = (long)m["s"], now = clock.ElapsedMilliseconds;
-                    PingMs = (int)(now - c);
-                    NoteServerTime(s, (now - c) / 2);
+                    long c = (long)m["c"], s = (long)m["s"], rtt = at - c;
+                    PingMs = (int)rtt;
+                    NoteServerTime(s, c + rtt / 2, rtt);
                     break;
                 }
-                case "load": LastResults = null; LoadRequested?.Invoke((string)m["track"], (int)m["race"], (int)m["races"]); break;
+                case "load":
+                    LastResults = null;
+                    // The snapshot saying 'loading' comes a moment later; the race scene decides online or solo from the
+                    // snapshot as it starts, so it must already say so.
+                    if (Room != null) { Room.state = "loading"; Room.raceIndex = (int)m["race"] - 1; Room.startAt = null; }
+                    LoadRequested?.Invoke((string)m["track"], (int)m["race"], (int)m["races"]);
+                    break;
                 case "countdown":
-                    NoteServerTime((long)m["serverNow"], PingMs > 0 ? PingMs / 2 : 0);
+                    NoteServerTime((long)m["serverNow"], at, -1);
                     CountdownAt?.Invoke(ServerToLocalUnscaled((long)m["startAt"]));
                     break;
                 case "s": StateReceived?.Invoke(m); break;
@@ -197,7 +227,8 @@ namespace KartCup
                     PayoutsChanged?.Invoke(list);
                     break;
                 case "error":
-                    if (welcomed == null) welcomed = false;
+                    // refused before any welcome (kicked, started without us, full): trying again would be refused again
+                    if (welcomed == null) { welcomed = false; wantReconnect = false; }
                     Error?.Invoke((string)m["msg"]);
                     break;
                 case "closed":
@@ -211,51 +242,121 @@ namespace KartCup
         {
             if (token == null || token.Type == JTokenType.Null) return;
             Room = token.ToObject<RoomState>();
+            if (Room.state == "loading") LastResults = null;
             RoomChanged?.Invoke(Room);
+            // Back after the verdict went out (a reconnect): the room's snapshot carries it, so the results card gets it.
+            if ((Room.state == "results" || Room.state == "finished") && Room.lastResults != null
+                && (LastResults?.results == null || LastResults.results.race != Room.lastResults.race || LastResults.room?.round != Room.round))
+            {
+                LastResults = new ResultsMsg { results = Room.lastResults, standings = Room.standings, payouts = Room.payouts, room = Room };
+                ResultsReceived?.Invoke(LastResults);
+            }
         }
 
         // ---- clocks: the server's ms epoch mapped onto this phone's stopwatch ----
-        void NoteServerTime(long serverMs, long halfRtt)
+        // The room times every race by it, and refuses a race clock that runs ahead of its own or lags behind by
+        // more than the network explains. Every sample is stamped when it ARRIVED (the receive thread), not when a
+        // frame got round to it: a scene load held messages for seconds and skewed the old fit by as much.
+        void NoteServerTime(long serverMs, long localMs, long rtt)
         {
-            double sample = serverMs - (clock.ElapsedMilliseconds - halfRtt);
-            // Keep the smallest-latency estimate biased: a late sample can only make the offset look larger.
-            offsetMs = double.IsNaN(offsetMs) ? sample : Math.Min(offsetMs, sample) * 0.7 + sample * 0.3;
+            double sample = serverMs - localMs;
+            if (rtt >= 0)
+            {
+                // A ping's round trip bounds the error to half of it; the quickest recent round trip is the truest.
+                pings.Enqueue((rtt, sample));
+                while (pings.Count > PingWindow) pings.Dequeue();
+                offsetMs = pings.Aggregate((a, b) => b.rtt <= a.rtt ? b : a).sample;
+            }
+            else if (pings.Count == 0)
+            {
+                // One-way (welcome, countdown), until a ping lands: the server's stamp is older than it looks by the
+                // unknown delay, so the largest sample is the one with the least delay in it.
+                offsetMs = double.IsNaN(offsetMs) ? sample : Math.Max(offsetMs, sample);
+            }
         }
 
         /// A server timestamp as a Time.unscaledTimeAsDouble value on this phone.
         public double ServerToLocalUnscaled(long serverMs)
         {
-            double localMs = serverMs - (double.IsNaN(offsetMs) ? 0 : offsetMs);
-            return Time.unscaledTimeAsDouble + (localMs - clock.ElapsedMilliseconds) / 1000.0;
+            double localMs = serverMs - (double.IsNaN(offsetMs) ? 0 : offsetMs);   // on the stopwatch
+            double rel = Math.Min(swMinusUnscaled, clock.ElapsedMilliseconds - Time.unscaledTimeAsDouble * 1000.0);
+            return (localMs - rel) / 1000.0;
         }
 
         // ---- leaving and dying ----
-        void OnSocketClosed()
+        void OnSocketClosed(string reason)
         {
+            if (Connected) return;                                   // an old socket's goodbye, after a reconnect
+            if (reason == "replaced") { wantReconnect = false; Error?.Invoke("This room was opened on another device."); return; }
+            if (reason == "refused") { wantReconnect = false; return; }
             if (!wantReconnect) return;
             // Dropped mid-room (scene load hiccup, a tunnel): come back as the same player.
             _ = Reconnect();
         }
 
+        /// Keep trying, backing off, while we still belong to a room: one failed attempt (no network yet after a
+        /// handover, a busy moment) must not sit a racer out of a paid race.
         async Awaitable Reconnect()
         {
-            await Awaitable.WaitForSecondsAsync(1.5f);
-            if (!wantReconnect || Room == null) return;
-            if (!await Connect()) Error?.Invoke("Lost the room connection.");
+            if (reconnecting) return;
+            reconnecting = true;
+            try
+            {
+                float wait = 1.5f;
+                for (int attempt = 0; wantReconnect && Room != null && !Connected; attempt++)
+                {
+                    await Awaitable.WaitForSecondsAsync(wait);
+                    if (!wantReconnect || Room == null || Connected) break;
+                    if (await Connect()) break;
+                    if (attempt == 2) Error?.Invoke("Reconnecting to the room…");
+                    wait = Mathf.Min(wait * 2f, 10f);
+                }
+            }
+            finally { reconnecting = false; }
         }
 
         void OnApplicationPause(bool paused)
         {
-            if (!paused && wantReconnect && Room != null && !Connected) _ = Reconnect();
+            if (paused) return;
+            Refit();
+            if (wantReconnect && Room != null && !Connected) _ = Reconnect();
+        }
+
+        void OnApplicationFocus(bool focus) { if (focus) Refit(); }
+
+        /// Back from the background (the wallet app, a locked screen): the phone's clocks may have stopped while the
+        /// server's ran on, so the ping window starts afresh and a ping goes out at once. The old offset stands until a
+        /// new sample replaces it (none at all would map GO to 1970). A race already under way keeps its GO.
+        void Refit()
+        {
+            pings.Clear(); swMinusUnscaled = double.PositiveInfinity; pingTimer = 0f;
         }
 
         public void Leave()
         {
             wantReconnect = false;
-            Send(new { t = "leave" });
-            Close();
+            var socket = ws; ws = null;
             Room = null; Code = null; MyId = null; LastResults = null;
+            _ = SayGoodbye(socket, cts);
             Destroy(gameObject);
+        }
+
+        /// The leave frame goes out and the socket closes cleanly before it is disposed: a disposed socket can lose a
+        /// frame still queued, and the room would take a leave for a drop.
+        static async Task SayGoodbye(ClientWebSocket socket, CancellationTokenSource source)
+        {
+            if (socket == null) return;
+            try
+            {
+                using var soon = new CancellationTokenSource(1500);
+                if (socket.State == WebSocketState.Open)
+                {
+                    await socket.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes("{\"t\":\"leave\"}")), WebSocketMessageType.Text, true, soon.Token);
+                    await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "left", soon.Token);
+                }
+            }
+            catch { /* gone already */ }
+            finally { try { source?.Cancel(); } catch { } try { socket.Dispose(); } catch { } }
         }
 
         void Close()

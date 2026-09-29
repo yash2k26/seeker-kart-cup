@@ -22,7 +22,7 @@ namespace KartCup
         void Start()
         {
             if (roster == null || roster.characters.Length == 0) { Debug.LogError("[race] no roster"); return; }
-            if (RoomClient.InRoom) { SpawnOnline(); return; }
+            if (RoomClient.InRaceRoom) { SpawnOnline(); return; }
 
             // A race entered outside a cup (editor playtest, a direct scene load) still needs a grid.
             if (!Cup.Active)

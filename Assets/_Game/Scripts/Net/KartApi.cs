@@ -20,6 +20,21 @@ namespace KartCup
             set { PlayerPrefs.SetString(kSession, value ?? ""); PlayerPrefs.Save(); }
         }
         public static bool HasSession => !string.IsNullOrEmpty(SessionToken);
+        /// The wallet the session belongs to (the token's body), or null.
+        public static string SessionWallet
+        {
+            get
+            {
+                try
+                {
+                    var t = SessionToken; if (string.IsNullOrEmpty(t)) return null;
+                    var b = t.Split('.')[0].Replace('-', '+').Replace('_', '/');
+                    b = b.PadRight(b.Length + (4 - b.Length % 4) % 4, '=');
+                    return (string)Newtonsoft.Json.Linq.JObject.Parse(Encoding.UTF8.GetString(Convert.FromBase64String(b)))["w"];
+                }
+                catch { return null; }
+            }
+        }
 
         /// Stable per-install id so guest races can be claimed after sign-in. Not tied to hardware ids.
         public static string DeviceId
@@ -86,13 +101,18 @@ namespace KartCup
         }
 
         public static Awaitable<RaceStart> StartRace(string trackId) => Post<RaceStart>("/v1/race/start", new { deviceId = DeviceId, trackId });
-        public static Awaitable<RaceFinish> FinishRace(string raceToken, int totalMs, List<int> lapMs, List<int> checkpointMs, int position)
-            => Post<RaceFinish>("/v1/race/finish", new { raceToken, totalMs, lapMs, checkpointMs, position });
+        /// `path`: the drive, 5 samples a second of [t s, x, y, z]; the Worker's referee must believe it (worker/src/referee.ts).
+        public static Awaitable<RaceFinish> FinishRace(string raceToken, int totalMs, List<int> lapMs, List<int> checkpointMs, int position, List<float[]> path)
+            => Post<RaceFinish>("/v1/race/finish", new { raceToken, totalMs, lapMs, checkpointMs, position, path });
         public static Awaitable<RaceFinish> ClaimRace(string raceToken) => Post<RaceFinish>("/v1/race/claim", new { raceToken });
         public static Awaitable<Board> Leaderboard(string track) => Get<Board>($"/v1/leaderboard?track={track}");
         public static Awaitable<Profile> Me() => Get<Profile>("/v1/me");
         public static Awaitable<object> DeleteMe() => Send<object>("DELETE", "/v1/me", null);
         public static Awaitable<object> ConfirmTx(string signature, string raceId) => Post<object>("/v1/tx/confirm", new { signature, raceId });
+        /// An entry payment for a room (session): the room seats it, or verifies and refunds it. Never dropped.
+        public static Awaitable<object> RoomEntry(string code, int round, string signature) => Post<object>($"/v1/rooms/{code}/entry", new { signature, round });
+        /// A payment the phone may have made but never got the signature of: the room looks for it on-chain by its memo.
+        public static Awaitable<object> RoomEntryScan(string code, int round) => Post<object>($"/v1/rooms/{code}/entry", new { scan = true, round });
         public static Awaitable<object> VerifyPurchase(string signature, string sku, string orderId, string currency) => Post<object>("/v1/purchase/verify", new { signature, sku, orderId, currency });
 
         public static void Event(string name, object props = null)
@@ -130,6 +150,80 @@ namespace KartCup
         {
             public readonly long Status;
             public ApiException(long status, string body) : base($"{status}: {body}") { Status = status; }
+        }
+    }
+
+    /// Entry payments this phone made that no room has acknowledged yet. The transfer is on-chain before any room hears
+    /// of it, so the signature is written down first and delivered over HTTP until a room answers: the room then seats
+    /// it, or verifies and refunds it. Nothing depends on the socket being up or the seat still being there.
+    /// Each is kept with the wallet that paid (delivered only under that wallet's session). An attempt is written down
+    /// before the wallet app even opens: if the game dies before the signature comes back, the room is asked to look
+    /// for the transfer on-chain by its memo.
+    public static class PendingEntries
+    {
+        const string Key = "kc.entries";
+        const string Scan = "scan:";
+        const long ScanForSeconds = 300;          // an attempt is asked about for five minutes, then let go
+        [Serializable] public class Entry { public string code, sig, wallet; public int round; public long at; }
+        static bool flushing;
+        static long Now => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+        static List<Entry> Load() { try { return JsonConvert.DeserializeObject<List<Entry>>(PlayerPrefs.GetString(Key, "[]")) ?? new List<Entry>(); } catch { return new List<Entry>(); } }
+        static void Store(List<Entry> list) { PlayerPrefs.SetString(Key, JsonConvert.SerializeObject(list)); PlayerPrefs.Save(); }
+        static void Remove(string sig) { var list = Load(); list.RemoveAll(e => e.sig == sig); Store(list); }
+        public static bool Has(string sig) => Load().Exists(e => e.sig == sig);
+
+        public static void Add(string code, int round, string sig, string wallet)
+        {
+            var list = Load();
+            if (!list.Exists(e => e.sig == sig)) list.Add(new Entry { code = code, round = round, sig = sig, wallet = wallet, at = Now });
+            Store(list);
+        }
+
+        /// Before the wallet app opens: returns the attempt's id, to be replaced by the signature or dropped.
+        public static string Attempt(string code, int round, string wallet)
+        {
+            var id = Scan + Guid.NewGuid().ToString("N");
+            Add(code, round, id, wallet);
+            return id;
+        }
+
+        public static void Forget(string id) { if (!string.IsNullOrEmpty(id)) Remove(id); }
+
+        /// Deliver every undelivered entry. Safe to call often: a room answers a repeat as already known.
+        public static async Awaitable Flush()
+        {
+            if (flushing || !KartApi.HasSession) return;
+            flushing = true;
+            try
+            {
+                var me = KartApi.SessionWallet;
+                foreach (var e in Load())
+                {
+                    if (!string.IsNullOrEmpty(e.wallet) && e.wallet != me) continue;   // another wallet's: kept until it signs in
+                    bool attempt = e.sig.StartsWith(Scan);
+                    try
+                    {
+                        if (attempt) { await KartApi.RoomEntryScan(e.code, e.round); if (Now - e.at > ScanForSeconds) Remove(e.sig); }
+                        else { await KartApi.RoomEntry(e.code, e.round, e.sig); Remove(e.sig); }
+                    }
+                    // not a payment, taken by someone else, or no such room: there is nothing to deliver it to
+                    catch (KartApi.ApiException x) when (x.Status == 400 || x.Status == 404) { Remove(e.sig); }
+                    catch (Exception x) { Debug.LogWarning("[entry] will retry: " + x.Message); }
+                }
+            }
+            finally { flushing = false; }
+        }
+
+        /// Right after paying: deliver now, and keep trying for about half a minute if the network is being difficult.
+        public static async Awaitable Deliver(string sig)
+        {
+            for (float wait = 2f; wait <= 16f && Has(sig); wait *= 2f)
+            {
+                await Flush();
+                if (!Has(sig)) return;
+                await Awaitable.WaitForSecondsAsync(wait);
+            }
         }
     }
 }

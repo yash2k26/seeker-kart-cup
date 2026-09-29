@@ -40,7 +40,7 @@ namespace KartCup
             if (Paused || (race != null && race.state == RaceManager.State.Finished)) return;
             Paused = true;
             // Online the race clock is everyone's clock: the overlay opens, but nothing stops and there is no restart.
-            bool online = RoomClient.InRoom;
+            bool online = RoomClient.Member;
             if (restartButton != null) restartButton.SetActive(!online);
             if (!online) { Time.timeScale = 0f; HitStop.Paused = true; AudioListener.pause = true; }
             foreach (var go in hideWhilePaused) if (go != null) go.SetActive(false);
@@ -61,7 +61,7 @@ namespace KartCup
             AudioDirector.Instance?.Back();
         }
 
-        public void Restart() { if (RoomClient.InRoom) return; Resume(); ScreenFlow.Instance?.Restart(); }
+        public void Restart() { if (RoomClient.Member) return; Resume(); ScreenFlow.Instance?.Restart(); }
         public void Quit() { Resume(); ScreenFlow.Instance?.BackToMenu(); }   // online: BackToMenu leaves the room
 
         void OnDestroy() { if (Paused) { Time.timeScale = 1f; AudioListener.pause = false; HitStop.Paused = false; } }

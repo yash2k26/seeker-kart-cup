@@ -54,7 +54,8 @@ namespace KartCup
             // one would just throw the standings away.
             if (playLabel != null) playLabel.text = Resuming ? "CONTINUE CUP" : "PLAY";
             if (!IsMenu) return;
-            if (PendingLobby && RoomClient.InRoom) { PendingLobby = false; Show(Lobby, silent: true); return; }
+            _ = PendingEntries.Flush();   // an entry payment a room never heard of (the app was closed mid-payment)
+            if (PendingLobby && RoomClient.Member) { PendingLobby = false; Show(Lobby, silent: true); return; }
             PendingLobby = false;
             if (!string.IsNullOrEmpty(Application.absoluteURL)) OnDeepLink(Application.absoluteURL);   // cold start from an invite link
             if (!string.IsNullOrEmpty(PendingJoin)) { var code = PendingJoin; PendingJoin = null; Show(Rooms, silent: true); RoomsPanel.Instance?.JoinFromLink(code); }
@@ -133,17 +134,31 @@ namespace KartCup
         // ---------- rooms ----------
         public void LeaveRoom() { if (RoomClient.Instance != null) RoomClient.Instance.Leave(); }
 
+        static string loadedFor;   // "CODE:round:race index" of the room race this phone last loaded
+
         /// The room says which track to load next: from the lobby for race one, from the results card after that.
         void OnLoadRequested(string trackId, int race, int races)
         {
             loading = false;                       // the results card may have set it; a new race is a new load
+            var r = RoomClient.Instance != null ? RoomClient.Instance.Room : null;
+            loadedFor = r != null ? $"{r.code}:{r.round}:{race - 1}" : null;
             Load(Tracks.SceneOf(Tracks.IndexOf(trackId)));
         }
 
         /// Rematch: the room went back to its lobby while we sit on a results card — everyone returns to the menu's lobby.
         void OnRoomChanged(RoomClient.RoomState room)
         {
-            if (IsMenu || room == null || room.state != "lobby") return;
+            if (room == null) return;
+            if (room.state == "lobby") loadedFor = null;   // back in the lobby, the next start is a new load even in the same round
+            // A `load` that went out while this phone was reconnecting is never sent again, but the room's snapshot
+            // says which track is loading: load it, or the room starts without us.
+            if (room.state == "loading" && !loading && room.raceIndex >= 0 && room.raceIndex < room.tracks.Count
+                && loadedFor != $"{room.code}:{room.round}:{room.raceIndex}")
+            {
+                OnLoadRequested(room.tracks[room.raceIndex], room.raceIndex + 1, room.tracks.Count);
+                return;
+            }
+            if (IsMenu || room.state != "lobby") return;
             PendingLobby = true;
             loading = false;
             Load("Menu");

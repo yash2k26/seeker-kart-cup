@@ -44,7 +44,7 @@ namespace KartCup
             foreach (var control in FindObjectsByType<HoldButton>(FindObjectsSortMode.None))
                 control.gameObject.SetActive(false);
 
-            if (RoomClient.InRoom) { OnlineFinish(who, race); return; }
+            if (RoomClient.Member) { OnlineFinish(who, race); return; }
 
             // One ordering decides BOTH the position shown and the points awarded. Deriving them separately let the
             // card say "you finished 6th" while handing out the win's 10 points.
@@ -171,7 +171,7 @@ namespace KartCup
         {
             "confirmed" => $"paid ✓ {WalletFlow.Short(p.signature)}",
             "sent" => "sending to your wallet…",
-            "failed" => "payout delayed — we keep retrying",
+            "failed" => "payout stuck — contact support with this room's code",
             _ => "paying out…",
         };
 
