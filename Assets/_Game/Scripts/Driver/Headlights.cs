@@ -41,12 +41,13 @@ namespace KartCup
                 l.spotAngle = night.angle; l.innerSpotAngle = night.angle * 0.5f; l.shadows = LightShadows.None;
             }
             if (!player) return;
-            // The film keeps every face lit: a soft cool fill over the seat, from the camera's side.
+            // The film keeps every face lit: a soft cool fill over the seat, from the camera's side. Gentle and a metre
+            // off: close in, it blew a bald or pale head out to a white ball (a black cap hid that in the editor).
             var seat = GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "DriverSeat") ?? body.transform;
             var fill = new GameObject("DriverFill").AddComponent<Light>();
             fill.transform.SetParent(seat, false);
-            fill.transform.position = seat.position + kart.transform.up * 1.4f - kart.transform.forward * 0.7f;
-            fill.type = LightType.Point; fill.range = 3.4f; fill.intensity = 0.6f; fill.color = new Color(0.9f, 0.92f, 1f); fill.shadows = LightShadows.None;
+            fill.transform.position = seat.position + kart.transform.up * 1.8f - kart.transform.forward * 1.2f;
+            fill.type = LightType.Point; fill.range = 4f; fill.intensity = 0.22f; fill.color = new Color(0.9f, 0.92f, 1f); fill.shadows = LightShadows.None;
         }
 
         /// Smoke, dust and sparks were authored for daylight as unlit white; at night they read as glowing marshmallows.
