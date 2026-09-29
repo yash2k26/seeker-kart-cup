@@ -19,5 +19,39 @@ CERT_SHA256 = "9E:EA:EE:E5:53:EF:C0:08:32:69:5E:7D:E7:2B:29:75:AA:AA:0B:88:15:EF
 SKR_MINT = "SKRbvo6Gf7GondiT3BbTfuRDPqLWei4j2Qy2NPGZhW3"
 TREASURY_OWNER = ""                       # TODO: treasury wallet (owner), not the ATA
 TREASURY_ATA = ""                         # TODO: treasury's SKR associated token account, pre-created once
-PRICES_JSON = "{\"paint.sunset\":\"1000000\"}"   # base units, 6 decimals: 1000000 = 1 SKR
-# secrets (wrangler secret put): HELIUS_URL, SESSION_HMAC_KEY
+PRICES_JSON = "{}"                        # per-sku overrides of catalog.ts, e.g. {"paint.sunset":{"SKR":"1000000"}}
+HOUSE_CUT_BPS = "1000"                    # 10% of every prize pool
+PAID_ROOMS = "1"                          # "0" = free rooms only (kill switch; no redeploy of the APK needed)
+# Paid entry is refused from these places (research/20): India's Online Gaming Act 2025 bans paid skill games outright;
+# Belgium/Japan/Korea treat paid competitions with chance elements as gambling; the US states mirror Skillz's exclusions.
+PAID_BLOCK = "IN,BE,JP,KR,US-AR,US-CT,US-DE,US-LA,US-SD"
+PRIORITY_FEE_MICROLAMPORTS = "20000"      # research/22: median on-chain priority fee is 0; this lands simple transfers reliably
+APK_URL = "https://github.com/"           # TODO: the GitHub Release / dApp Store link the invite page sends people to
+# secrets (wrangler secret put): HELIUS_URL, SESSION_HMAC_KEY, TREASURY_SECRET (payout hot wallet), DEMO_CODE
+
+# Rate limits (Workers Rate Limiting API). RL: per IP per route on the unauthenticated writes (race start/finish,
+# events, room create, auth challenge, the RPC proxy). RL_STRICT: per wallet on the demo-code route.
+[[ratelimits]]
+name = "RL"
+namespace_id = "7101"
+simple = { limit = 60, period = 60 }
+
+[[ratelimits]]
+name = "RL_STRICT"
+namespace_id = "7102"
+simple = { limit = 5, period = 60 }
+
+# RL_WIDE: per IP across all room codes on the room read routes (RL there is keyed per IP and room).
+[[ratelimits]]
+name = "RL_WIDE"
+namespace_id = "7103"
+simple = { limit = 600, period = 60 }
+
+# Online rooms: one SQLite-backed Durable Object per room code.
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "RoomDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RoomDO"]

@@ -2,6 +2,8 @@
 import { challenge, verify, readSession } from './auth';
 import { raceStart, raceFinish, raceClaim, leaderboard, me, deleteMe, event, demoUnlock } from './race';
 import { rpcProxy, txConfirm, purchaseVerify } from './chain';
+import { roomsCreate, roomsInfo, roomsSocket, roomsPublic, roomsEntry, invitePage, config } from './rooms';
+export { RoomDO } from './room';
 
 export interface Env {
   DB: D1Database;
@@ -16,7 +18,35 @@ export interface Env {
   HELIUS_URL: string;
   SESSION_HMAC_KEY: string;
   DEMO_CODE?: string;   // secret; reviewer/demo unlock of the SGT cosmetics (no Seeker on hand)
+  // ---- rooms & tournaments ----
+  ROOMS: DurableObjectNamespace<import('./room').RoomDO>;
+  TREASURY_SECRET?: string;          // secret; the payout hot wallet (base58 or JSON byte array). Its pubkey = TREASURY_OWNER
+  HOUSE_CUT_BPS?: string;            // "1000" = 10% of every prize pool
+  PAID_ROOMS?: string;               // "1" enables entry fees; anything else = free rooms only (kill switch)
+  PAID_BLOCK?: string;               // jurisdictions where paid rooms are refused: "IN,BE,JP,KR,US-AR,US-CT,US-DE,US-LA,US-SD"
+  PRIORITY_FEE_MICROLAMPORTS?: string;
+  APK_URL?: string;                  // where the invite page sends people without the app
+  MOCK_CHAIN?: string;               // "1" in .dev.vars only: fake payments and payouts for the local smoke test
+  RATES_JSON?: string;               // optional pin: {"SKR":0.0196,"SOL":121} instead of the live price feed
+  RL?: RateLimit;                    // per-IP limit on the routes anyone can call without signing in
+  RL_STRICT?: RateLimit;             // per-wallet limit on guessing the demo code
+  RL_WIDE?: RateLimit;               // per-address limit across room codes (the per-room one is RL)
 }
+
+// Routes that cost something per call (a D1 write or read, an upstream RPC, waking a Durable Object): a per-IP budget
+// per minute (RL). A session is no limit by itself: any keypair can sign in.
+const LIMITED = new Set([
+  'POST /rpc', 'POST /v1/auth/challenge', 'POST /v1/auth/verify', 'POST /v1/race/start', 'POST /v1/race/finish',
+  'POST /v1/race/claim', 'POST /v1/tx/confirm', 'POST /v1/purchase/verify', 'POST /v1/demo/unlock', 'POST /v1/event',
+  'POST /v1/rooms', 'GET /v1/rooms/public', 'GET /v1/config', 'GET /v1/leaderboard',
+]);
+
+async function limited(req: Request, env: Env, key: string, rl: RateLimit | undefined = env.RL): Promise<boolean> {
+  if (!rl) return false;
+  const ip = req.headers.get('cf-connecting-ip') ?? 'local';
+  return !(await rl.limit({ key: `${key}|${ip}` })).success;
+}
+const slowDown = () => Response.json({ error: 'slow down' }, { status: 429, headers: CORS });
 
 type Handler = (req: Request, env: Env, ctx: ExecutionContext, wallet: string | null) => Promise<Response>;
 
@@ -35,6 +65,9 @@ const routes: Record<string, Handler> = {
   'DELETE /v1/me': deleteMe,
   'POST /v1/event': event,
   'POST /v1/demo/unlock': demoUnlock,
+  'POST /v1/rooms': roomsCreate,
+  'GET /v1/rooms/public': roomsPublic,
+  'GET /v1/config': config,
 };
 
 const CORS = {
@@ -46,6 +79,9 @@ const CORS = {
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
+    // MOCK_CHAIN fakes payments and payouts for the local smoke test. It must never be live: refuse to serve anything
+    // on a real host while it is set, rather than trust that nobody ever pastes it into the dashboard.
+    if (env.MOCK_CHAIN === '1' && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(url.hostname)) return bad('misconfigured', 503);
     if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
 
     // Digital Asset Links: the wallet verifies our package + signing cert against this file (MWA spec).
@@ -56,12 +92,38 @@ export default {
         target: { namespace: 'android_app', package_name: env.PACKAGE_NAME, sha256_cert_fingerprints: fps },
       }], { headers: { 'cache-control': 'public, max-age=3600' } });
     }
+    // Rooms: /v1/rooms/<CODE> (state), /v1/rooms/<CODE>/ws (socket → Durable Object), /r/<CODE> (invite page)
+    const room = url.pathname.match(/^\/v1\/rooms\/([A-Za-z0-9]{5})(\/ws)?$/);
+    if (room && req.method === 'GET') {
+      // Each one wakes a Durable Object. Keyed by room as well as address: phones sharing one Wi-Fi reconnecting to
+      // their own room must not use up each other's budget, or a stranger's calls to other codes use up theirs.
+      if (await limited(req, env, `${room[2] ? 'GET /v1/rooms/ws' : 'GET /v1/rooms/code'}|${room[1].toUpperCase()}`)) return slowDown();
+      if (await limited(req, env, 'GET /v1/rooms/*', env.RL_WIDE)) return slowDown();   // and across codes, per address
+      try { return room[2] ? await roomsSocket(req, env, room[1]) : await roomsInfo(req, env, room[1]); }
+      catch (e: any) { console.error('rooms', e?.stack ?? e); return Response.json({ error: 'internal' }, { status: 500, headers: CORS }); }
+    }
+    // An entry payment for a room, by HTTP: it reaches the room whatever state the room or the phone's socket is in.
+    const entry = url.pathname.match(/^\/v1\/rooms\/([A-Za-z0-9]{5})\/entry$/);
+    if (entry && req.method === 'POST') {
+      if (await limited(req, env, 'POST /v1/rooms/entry')) return slowDown();
+      try {
+        const res = await roomsEntry(req, env, entry[1], await readSession(env, req.headers.get('authorization')));
+        Object.entries(CORS).forEach(([k, v]) => res.headers.set(k, v));
+        return res;
+      } catch (e: any) { console.error('rooms entry', e?.stack ?? e); return Response.json({ error: 'internal' }, { status: 500, headers: CORS }); }
+    }
+    const invite = url.pathname.match(/^\/r\/([A-Za-z0-9]{5})\/?$/);
+    if (invite && req.method === 'GET') {
+      if (await limited(req, env, 'GET /r') || await limited(req, env, 'GET /v1/rooms/*', env.RL_WIDE)) return slowDown();
+      return invitePage(req, env, invite[1]);
+    }
     if (url.pathname === '/privacy' || url.pathname === '/terms') {
       return env.ASSETS.fetch(new Request(new URL(url.pathname + '.html', url), req));
     }
 
     const key = `${req.method} ${url.pathname}`;
     const handler = routes[key];
+    if (LIMITED.has(key) && await limited(req, env, key)) return slowDown();
     if (!handler) {   // icon.png, index; the assets binding throws on a miss (observed as a 1101), so a miss is a plain 404
       if (req.method !== 'GET') return bad('not found', 404);
       try { return await env.ASSETS.fetch(req); } catch { return bad('not found', 404); }
