@@ -18,9 +18,12 @@ export const TRACK_GEO = GEO as unknown as Record<string, Geo>;
 export const geoOf = (id: unknown): Geo | undefined =>
   typeof id === 'string' && Object.prototype.hasOwnProperty.call(TRACK_GEO, id) ? TRACK_GEO[id] : undefined;
 
-// The fastest kart: maxSpeed 40 x 1.10 (driver +2) x 1.05 (kart +2) + 10 boost = 56.2 m/s on the road, which is the
-// fastest surface (Default Road speed 1; dirt 0.9, grass 0.7; no boost pads). 62 leaves 10% for slopes and bumps.
-export const V_SUSTAINED = 62;       // m/s, averaged over WINDOW_S
+// The fastest kart: maxSpeed 40 x 1.10 (driver SPEED +2) x 1.105 (kart SPEED 5) + boost 10 x 1.24 (kart TURBO 4) x 1.16
+// (driver TURBO +2) = 63.0 m/s on the road, which is the fastest surface (Default Road speed 1; dirt 0.9, grass 0.7;
+// no boost pads), and a Nitro kicks it 8 m/s past that for a moment: 71. The factors are KartDef/CharacterDef.ApplyTo
+// and ItemSetup; referee-test.ts works the same sum out from the catalog, so a faster kart in the shop fails that
+// test, not an honest driver. ponytail: one cap for every kart; a cap per kart if the top of the board needs it.
+export const V_SUSTAINED = 72;       // m/s, averaged over WINDOW_S
 export const V_BURST = 95;           // m/s between two samples: a knock or a landing, never a teleport
 // A whole lap cannot average more than this along the centreline. The racing line is a few percent shorter than the
 // centreline, and nobody holds top speed through the corners; a bot cutting straight from gate to gate at V_SUSTAINED

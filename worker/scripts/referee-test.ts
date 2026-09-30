@@ -1,9 +1,17 @@
 // Self-check of the referee on every circuit: synthetic drives along the real centreline (tracks.json).
 //   npm run test:referee
 import { TRACK_GEO, referee, agrees, finishT, lapTimes, checkpointTimes, V_SUSTAINED, LAP_V, type Geo, type Sample } from '../src/referee';
+import { CATALOG, type Powers } from '../src/catalog';
 
 let failures = 0;
 const check = (ok: boolean, what: string) => { if (!ok) { failures++; console.log('  FAIL', what); } };
+
+// Every kart in the shop, under the quickest driver the stat range allows (+2 SPEED, +2 TURBO) and with a Nitro's
+// 8 m/s kick on top, fits under the cap: the sums are KartDef.ApplyTo and CharacterDef.ApplyTo on a 40 m/s kart with
+// a 10 m/s boost, and ItemSetup's Nitro.
+const top = (p: Powers) => 40 * 1.10 * (1 + (p.speed - 2) * 0.035) + 10 * 1.16 * (1 + (p.turbo - 2) * 0.12);
+const fastest = Math.max(...CATALOG.filter(s => s.powers).map(s => top(s.powers!)));
+check(fastest + 8 <= V_SUSTAINED, `the fastest kart in the shop (${fastest.toFixed(1)} m/s, plus a Nitro) fits under the ${V_SUSTAINED} m/s cap`);
 
 /** Arc-length parametrised centreline: position at s metres from sample 0 (the start line), wrapping. */
 function path(g: Geo) {
@@ -49,7 +57,7 @@ for (const [id, g] of Object.entries(TRACK_GEO)) {
     check(agrees(s, g, Math.round(ft * 1000) - 3000, laps, cps) !== null, `${id} a claimed time 3 s faster than the drive is refused`);
   }
 
-  check(referee(g, drive(g, 70, 15)).bad?.startsWith('sustained') === true, `${id} 70 m/s is refused`);
+  check(referee(g, drive(g, V_SUSTAINED + 8, 15)).bad?.startsWith('sustained') === true, `${id} ${V_SUSTAINED + 8} m/s is refused`);
   // the countdown: the grid seen before GO is fine; rolling off it, or crossing the line before GO, is not
   const withGrid = (early: number) => { const d = drive(g, 45, 15); const pre: Sample[] = [];
     for (let t = -3; t < 0; t += 1 / 15) { const q = d[0]; const roll = Math.max(0, t + early) * 45; pre.push({ t: +t.toFixed(3), x: q.x + roll * g.gates[0][3], y: 0, z: q.z + roll * g.gates[0][4] }); }
@@ -267,7 +275,7 @@ for (const [id, g] of Object.entries(TRACK_GEO)) {
     for (let j = 1; j <= steps; j++) { t += d / steps / (V_SUSTAINED * 0.99); chord.push({ t, x: prev.x + (tgt.x - prev.x) * j / steps, y: 0, z: prev.z + (tgt.z - prev.z) * j / steps }); }
     prev = tgt;
   }
-  const cs = referee(g, chord), honestBest = (15 + L * g.laps) / 56.2;
+  const cs = referee(g, chord), honestBest = (15 + L * g.laps) / fastest;
   console.log(`  chords at the cap: ${cs.bad ?? `finishes in ${finishT(cs, g)?.toFixed(1)} s`}; the centreline at the kart's top speed takes ${honestBest.toFixed(1)} s`);
   check(cs.bad !== null || finishT(cs, g) === null, `${id} gate-to-gate chords at the speed cap are refused`);
 }
