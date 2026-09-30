@@ -12,8 +12,8 @@ export interface Env {
   PACKAGE_NAME: string;
   CERT_SHA256: string;
   SKR_MINT: string;
-  TREASURY_OWNER: string;
-  TREASURY_ATA: string;
+  TREASURY_OWNER?: string;           // secret; see wrangler.toml
+  TREASURY_ATA?: string;
   PRICES_JSON: string;
   HELIUS_URL: string;
   SESSION_HMAC_KEY: string;
