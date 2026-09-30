@@ -140,7 +140,10 @@ namespace KartCup
             go.name = (isPlayer ? "Player_" : online ? "Remote_" : "AI_") + def.displayName;
             var kart = go.GetComponent<Kart>();
             def.ApplyTo(kart);
-            garage?.Find(kartId)?.ApplyTo(kart);
+            // A room with money on it races equal karts: the garage pick is paint there. Its powers count in solo
+            // races and free rooms, where nobody bought a place on the podium.
+            bool paidRoom = online && RoomClient.Instance != null && RoomClient.Instance.Room.IsPaid;
+            if (!paidRoom) garage?.Find(kartId)?.ApplyTo(kart);
             if (isPlayer) CharacterDef.Paint(go, Paints.ColorFor(def)); else def.ApplyLivery(go);
             if (NightScene.Instance != null) go.AddComponent<Headlights>().Init(kart, isPlayer);   // lamps lit after dark
 

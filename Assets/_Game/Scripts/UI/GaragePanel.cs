@@ -131,7 +131,8 @@ namespace KartCup
             else
             {
                 if (nameLabel != null) nameLabel.text = def.displayName.ToUpperInvariant();
-                if (blurbLabel != null) blurbLabel.text = def.blurb;
+                // Said before the money leaves: powers count in solo and free rooms; a paid room races equal karts.
+                if (blurbLabel != null) blurbLabel.text = def.IsFree ? def.blurb : $"{def.blurb}   <alpha=#99>Paid rooms race equal karts.";
                 if (priceLabel != null) priceLabel.text = def.IsFree ? $"FREE  ·  {def.Tier}" : owned ? $"UNLOCKED  ·  {def.Tier}" : $"LOCKED  ·  {KartPrice(item, def)}";
                 if (owned) SetButton(primaryLabel, primaryButton, selected ? "SELECTED" : "SELECT", !selected);
                 else SetButton(primaryLabel, primaryButton, item != null ? $"UNLOCK  ·  {Skr(item)}" : KartApi.Cfg == null ? "CONNECT TO BUY" : "…", item != null);
