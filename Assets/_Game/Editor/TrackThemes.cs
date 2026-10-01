@@ -54,17 +54,18 @@ public static partial class TrackSetup
             // right of centre) lands at yaw 30, and the moonlight comes from there.
             night = true, sky = "skybox-moonrise", skyRotation = 6f, skyExposure = 0.9f,
             sun = new Vector3(26, -150, 0), sunColor = new Color(0.62f, 0.72f, 1f), sunIntensity = 0.7f,
-            ambientSky = new Color(0.16f, 0.20f, 0.30f), ambientEquator = new Color(0.12f, 0.15f, 0.22f), ambientGround = new Color(0.05f, 0.05f, 0.07f),
-            fog = new Color(0.22f, 0.27f, 0.33f), fogStart = 60, fogEnd = 430, farClip = 470,
-            water = "Water_night", wet = 1f, lampEvery = 36f, studs = true, lighthouse = true, tunnel = true, groundDetail = "sand_diff",
+            ambientSky = new Color(0.22f, 0.26f, 0.36f), ambientEquator = new Color(0.20f, 0.20f, 0.24f), ambientGround = new Color(0.09f, 0.08f, 0.08f),
+            // the film's air is thick and a little warm from the lamps: the haze starts close and the far coast sinks into it
+            fog = new Color(0.24f, 0.25f, 0.29f), fogStart = 22, fogEnd = 330, farClip = 470,
+            water = "Water_night", wet = 1f, lampEvery = 30f, studs = true, lighthouse = true, tunnel = true, groundDetail = "sand_diff",
             post = p =>
             {
                 // The teaser's grade: filmic roll-off, teal shadows under warm lamps, bloom on every practical, a
                 // little grain and fringe. The base profile (LookSetup) carries every component; this only retunes.
                 if (p.TryGet(out Tonemapping tone)) tone.mode.value = TonemappingMode.ACES;
-                if (p.TryGet(out ColorAdjustments g)) { g.postExposure.value = 0.75f; g.contrast.value = 14f; g.saturation.value = 10f; g.colorFilter.value = new Color(0.94f, 0.97f, 1f); }
+                if (p.TryGet(out ColorAdjustments g)) { g.postExposure.value = 1.0f; g.contrast.value = 12f; g.saturation.value = 10f; g.colorFilter.value = new Color(0.94f, 0.97f, 1f); }
                 if (p.TryGet(out SplitToning split)) { split.shadows.value = new Color(0.10f, 0.36f, 0.52f); split.highlights.value = new Color(1f, 0.80f, 0.58f); split.balance.value = -12f; }
-                if (p.TryGet(out Bloom bloom)) { bloom.threshold.value = 0.85f; bloom.intensity.value = 1.3f; bloom.scatter.value = 0.72f; }
+                if (p.TryGet(out Bloom bloom)) { bloom.threshold.value = 0.8f; bloom.intensity.value = 1.5f; bloom.scatter.value = 0.76f; }
                 if (p.TryGet(out Vignette vignette)) vignette.intensity.value = 0.34f;
                 if (p.TryGet(out FilmGrain grain)) grain.intensity.value = 0.22f;
                 if (p.TryGet(out ChromaticAberration fringe)) fringe.intensity.value = 0.06f;

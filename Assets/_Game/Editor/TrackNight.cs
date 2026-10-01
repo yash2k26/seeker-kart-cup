@@ -46,9 +46,12 @@ public static partial class TrackSetup
     /// A lamp every V.lampEvery metres: on the land side down the straights, on the outside through the corners
     /// (both sides through a tight one), each a real spot light. The road and kerbs are built in chunks because a
     /// phone lights a renderer by at most eight lights; the lights themselves cast no shadow.
+    static readonly List<Vector3> lampHeads = new();
+
     static void SodiumLamps(Transform root)
     {
         if (V.lampEvery <= 0f) return;
+        lampHeads.Clear();
         var pole = Plain("Lamp_Pole", new Color(0.16f, 0.17f, 0.19f));
         var glow = Emissive("Lamp_Glow", Sodium, 3.2f);
         int n = centre.Length, step = Mathf.Max(1, Samples(V.lampEvery)), count = 0;
@@ -59,6 +62,7 @@ public static partial class TrackSetup
             float side = c.HasValue ? c.Value.outside : 1f;      // `right` points into the island: +1 is the land side
             Lamp(root, i, side, pole, glow, ref count);
         }
+        Glows(root, "LampGlows", lampHeads, Sodium);
         Debug.Log($"[track] {count} sodium lamps");
     }
 
@@ -79,7 +83,8 @@ public static partial class TrackSetup
         light.transform.SetParent(lamp, false);
         light.transform.localPosition = new Vector3(0, H - 0.35f, Arm + 0.1f);
         light.transform.localRotation = Quaternion.Euler(90, 0, 0);
-        light.type = LightType.Spot; light.color = Sodium; light.intensity = 260f; light.range = 32f;
+        lampHeads.Add(light.transform.position);
+        light.type = LightType.Spot; light.color = Sodium; light.intensity = 340f; light.range = 40f;
         light.spotAngle = 112f; light.innerSpotAngle = 40f; light.shadows = LightShadows.None;   // wide: the pool reaches well onto the road
         var capsule = lamp.gameObject.AddComponent<CapsuleCollider>();
         capsule.center = new Vector3(0, H / 2f, 0); capsule.height = H; capsule.radius = 0.16f;
@@ -418,6 +423,38 @@ public static partial class TrackSetup
         var mesh = new Mesh { name = "Beam", vertices = v, normals = nrm, uv = uv, triangles = tris };
         mesh.RecalculateBounds();
         return mesh;
+    }
+
+    /// What the film's haze does round every lamp, without a volume: three additive quads per lamp in ONE mesh (a
+    /// star at the glass, a halo, and a wide soft bloom of lit air), opened toward the eye by KartCup/Glow.
+    static void Glows(Transform root, string name, List<Vector3> at, Color colour)
+    {
+        if (at.Count == 0) return;
+        var shader = Shader.Find("KartCup/Glow");
+        if (shader == null) { Debug.LogWarning("[track] KartCup/Glow missing: no lamp halos"); return; }
+        var mat = LoadOrCreate(Art + "Materials/Lamp_Halo.mat", shader, Color.white);
+        mat.shader = shader; mat.SetColor("_Color", colour); mat.SetFloat("_Strength", 1f); mat.SetFloat("_Near", 5f);
+        EditorUtility.SetDirty(mat);
+        // size in metres, falloff power, strength
+        (float size, float power, float strength)[] layers = { (30f, 2.0f, 0.26f), (8f, 2.6f, 0.9f), (2.2f, 1.4f, 3.0f) };
+        var v = new List<Vector3>(); var uv = new List<Vector2>(); var uv2 = new List<Vector2>(); var col = new List<Color>(); var tri = new List<int>();
+        foreach (var world in at)
+        {
+            var p = root.InverseTransformPoint(world);
+            foreach (var (size, power, strength) in layers)
+            {
+                int b = v.Count;
+                foreach (var c in new[] { new Vector2(-1, -1), new Vector2(1, -1), new Vector2(1, 1), new Vector2(-1, 1) })
+                { v.Add(p); uv.Add(c); uv2.Add(new Vector2(size, power)); col.Add(new Color(1, 1, 1, strength)); }
+                tri.AddRange(new[] { b, b + 1, b + 2, b, b + 2, b + 3 });
+            }
+        }
+        var mesh = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+        mesh.SetVertices(v); mesh.SetUVs(0, uv); mesh.SetUVs(1, uv2); mesh.SetColors(col); mesh.SetTriangles(tri, 0);
+        mesh.RecalculateBounds();
+        var bounds = mesh.bounds; bounds.Expand(30f); mesh.bounds = bounds;   // every vertex sits at a lamp: the quads open in the shader
+        var go = Part(root, name, SaveMesh(mesh, name), mat, Vector3.zero, Vector3.one);
+        go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
     }
 
     static Mesh SaveMesh(Mesh mesh, string name)

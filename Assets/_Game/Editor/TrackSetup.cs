@@ -1160,7 +1160,7 @@ public static partial class TrackSetup
         m.SetFloat("_Tile", 3f); m.SetFloat("_PuddleTile", 38f); m.SetFloat("_BumpScale", V.night ? 0.7f : 1f);
         m.SetFloat("_Wet", V.wet); m.SetFloat("_Puddles", 0.65f);
         m.SetFloat("_LaneOffset", HalfWidth * 0.5f); m.SetFloat("_LaneHalf", 3.4f);
-        m.SetColor("_Tint", V.night ? new Color(1.15f, 1.15f, 1.2f) : new Color(0.75f, 0.75f, 0.78f));   // the tile is dark; night lifts it for the lamps
+        m.SetColor("_Tint", V.night ? new Color(1.7f, 1.68f, 1.7f) : new Color(0.75f, 0.75f, 0.78f));   // the tile is dark; night lifts it for the lamps
         EditorUtility.SetDirty(m);
         return m;
     }
