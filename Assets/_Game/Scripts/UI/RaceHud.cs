@@ -73,7 +73,7 @@ namespace KartCup
             }
 
             if (timeLabel != null) timeLabel.text = Clock(race.raceTime);
-            bool armed = playerItems != null && playerItems.item != null;
+            bool armed = playerItems != null && playerItems.item != null && playerItems.ammo > 0;   // a fired item is no longer held
             if (itemLabel != null) itemLabel.text = armed ? playerItems.item.itemName.ToUpperInvariant() : "";
             if (itemButton != null && armed != itemArmed)
             {

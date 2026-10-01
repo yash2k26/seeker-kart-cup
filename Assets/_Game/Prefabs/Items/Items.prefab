@@ -93,7 +93,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PowerslideKartPhysics.ProjectileItem
   itemName: Rocket
   itemPrefab: {fileID: 8047099065696371936, guid: dc4a23aa091754adf9820aba0ee1bf92, type: 3}
-  spawnOffset: {x: 0, y: 0.5, z: 0}
+  spawnOffset: {x: 0, y: 1.5, z: 1.2}
 --- !u!1 &5695735558697914178
 GameObject:
   m_ObjectHideFlags: 0
@@ -285,8 +285,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   itemName: Homing Item
-  itemPrefab: {fileID: 5462182083005470935, guid: 9781abd6a830e5540ad04369f329371f, type: 3}
-  spawnOffset: {x: 0, y: 0.5, z: 0}
+  itemPrefab: {fileID: 7368741468156778470, guid: 1f88bdf0ba6874e9091555a3e9a14312, type: 3}
+  spawnOffset: {x: 0, y: 1.5, z: 1.2}
 --- !u!1 &7580453890011044708
 GameObject:
   m_ObjectHideFlags: 0

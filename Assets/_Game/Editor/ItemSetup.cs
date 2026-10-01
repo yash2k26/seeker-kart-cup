@@ -16,9 +16,11 @@ public static class ItemSetup
     public static void Build()
     {
         Directory.CreateDirectory(Out);
-        // A rocket is the homing missile with the homing off and the speed up; a bomb is the trap, bigger, black,
-        // dropped behind the kart and hitting three spins hard.
-        var rocket = Variant("HomingItem", "Rocket", p => { p.homingAccuracy = 0f; p.startSpeed = 32f; p.targetSpeed = 70f; p.accel = 24f; p.kartSpinCount = 2; });
+        // A rocket is the homing missile with the homing off and the speed up: out of the tubes at once and gone. The
+        // homing one keeps its brain and wears a blue nose. A bomb is the trap, bigger, black, dropped behind the
+        // kart and hitting three spins hard. Both rockets are the film's (Rocketize).
+        var rocket = Variant("HomingItem", "Rocket", p => { p.homingAccuracy = 0f; p.startSpeed = 48f; p.targetSpeed = 96f; p.accel = 46f; p.kartSpinCount = 2; Rocketize(p, Red); });
+        var homing = Variant("HomingItem", "Homing", p => { p.startSpeed = Mathf.Max(p.startSpeed, 26f); Rocketize(p, Blue); });
         var bomb = Variant("StaticItem", "Bomb", p =>
         {
             p.kartSpinCount = 3;
@@ -33,13 +35,17 @@ public static class ItemSetup
         });
 
         var sun = SunBomb();
+        Mount();
 
         var src = AssetDatabase.LoadAssetAtPath<GameObject>(PKP + "Items.prefab");
         if (src == null) { Debug.LogError("[items] Powerslide Items.prefab missing"); if (Application.isBatchMode) EditorApplication.Exit(1); return; }
         var go = (GameObject)PrefabUtility.InstantiatePrefab(src);
         PrefabUtility.UnpackPrefabInstance(go, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
         go.name = "Items";
-        Projectile(go.transform, "RocketItem", "Rocket", rocket, new Vector3(0, 0.5f, 0));
+        // the homing item Powerslide ships fires its own grey missile: point it at ours
+        foreach (var item in go.GetComponentsInChildren<ProjectileItem>()) if (item.itemName == "Homing Item") { item.itemPrefab = homing; item.spawnOffset = new Vector3(0, 1.5f, 1.2f); }
+        // (the kart's ItemMount moves a fired shot to the pod's tubes; this offset is only where it starts without one)
+        Projectile(go.transform, "RocketItem", "Rocket", rocket, new Vector3(0, 1.5f, 1.2f));
         Projectile(go.transform, "BombItem", "Bomb", bomb, new Vector3(0, 0.5f, -2.5f));
         Projectile(go.transform, "SunBombItem", "Sun Bomb", sun, new Vector3(0, 0.8f, 3.2f));   // clear of the longest kart's collider (2.55 m ahead)
         var nitro = new GameObject("NitroItem");
@@ -83,7 +89,7 @@ public static class ItemSetup
         var gold = new Color(1f, 0.58f, 0.05f); var hot = new Color(1f, 0.70f, 0.12f);
         var slot = new System.Collections.Generic.Dictionary<string, Material>
         {
-            ["sun_gold"]   = Lit("Sun_Gold",   gold, 1f, 0.62f, new Color(1f, 0.50f, 0.03f) * 0.75f),   // all metal: a headlight on it comes back gold, not white
+            ["sun_gold"]   = Lit("Sun_Gold",   gold, 1f, 0.62f, new Color(1f, 0.50f, 0.03f) * 1.1f),   // all metal: a headlight on it comes back gold, not white
             ["sun_groove"] = Lit("Sun_Groove", new Color(0.16f, 0.05f, 0.008f), 1f, 0.4f, Color.black),
             ["sun_trim"]   = Lit("Sun_Trim",   new Color(0.62f, 0.27f, 0.03f), 1f, 0.6f, new Color(1f, 0.40f, 0.04f) * 0.35f),
             ["sun_rays"]   = Lit("Sun_Rays",   new Color(1f, 0.64f, 0.07f), 1f, 0.65f, new Color(1f, 0.56f, 0.04f) * 1.1f),
@@ -312,6 +318,118 @@ public static class ItemSetup
         var imp = (TextureImporter)AssetImporter.GetAtPath(path);
         imp.alphaIsTransparency = true; imp.wrapMode = TextureWrapMode.Clamp; imp.mipmapEnabled = true; imp.SaveAndReimport();
         return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+    }
+
+    // ---------- the film's launcher, rocket and cradle (tools/blender/export_weapons.py) ----------
+    const string Models = "Assets/_Game/Art/Models/Items/";
+    const float FilmScale = 1.35f;      // the film's kart is 2.6 m long, ours run 3.3 to 4.5
+
+    /// An exported model under `parent`, its slots given materials BY POSITION (the importer names them all "Lit"),
+    /// turned so the film's forward (+Y in Blender) is +Z here, at `scale`.
+    static Transform Model(string fbx, Transform parent, string name, float scale, params Material[] slots)
+    {
+        var wrap = new GameObject(name).transform;
+        wrap.SetParent(parent, false);
+        var src = AssetDatabase.LoadAssetAtPath<GameObject>(Models + fbx + ".fbx");
+        if (src == null) { Debug.LogError($"[items] {fbx}.fbx missing: run tools/blender/export_weapons.py"); return wrap; }
+        var go = (GameObject)PrefabUtility.InstantiatePrefab(src, wrap);
+        PrefabUtility.UnpackPrefabInstance(go, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+        go.transform.localPosition = Vector3.zero;
+        go.transform.localRotation = Quaternion.Euler(0, 180, 0) * go.transform.localRotation;   // the importer's own turn stays
+        var mr = go.GetComponentInChildren<MeshRenderer>();
+        if (mr != null)
+        {
+            var ms = mr.sharedMaterials;
+            if (ms.Length != slots.Length) Debug.LogError($"[items] {fbx}.fbx has {ms.Length} slots, expected {slots.Length}");
+            for (int i = 0; i < ms.Length && i < slots.Length; i++) ms[i] = slots[i];
+            mr.sharedMaterials = ms; mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+        wrap.localScale = Vector3.one * scale;
+        return wrap;
+    }
+
+    static Material Paint => Lit("Pod_Paint", new Color(1f, 0.35f, 0.12f), 0.3f, 0.7f, new Color(1f, 0.30f, 0.08f) * 0.22f);   // the game's orange, lit a little so it reads at night
+    static Material Dark => Lit("Pod_Dark", new Color(0.03f, 0.032f, 0.04f), 0.85f, 0.65f, Color.black);
+    static Material Steel => Lit("Pod_Steel", new Color(0.55f, 0.57f, 0.6f), 1f, 0.7f, Color.black);
+    static Material Red => Lit("Pod_Red", new Color(0.75f, 0.04f, 0.02f), 0.2f, 0.7f, new Color(1f, 0.1f, 0.02f) * 1.4f);
+    static Material Blue => Lit("Pod_Blue", new Color(0.03f, 0.25f, 0.8f), 0.2f, 0.7f, new Color(0.05f, 0.5f, 1f) * 1.6f);
+    static Material White => Lit("Rocket_White", new Color(0.85f, 0.85f, 0.82f), 0.1f, 0.7f, new Color(0.25f, 0.25f, 0.24f));
+
+    /// Dresses a Powerslide projectile as the film's rocket: the shell (red-nosed, or blue for the homing one), a jet
+    /// left in the air behind it, a light that rakes whatever it passes, and a nose that follows its flight.
+    static void Rocketize(SpawnedProjectileItem p, Material nose)
+    {
+        var go = p.gameObject;
+        for (int i = go.transform.childCount - 1; i >= 0; i--) Object.DestroyImmediate(go.transform.GetChild(i).gameObject);
+        foreach (var r in go.GetComponents<Renderer>()) Object.DestroyImmediate(r);
+        foreach (var f in go.GetComponents<MeshFilter>()) Object.DestroyImmediate(f);
+        var sphere = go.GetComponent<SphereCollider>(); if (sphere != null) sphere.radius = 0.45f;
+        var model = Model("RocketShell", go.transform, "Model", 1.9f, White, nose, Dark);
+        go.AddComponent<KartCup.RocketLook>().model = model;
+        var dot = Additive("FX_SunDot", Tex("dot"), new Color(1f, 0.34f, 0.05f) * 3f);
+        var jet = Particles("Jet", model, dot, new Vector3(0, 0, -0.32f));
+        {
+            // local: at 60 m/s a world-space jet is a row of dots a metre apart; this one stays a flame on the nozzle
+            var m = jet.main; m.loop = true; m.startLifetime = new ParticleSystem.MinMaxCurve(0.1f, 0.22f); m.startSpeed = new ParticleSystem.MinMaxCurve(6f, 12f);
+            m.startSize = new ParticleSystem.MinMaxCurve(0.4f, 0.8f); m.maxParticles = 60; m.simulationSpace = ParticleSystemSimulationSpace.Local;
+            var e = jet.emission; e.rateOverTime = 120f;
+            var sh = jet.shape; sh.enabled = true; sh.shapeType = ParticleSystemShapeType.Cone; sh.angle = 12f; sh.radius = 0.05f; sh.rotation = new Vector3(180, 0, 0);
+            var sz = jet.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0.2f));
+            Fade(jet, new Color(1f, 0.95f, 0.8f), new Color(1f, 0.35f, 0.05f));
+        }
+        var light = new GameObject("Glow").AddComponent<Light>(); light.transform.SetParent(model, false); light.transform.localPosition = new Vector3(0, 0, -0.5f);
+        light.color = new Color(1f, 0.55f, 0.2f); light.intensity = 10f; light.range = 8f;
+    }
+
+    /// Resources/ItemMount: the pod on its strut with a muzzle flash, and the cradle with the two things it can
+    /// carry. ItemMount.cs puts them on the flanks of whichever kart it is given and plays them.
+    static void Mount()
+    {
+        Directory.CreateDirectory("Assets/_Game/Resources");
+        float s = FilmScale;
+        var root = new GameObject("ItemMount");
+        var mount = root.AddComponent<KartCup.ItemMount>();
+
+        var pod = new GameObject("Pod").transform; pod.SetParent(root.transform, false);
+        Model("RocketPod", pod, "Model", s, Paint, Dark, Steel, Red);
+        var strut = new GameObject("Strut").transform; strut.SetParent(pod, false); strut.localPosition = new Vector3(0.14f * s, -0.2f * s, -0.12f * s);
+        var leg = GameObject.CreatePrimitive(PrimitiveType.Cube); leg.name = "Leg"; Object.DestroyImmediate(leg.GetComponent<Collider>());
+        leg.transform.SetParent(strut, false); leg.transform.localPosition = new Vector3(0, -0.4f * s, 0); leg.transform.localScale = new Vector3(0.09f, 0.8f * s, 0.09f);
+        leg.GetComponent<MeshRenderer>().sharedMaterial = Steel; leg.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        var muzzle = new GameObject("Muzzle").transform; muzzle.SetParent(pod, false); muzzle.localPosition = new Vector3(0, 0, 0.52f * s);
+        var flash = Particles("Flash", muzzle, Additive("FX_SunDot", Tex("dot"), new Color(1f, 0.34f, 0.05f) * 3f), Vector3.zero);
+        {
+            var m = flash.main; m.playOnAwake = false; m.startLifetime = new ParticleSystem.MinMaxCurve(0.08f, 0.22f); m.startSpeed = new ParticleSystem.MinMaxCurve(5f, 16f);
+            m.startSize = new ParticleSystem.MinMaxCurve(0.3f, 0.75f); m.maxParticles = 30;
+            Burst(flash, 18);
+            var sh = flash.shape; sh.enabled = true; sh.shapeType = ParticleSystemShapeType.Cone; sh.angle = 24f; sh.radius = 0.12f;
+            Fade(flash, new Color(1f, 0.97f, 0.85f), new Color(1f, 0.4f, 0.06f));
+            var r = flash.GetComponent<ParticleSystemRenderer>(); r.renderMode = ParticleSystemRenderMode.Stretch; r.velocityScale = 0.04f; r.lengthScale = 1.4f;
+        }
+        var fl = new GameObject("FlashLight").AddComponent<Light>(); fl.transform.SetParent(muzzle, false);
+        fl.color = new Color(1f, 0.7f, 0.35f); fl.intensity = 0f; fl.range = 11f; fl.enabled = false;
+
+        var cradle = new GameObject("Cradle").transform; cradle.SetParent(root.transform, false);
+        Model("Cradle", cradle, "Model", s, Dark, Paint);
+        // the sun bomb as it rides: the same model the throw uses, face to the camera behind, tipped up a little
+        var gold = AssetDatabase.LoadAssetAtPath<Material>(Out + "Sun_Gold.mat");
+        Material M(string n) => AssetDatabase.LoadAssetAtPath<Material>(Out + n + ".mat");
+        var sun = Model("SunBomb", cradle, "SunBomb", s, gold, M("Sun_Groove"), M("Sun_Trim"), M("Sun_Rays"), M("Sun_Face"), M("Sun_Dark"), M("Sun_Rope"), M("Sun_Ember"));
+        sun.localRotation = Quaternion.Euler(-14f, 0f, 0f);   // its lit face looks back at the chase camera
+        // "gold crawls across the paint": the bomb lights the flank it rides on
+        var warm = new GameObject("Warm").AddComponent<Light>(); warm.transform.SetParent(sun, false); warm.transform.localPosition = new Vector3(0, 0.1f, -0.5f);
+        warm.color = new Color(1f, 0.72f, 0.2f); warm.intensity = 5f; warm.range = 3.5f;
+        var bomb = GameObject.CreatePrimitive(PrimitiveType.Sphere); bomb.name = "Bomb"; Object.DestroyImmediate(bomb.GetComponent<Collider>());
+        bomb.transform.SetParent(cradle, false); bomb.transform.localScale = Vector3.one * (0.46f * s);
+        bomb.GetComponent<MeshRenderer>().sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(Out + "Bomb.mat") ?? Dark;
+        var cap = GameObject.CreatePrimitive(PrimitiveType.Cylinder); cap.name = "Cap"; Object.DestroyImmediate(cap.GetComponent<Collider>());
+        cap.transform.SetParent(bomb.transform, false); cap.transform.localPosition = new Vector3(0, 0.5f, 0); cap.transform.localScale = new Vector3(0.28f, 0.08f, 0.28f);
+        cap.GetComponent<MeshRenderer>().sharedMaterial = Red;
+
+        mount.pod = pod; mount.strut = strut; mount.muzzle = muzzle; mount.cradle = cradle; mount.flash = flash; mount.flashLight = fl;
+        mount.sunBomb = sun.gameObject; mount.bomb = bomb;
+        PrefabUtility.SaveAsPrefabAsset(root, "Assets/_Game/Resources/ItemMount.prefab");
+        Object.DestroyImmediate(root);
     }
 
     /// A copy of one of Powerslide's spawned-projectile prefabs, retuned.

@@ -16,6 +16,7 @@ namespace KartCup
         ItemCaster caster;
         Item heldItem;
         KartPowers powers;
+        ItemMount mount;
         int knownAmmo, castFrame = -1;
 
         public void Bind(Kart k, BlockyDriverPose pose, bool player)
@@ -31,19 +32,30 @@ namespace KartCup
             powers = GetComponent<KartPowers>();
             if (caster != null && player) caster.castEvent.AddListener(() => AudioDirector.Instance?.UseItem());
             if (caster != null) caster.castEvent.AddListener(() => castFrame = Time.frameCount);
+            mount = ItemMount.On(k);   // the pod and the cradle (before the listener above runs they have noted what was fired)
         }
 
-        /// The ATTACK power: the projectile this kart just fired flies harder. A projectile does not say who fired it,
-        /// so the one that appeared beside the kart on the frame of the cast is taken to be ours.
+        /// The projectile this kart just fired. A projectile does not say who fired it, so the one that appeared beside
+        /// the kart on the frame of the cast is taken to be ours. It never touches its own kart (Powerslide ignores one
+        /// collider; a kart has two, and a rocket born inside the second spun its own shooter), it starts from where
+        /// the kart shows it (the pod's tubes, the cradle), and the ATTACK power makes it fly harder.
         void LateUpdate()
         {
-            if (castFrame != Time.frameCount || powers == null || Mathf.Abs(powers.attack - 1f) < 0.01f) return;
+            if (castFrame != Time.frameCount) return;
             foreach (var shot in FindObjectsByType<SpawnedProjectileItem>(FindObjectsSortMode.None))
             {
-                if (shot.GetComponent<PoweredShot>() != null || (shot.transform.position - transform.position).sqrMagnitude > 16f) continue;
+                if (shot.GetComponent<PoweredShot>() != null || (shot.transform.position - transform.position).sqrMagnitude > 25f) continue;
                 shot.gameObject.AddComponent<PoweredShot>();
-                shot.targetSpeed *= powers.attack; shot.accel *= powers.attack;
                 var srb = shot.GetComponent<Rigidbody>();
+                bool moving = srb != null && rb != null && (srb.linearVelocity - rb.linearVelocity).sqrMagnitude > 4f;   // thrown or fired, not dropped
+                if (moving)
+                {
+                    foreach (var mine in GetComponentsInChildren<Collider>())
+                        foreach (var its in shot.GetComponentsInChildren<Collider>()) Physics.IgnoreCollision(mine, its, true);
+                    if (mount != null && mount.LaunchPoint(out var from)) { shot.transform.position = from; srb.position = from; }
+                }
+                if (powers == null || Mathf.Abs(powers.attack - 1f) < 0.01f) continue;
+                shot.targetSpeed *= powers.attack; shot.accel *= powers.attack;
                 if (srb != null && rb != null) srb.linearVelocity = rb.linearVelocity + (srb.linearVelocity - rb.linearVelocity) * powers.attack;
             }
         }

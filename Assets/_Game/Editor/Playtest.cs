@@ -16,8 +16,9 @@ public static class Playtest
     static bool camSet, noHud, vista, mobile;
     static string look = "Lighthouse", item;   // -item "Sun Bomb": the player throws it after GO and three frames follow it
     static int itemShot;
-    static readonly double[] itemTimes = { 0.5, 2.15, 2.55, 2.9, 3.8 };   // after the throw: in the air, burning, the burst, its wave, the glitter
+    static double[] itemTimes = { 0.5, 2.15, 2.55, 2.9, 3.8 };   // after the throw: in the air, burning, the burst, its wave, the glitter
     static double thrownAt = -1;
+    static bool armed, heldShot;
     static Vector3 itemFrom, itemAt;   // a second camera for the item frames: beside the road, on where it lands
     static int prevQuality;
     static readonly double[] shotTimes = { 5, 12, 22, 34 };
@@ -42,7 +43,7 @@ public static class Playtest
         mobile = args.Contains("-mobile");   // the phone's quality tier (Forward, eight lights per object), restored on exit
         look = "Lighthouse";
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-look") look = args[i + 1];   // what the vista frames look at
-        item = null; itemShot = 0; thrownAt = -1;
+        item = null; itemShot = 0; thrownAt = -1; armed = false; heldShot = false;
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-item") item = args[i + 1];
         prevQuality = QualitySettings.GetQualityLevel();
         if (mobile) QualitySettings.SetQualityLevel(0, true);
@@ -67,13 +68,29 @@ public static class Playtest
             if (shot == 3 && race != null && race.Player != null) race.Finish(race.Player);   // results card in the frame
             captureAt = t + 0.6;                                                              // after the entrance has landed
         }
+        // the item is handed over a little before it is used, so the kart is seen carrying it (pod up, bomb in the cradle)
+        if (item != null && !armed && t >= 9.6)
+        {
+            armed = true;
+            var r0 = Object.FindFirstObjectByType<RaceManager>();
+            var c0 = r0 != null && r0.Player != null ? r0.Player.GetComponent<ItemCaster>() : null;
+            var d0 = Object.FindFirstObjectByType<ItemManager>()?.GetItem(item);
+            if (c0 != null && d0 != null) c0.GiveItem(d0);
+            if (item != "Sun Bomb") itemTimes = new[] { 0.05, 0.2, 0.5 };   // a rocket is gone in half a second
+        }
+        if (item != null && armed && !heldShot && t >= 10.7)
+        {
+            heldShot = true;
+            var k = Object.FindFirstObjectByType<RaceManager>()?.Player?.transform;
+            if (k != null) { itemFrom = k.position + k.forward * 4.2f - k.right * 3.4f + Vector3.up * 2.2f; itemAt = k.position + Vector3.up * 1.1f; SideShot($"item{track}-held"); itemFrom = k.position - k.forward * 4.5f + k.right * 3.2f + Vector3.up * 2.4f; SideShot($"item{track}-held-b"); }
+        }
         if (item != null && thrownAt < 0 && t >= 11)
         {
             var race = Object.FindFirstObjectByType<RaceManager>();
             var caster = race != null && race.Player != null ? race.Player.GetComponent<ItemCaster>() : null;
             var def = Object.FindFirstObjectByType<ItemManager>()?.GetItem(item);
             if (caster != null) { var k = race.Player.transform; itemAt = k.position + k.forward * 11f + Vector3.up * 0.6f; itemFrom = k.position + k.forward * 3f + k.right * 7f + Vector3.up * 2.4f; }
-            if (caster != null && def != null) { caster.GiveItem(def); caster.Cast(); thrownAt = t; Debug.Log($"[playtest] threw {item} at {t:0.0}s: ammo now {caster.ammo}, active {race.Player.GetComponent<Kart>().active}, spinning {race.Player.GetComponent<Kart>().spinningOut}, state {race.state}"); }
+            if (caster != null && def != null) { if (caster.ammo == 0) caster.GiveItem(def); caster.Cast(); thrownAt = t; Debug.Log($"[playtest] threw {item} at {t:0.0}s: ammo now {caster.ammo}, active {race.Player.GetComponent<Kart>().active}, spinning {race.Player.GetComponent<Kart>().spinningOut}, state {race.state}"); }
             else { Debug.LogError($"[playtest] cannot throw {item}: caster {(caster != null)}, item {(def != null)}"); thrownAt = t; }
         }
         if (thrownAt >= 0 && itemShot < itemTimes.Length && t >= thrownAt + itemTimes[itemShot]) { Capture($"item{track}-{itemShot}"); SideShot($"item{track}-{itemShot}-side"); var bombs = Object.FindObjectsByType<SunBomb>(FindObjectsSortMode.None);
