@@ -34,7 +34,7 @@ namespace KartCup
             if (infoLabel != null) infoLabel.text = "GRAND PRIX · 4 RACES   ·   ENTRY 0.05 SOL   ·   PUBLIC";
             if (poolLabel != null) poolLabel.text = "PRIZE POOL 0.15 SOL (≈$18.18)   ·   1st 0.08775 SOL   2nd 0.04725 SOL";
             if (prizeLabel != null) prizeLabel.text = "10% platform fee · the host earns 0.003 SOL of it";
-            if (playersLabel != null) playersLabel.text = "1.<pos=8%><b>toly.skr  <size=70%><color=#93AEBC>HOST</color></size></b><pos=62%>PAID<pos=84%>\n2.<pos=8%>mert.skr<pos=62%>PAID<pos=84%>READY\n3.<pos=8%>9xQ4…Tf2<pos=62%>NOT PAID<pos=84%>\n<color=#93AEBC>4.<pos=8%>Invite a friend…</color>";
+            if (playersLabel != null) playersLabel.text = "1.<pos=8%><b>toly.skr  <size=70%><color=#B4A7DE>HOST</color></size></b><pos=62%>PAID<pos=84%>\n2.<pos=8%>mert.skr<pos=62%>PAID<pos=84%>READY\n3.<pos=8%>9xQ4…Tf2<pos=62%>NOT PAID<pos=84%>\n<color=#B4A7DE>4.<pos=8%>Invite a friend…</color>";
             if (statusLabel != null) statusLabel.text = "Waiting for 9xQ4…Tf2 to pay in";
             if (primaryLabel != null) primaryLabel.text = "START RACE";
         }
@@ -67,11 +67,11 @@ namespace KartCup
             if (playersLabel != null)
                 playersLabel.text = string.Join("\n", r.players.Select((p, i) =>
                 {
-                    string who = (p.id == client.MyId ? "<b>" : "") + p.name + (p.host ? "  <size=70%><color=#93AEBC>HOST</color></size>" : "") + (p.id == client.MyId ? "</b>" : "");
+                    string who = (p.id == client.MyId ? "<b>" : "") + p.name + (p.host ? "  <size=70%><color=#B4A7DE>HOST</color></size>" : "") + (p.id == client.MyId ? "</b>" : "");
                     string paid = !r.IsPaid ? "IN" : p.paid ? "PAID" : p.paying ? "PAYING…" : "NOT PAID";
                     string state = !p.connected ? "AWAY" : p.ready ? "READY" : "";
                     return $"{i + 1}.<pos=8%>{who}<pos=62%>{paid}<pos=84%>{state}";
-                })) + (r.players.Count < (KartApi.Cfg?.maxPlayers ?? 6) ? $"\n<color=#93AEBC>{r.players.Count + 1}.<pos=8%>Invite a friend…</color>" : "");
+                })) + (r.players.Count < (KartApi.Cfg?.maxPlayers ?? 6) ? $"\n<color=#B4A7DE>{r.players.Count + 1}.<pos=8%>Invite a friend…</color>" : "");
 
             // the one button
             int here = r.players.Count(p => p.connected);

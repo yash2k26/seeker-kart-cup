@@ -21,7 +21,10 @@ Watercraft, Toy Car) and the UI kit under `Assets/_Game/Art/Textures/UI/Kit`.
 
 ## Fonts (SIL Open Font License, via Google Fonts)
 
-Anton, Barlow.
+Archivo (Omnibus-Type): every word in the game, cut to static files by `tools/fonts/make_archivo.py`.
+Titan One (Rodrigo Fuenzalida) and Barlow Semi Condensed (Jeremy Tribby): the KARTEL lockup, which is an image
+rendered for the teaser (`tools/brand/make_lockup.py`), not a shipped font.
+Anton, Barlow: the earlier interface faces; the files stay for scenes not yet rebuilt.
 
 ## Audio
 

@@ -72,13 +72,21 @@ public static partial class TrackSetup
 
     static void Lamp(Transform root, int i, float side, Material pole, Material glow, ref int count)
     {
+        lampHeads.Add(LampPost(root, $"Lamp{count++:00}", Beside(i, side, HalfWidth + Kerb + 2.4f), Quaternion.LookRotation(-right[i] * side, Vector3.up), pole, glow, V.lampColor));   // +Z toward the road
+        props++;
+    }
+
+    /// One post, its arm reaching along its +Z, with the spot light under the head. Returns where the light is (the
+    /// halo goes there). The menu's street stands the same posts (MenuMeet).
+    internal static Vector3 LampPost(Transform root, string name, Vector3 at, Quaternion rot, Material pole, Material glow, Color colour)
+    {
         const float H = 8f, Arm = 2.4f;
         var cylinder = Resources.GetBuiltinResource<Mesh>("Cylinder.fbx");
         var cube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
         var quad = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
-        var lamp = new GameObject($"Lamp{count++:00}").transform;
+        var lamp = new GameObject(name).transform;
         lamp.SetParent(root, false);
-        lamp.SetPositionAndRotation(Beside(i, side, HalfWidth + Kerb + 2.4f), Quaternion.LookRotation(-right[i] * side, Vector3.up));   // +Z toward the road
+        lamp.SetPositionAndRotation(at, rot);
         Part(lamp, "Pole", cylinder, pole, new Vector3(0, H / 2f, 0), new Vector3(0.22f, H / 2f, 0.22f));   // the builtin cylinder is 2 tall
         Part(lamp, "Arm", cube, pole, new Vector3(0, H - 0.1f, Arm / 2f), new Vector3(0.16f, 0.16f, Arm));
         Part(lamp, "Head", cube, pole, new Vector3(0, H - 0.2f, Arm + 0.1f), new Vector3(0.42f, 0.2f, 0.75f));
@@ -87,13 +95,12 @@ public static partial class TrackSetup
         light.transform.SetParent(lamp, false);
         light.transform.localPosition = new Vector3(0, H - 0.35f, Arm + 0.1f);
         light.transform.localRotation = Quaternion.Euler(90, 0, 0);
-        lampHeads.Add(light.transform.position);
-        light.type = LightType.Spot; light.color = V.lampColor; light.intensity = 340f; light.range = 34f;   // 34 m at 30 m spacing: a 114 m road piece still fits its lamps and the headlights in eight lights
+        light.type = LightType.Spot; light.color = colour; light.intensity = 340f; light.range = 34f;   // 34 m at 30 m spacing: a 114 m road piece still fits its lamps and the headlights in eight lights
         light.spotAngle = 112f; light.innerSpotAngle = 40f; light.shadows = LightShadows.None;   // wide: the pool reaches well onto the road
         var capsule = lamp.gameObject.AddComponent<CapsuleCollider>();
         capsule.center = new Vector3(0, H / 2f, 0); capsule.height = H; capsule.radius = 0.16f;
         GameObjectUtility.SetStaticEditorFlags(lamp.gameObject, StaticEditorFlags.BatchingStatic);
-        props++;
+        return light.transform.position;
     }
 
     // ---------- road studs ----------
@@ -465,6 +472,14 @@ public static partial class TrackSetup
         var mat = LoadOrCreate(Art + $"Materials/{material}.mat", shader, Color.white);
         mat.shader = shader; mat.SetColor("_Color", colour); mat.SetFloat("_Strength", 1f); mat.SetFloat("_Near", 5f); mat.SetFloat("_Flicker", flicker);
         EditorUtility.SetDirty(mat);
+        var go = Part(root, name, SaveMesh(GlowMesh(root, at, layers), name), mat, Vector3.zero, Vector3.one);
+        go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+    }
+
+    /// The glow shader's mesh: for every point, a quad per layer with all four corners AT the point (the shader opens
+    /// them toward the camera), in `root`'s space. Unsaved.
+    internal static Mesh GlowMesh(Transform root, List<Vector3> at, (float size, float power, float strength)[] layers = null)
+    {
         layers ??= LampLayers;
         var v = new List<Vector3>(); var uv = new List<Vector2>(); var uv2 = new List<Vector2>(); var col = new List<Color>(); var tri = new List<int>();
         foreach (var world in at)
@@ -482,8 +497,7 @@ public static partial class TrackSetup
         mesh.SetVertices(v); mesh.SetUVs(0, uv); mesh.SetUVs(1, uv2); mesh.SetColors(col); mesh.SetTriangles(tri, 0);
         mesh.RecalculateBounds();
         var bounds = mesh.bounds; bounds.Expand(30f); mesh.bounds = bounds;   // every vertex sits at a lamp: the quads open in the shader
-        var go = Part(root, name, SaveMesh(mesh, name), mat, Vector3.zero, Vector3.one);
-        go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        return mesh;
     }
 
     /// Pine Ridge's fireflies: small green-gold lights hanging in the wood either side of the road, each pulsing on

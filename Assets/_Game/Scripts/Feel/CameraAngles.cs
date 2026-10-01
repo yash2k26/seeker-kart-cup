@@ -26,7 +26,8 @@ namespace KartCup
         [SerializeField] TMP_Text pillLabel;                                  // "CAM · CHASE"
         [SerializeField] GameObject picker;                                   // the four option pills
         [SerializeField] Image[] optionPills = System.Array.Empty<Image>();  // tinted: accent = current
-        [SerializeField] Color accent = new(1f, 0.353f, 0.212f), idle = new(0.106f, 0.212f, 0.263f, 0.85f);
+        [SerializeField] Color accent = new(1f, 0.694f, 0.149f), idle = new(0.18f, 0.043f, 0.439f, 0.85f);
+        [SerializeField] Color onAccent = new(0.09f, 0.02f, 0.251f), onIdle = new(0.957f, 0.937f, 0.902f);   // the words on them
 
         static readonly FieldInfo LookBack = typeof(KartCamera).GetField("lookBack", BindingFlags.NonPublic | BindingFlags.Instance);
 
@@ -77,7 +78,12 @@ namespace KartCup
             }
             if (pillLabel != null) pillLabel.text = "CAM · " + p.name;
             for (int i = 0; i < optionPills.Length; i++)
-                if (optionPills[i] != null) optionPills[i].color = i == Index ? accent : idle;
+            {
+                if (optionPills[i] == null) continue;
+                optionPills[i].color = i == Index ? accent : idle;
+                var word = optionPills[i].GetComponentInChildren<TMP_Text>();
+                if (word != null) word.color = i == Index ? onAccent : onIdle;
+            }
         }
     }
 }

@@ -7,37 +7,45 @@ using UnityEngine.UI;
 /// The design system. Every colour, corner and typeface in the game comes from here, so the rules below are
 /// checkable rather than aspirational.
 ///
-///   TYPE      Anton for display (condensed, motorsport), Barlow for everything a player reads or counts.
-///             Two families, never mixed inside a word. One display size per screen.
-///   ACCENT    Ember (#FF5A36) is THE accent. It marks the primary action and nothing else. The old gold is retired.
-///   GREY      One cool blue-grey family, Ink900 -> Ink600. No warm greys anywhere.
+///   BRAND     The film's lockup is the brand: a gold wordmark on a deep violet shell, cream and gold words under it
+///             (teaser/graphics/kartel2_logo.py, the "gold" look). The palette below is read off it.
+///   TYPE      Archivo, the film's name-card face: condensed black for display, bold and semibold for everything a
+///             player reads or counts. One display size per screen. The wordmark itself is the film's image.
+///   ACCENT    Gold (#FFB126, the wordmark's face) is THE accent. It marks the primary action and nothing else, and
+///             words on it are OnAccent (the violet), never Paper: cream on gold cannot be read.
+///   INK       One violet family, Ink900 -> Ink600, from the lockup's shell. No greys beside it.
 ///   SHAPE     Actions are pills. Cards are 32. Rows, meters and chips are 12. Nothing else.
 ///   SPACING   8-unit base on the 2400x1080 reference canvas.
 public static class Design
 {
     // ---- palette: one accent, one grey family ----
-    public static readonly Color Ink900 = Hex("0A151C");   // scrim behind a modal
-    public static readonly Color Ink800 = Hex("11242E");   // card surface
-    public static readonly Color Ink700 = Hex("1B3643");   // row / secondary action
-    public static readonly Color Ink600 = Hex("2A5060");   // pressed secondary, hairlines
-    public static readonly Color Paper = Hex("F4F1EA");    // primary text
-    public static readonly Color Muted = Hex("93AEBC");    // secondary text, same family as the inks
-    public static readonly Color Ember = Hex("FF5A36");    // THE accent
+    public static readonly Color Ink900 = Hex("0D0326");   // scrim behind a modal (the shell's side)
+    public static readonly Color Ink800 = Hex("170540");   // card surface (the shell's shadowed front)
+    public static readonly Color Ink700 = Hex("2E0B70");   // row / secondary action (the shell's front)
+    public static readonly Color Ink600 = Hex("4B25B0");   // pressed secondary, hairlines (toward the shell's lit edge, #7446FF)
+    public static readonly Color Paper = Hex("F4EFE6");    // primary text (the tagline's cream)
+    public static readonly Color Muted = Hex("B4A7DE");    // secondary text, same family as the inks
+    public static readonly Color Accent = Hex("FFB126");   // THE accent (the wordmark's gold)
+    public static readonly Color OnAccent = Hex("170540"); // words on the accent
 
     // Drift tiers are a gameplay signal, not chrome: a charge ramp the player reads at speed.
     public static readonly Color[] Tiers = { Hex("FF5A36"), Hex("FFB03A"), Hex("FFFFFF") };
 
     // ---- type ----
-    public static TMP_FontAsset Display, Body, Strong;
+    // Archivo, the family the teaser is set in (tools/fonts/make_archivo.py cuts the static files). Display is its
+    // condensed black, as narrow as the Anton every title and button was drawn for; Strong and Body are the text
+    // weights; Hero is the film's own lockup face (expanded black italic), for the wordmark and the one big line.
+    public static TMP_FontAsset Display, Body, Strong, Hero;
 
     const string FontDir = "Assets/_Game/UI/Fonts/";
     const string SpriteDir = "Assets/_Game/Art/Textures/UI/Gen/";
 
     public static void Fonts()
     {
-        Display = MakeFont("Anton-Regular", 96);
-        Strong = MakeFont("Barlow-Bold", 78);
-        Body = MakeFont("Barlow-SemiBold", 78);
+        Display = MakeFont("Archivo-CondensedBlack", 96);
+        Strong = MakeFont("Archivo-Bold", 78);
+        Body = MakeFont("Archivo-SemiBold", 78);
+        Hero = MakeFont("Archivo-ExpandedBlackItalic", 96);
     }
 
     static TMP_FontAsset MakeFont(string ttf, int samplingSize)

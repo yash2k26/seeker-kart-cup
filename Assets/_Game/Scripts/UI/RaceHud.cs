@@ -14,8 +14,10 @@ namespace KartCup
         [SerializeField] float bigLabelSeconds = 0.9f;
         // Three drift tiers, three colours, the Mario Kart read: sand, coral, paper.
         [SerializeField] Color[] boostTiers = { new(1f, 0.353f, 0.212f), new(1f, 0.690f, 0.227f), new(1f, 1f, 1f) };
-        [SerializeField] Color accent = new(1f, 0.353f, 0.212f);
-        [SerializeField] Color idle = new(0.106f, 0.212f, 0.263f);
+        // Design.Accent, OnAccent and Ink700: the armed button turns gold, and its word violet with it.
+        [SerializeField] Color accent = new(1f, 0.694f, 0.149f), onAccent = new(0.09f, 0.02f, 0.251f);
+        [SerializeField] Color idle = new(0.18f, 0.043f, 0.439f);
+        TMP_Text itemWord; Color itemWordIdle;
 
         RaceManager race;
         Kart playerKart;
@@ -79,6 +81,8 @@ namespace KartCup
             {
                 var c = armed ? accent : idle;
                 itemButton.color = new Color(c.r, c.g, c.b, itemButton.color.a);
+                if (itemWord == null) { itemWord = itemButton.GetComponentInChildren<TMP_Text>(); if (itemWord != null) itemWordIdle = itemWord.color; }
+                if (itemWord != null) itemWord.color = armed ? onAccent : itemWordIdle;
                 if (armed) UiMotion.Punch(itemButton.transform, 1.12f, 0.24f);
                 itemArmed = armed;
             }

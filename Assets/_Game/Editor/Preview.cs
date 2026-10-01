@@ -186,6 +186,13 @@ public static class MenuPreview
             foreach (var smr in anim.GetComponentsInChildren<SkinnedMeshRenderer>()) smr.updateWhenOffscreen = true;
         }
         var backdrop = Object.FindFirstObjectByType<MenuBackdrop>();
+        // nor does the hoarding's film: a still of it (Builds/teaser-frame.png, any frame of the teaser) on its render texture
+        var film = AssetDatabase.LoadAssetAtPath<RenderTexture>("Assets/_Game/Video/TeaserRT.renderTexture");
+        if (film != null && File.Exists("Builds/teaser-frame.png"))
+        {
+            var still = new Texture2D(2, 2); still.LoadImage(File.ReadAllBytes("Builds/teaser-frame.png"));
+            Graphics.Blit(still, film);
+        }
 
         var flow = Object.FindFirstObjectByType<ScreenFlow>();
         var panels = new SerializedObject(flow).FindProperty("panels");
@@ -207,8 +214,26 @@ public static class MenuPreview
             Canvas.ForceUpdateCanvases();
             Shot(cam, $"menu{i}");
         }
+        // The title's street without the UI over it: the whole set, then each driver close, heads turned to the lens
+        // as MeetActor would have them (it never runs in edit mode).
+        canvas.gameObject.SetActive(false);
+        if (backdrop != null) backdrop.Snap(false);
+        var actors = Object.FindObjectsByType<MeetActor>(FindObjectsSortMode.None).OrderBy(a => a.name).ToArray();
+        foreach (var a in actors) a.FaceInEditor(cam.transform);
+        Shot(cam, "meet");
+        var home = cam.transform.position;
+        cam.transform.SetPositionAndRotation(home + new Vector3(0, 46f, 22f), Quaternion.Euler(90f, 0f, 0f));
+        Shot(cam, "meet-top");
+        for (int i = 0; i < actors.Length; i++)
+        {
+            var at = actors[i].transform.position + Vector3.up * 1.4f;
+            cam.transform.position = at + (home - at).normalized * 10f + Vector3.up * 0.6f;
+            cam.transform.LookAt(at);
+            foreach (var a in actors) a.FaceInEditor(cam.transform);
+            Shot(cam, $"meet-{i}");
+        }
         Preview.Batcher(true);
-        Debug.Log("[preview] wrote Builds/menu*.png");
+        Debug.Log("[preview] wrote Builds/menu*.png, Builds/meet*.png");
         if (Application.isBatchMode) EditorApplication.Exit(0);
     }
 

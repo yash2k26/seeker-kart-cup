@@ -176,9 +176,10 @@ public static class PodiumSetup
         scrim.pivot = new Vector2(0, 0.5f);
         var scrimImg = scrim.gameObject.AddComponent<UnityEngine.UI.Image>(); scrimImg.sprite = Gradient("podium_scrim"); scrimImg.color = new Color(0.02f, 0.04f, 0.06f, 0.82f); scrimImg.raycastTarget = false;
 
-        var title = Words("Kicker", canvasGo.transform, Design.Strong, "PRIZE POOL", 40, Design.Ember, new Vector2(0, 1), new Vector2(120, -96), new Vector2(1200, 56));
+        var title = Words("Kicker", canvasGo.transform, Design.Strong, "PRIZE POOL", 40, Design.Paper, new Vector2(0, 1), new Vector2(120, -96), new Vector2(1200, 56));
         title.characterSpacing = 14f;
-        var subtitle = Words("Big", canvasGo.transform, Design.Display, "", 210, goldC, new Vector2(0, 1), new Vector2(112, -150), new Vector2(1700, 236));
+        var subtitle = Words("Big", canvasGo.transform, Design.Hero, "", 168, goldC, new Vector2(0, 1), new Vector2(112, -158), new Vector2(1500, 220));
+        subtitle.enableAutoSizing = true; subtitle.fontSizeMin = 84; subtitle.fontSizeMax = 168;   // "0.54 SOL" at full size, "YOU TAKE THE CUP!" as wide as the frame allows
         var hint = Words("Hint", canvasGo.transform, Design.Strong, "TAP TO SKIP", 28, Design.Muted, new Vector2(1, 0), new Vector2(-110, 64), new Vector2(500, 40));
         hint.alignment = TextAlignmentOptions.Right; hint.characterSpacing = 10f;
 
@@ -239,7 +240,7 @@ public static class PodiumSetup
     // ---------- the rigs ----------
 
     /// The Kenney body model a driver prefab was built from (ContentSetup names the prefab, the mesh keeps the model).
-    static string ModelOf(string prefabPath)
+    internal static string ModelOf(string prefabPath)
     {
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
         var body = prefab.GetComponentsInChildren<SkinnedMeshRenderer>(true).FirstOrDefault();
@@ -247,16 +248,17 @@ public static class PodiumSetup
         return string.IsNullOrEmpty(mesh) ? null : mesh;
     }
 
-    static AnimationClip Clip(string fbxPath, string take, string name)
+    internal static AnimationClip Clip(string fbxPath, string take, string name, bool loop = true)
     {
         var src = AssetDatabase.LoadAllAssetsAtPath(fbxPath).OfType<AnimationClip>().FirstOrDefault(c => c.name == take);
         if (src == null) { Debug.LogWarning($"[podium] {fbxPath} has no {take}"); return null; }
         var clip = Object.Instantiate(src);
-        clip.name = name; clip.legacy = true; clip.wrapMode = WrapMode.Loop;
+        clip.name = name; clip.legacy = true; clip.wrapMode = loop ? WrapMode.Loop : WrapMode.Once;
         var path = ClipDir + name + ".anim";
-        AssetDatabase.DeleteAsset(path);
-        AssetDatabase.CreateAsset(clip, path);
-        return AssetDatabase.LoadAssetAtPath<AnimationClip>(path);
+        var existing = AssetDatabase.LoadAssetAtPath<AnimationClip>(path);
+        if (existing == null) { AssetDatabase.CreateAsset(clip, path); return clip; }
+        EditorUtility.CopySerialized(clip, existing); EditorUtility.SetDirty(existing);   // in place: the menu builds these every time, and a new asset is a new guid
+        return existing;
     }
 
     /// On one driver's own rig, in the hold pose and the torso's space: the point just over the head (Kenney's short
@@ -302,7 +304,7 @@ public static class PodiumSetup
 
     /// An arm's far end in the current pose: Kenney's rig weights each arm vertex wholly to its bone, so skinning by
     /// hand is exact (the same trick as ContentSetup.Fist, but measured from the shoulder, not along the kart).
-    static Vector3 End(SkinnedMeshRenderer body, Transform arm)
+    internal static Vector3 End(SkinnedMeshRenderer body, Transform arm)
     {
         var mesh = body.sharedMesh;
         int bi = System.Array.IndexOf(body.bones, arm);
@@ -520,7 +522,7 @@ public static class PodiumSetup
     /// Five crisp colours, not a blend: a fixed gradient that RandomColor picks from.
     static Gradient ConfettiColours()
     {
-        var cols = new[] { Design.Ember, Hex("FFC83A"), Design.Paper, Hex("2EC4B6"), Hex("3A86FF"), Hex("FF4FA3") };
+        var cols = new[] { Hex("FF7F16"), Hex("FFC83A"), Design.Paper, Hex("2EC4B6"), Hex("3A86FF"), Hex("FF4FA3") };
         var g = new Gradient { mode = GradientMode.Fixed };
         g.SetKeys(cols.Select((c, i) => new GradientColorKey(c, (i + 1f) / cols.Length)).ToArray(), new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 1f) });
         return g;

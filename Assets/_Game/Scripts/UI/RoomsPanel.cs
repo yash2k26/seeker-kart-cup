@@ -68,7 +68,7 @@ namespace KartCup
                 var r = has ? open[i] : null;
                 roomRows[i].text = has
                     ? $"{r.code}<pos=24%>{Fit(r.host)}<pos=58%>{r.players}/{r.maxPlayers}<pos=72%>{(r.tracks.Count > 1 ? "GRAND PRIX" : Tracks.At(Tracks.IndexOf(r.tracks[0])).name.ToUpperInvariant())}<pos=90%>{(r.fee == "0" ? "FREE" : WalletFlow.Amount(r.fee, r.currency))}"
-                    : i == 0 ? $"<color=#93AEBC>{problem ?? "No open rooms right now — make yours public"}</color>" : "";
+                    : i == 0 ? $"<color=#B4A7DE>{problem ?? "No open rooms right now — make yours public"}</color>" : "";
                 if (roomButtons.Length > i && roomButtons[i] != null) roomButtons[i].interactable = has;
             }
         }

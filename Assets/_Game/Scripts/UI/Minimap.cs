@@ -69,6 +69,6 @@ namespace KartCup
             return rt;
         }
 
-        static readonly Color Design_Ember = new(1f, 0.353f, 0.212f);
+        static readonly Color Design_Ember = new(1f, 0.694f, 0.149f);   // Design.Accent
     }
 }

@@ -25,7 +25,7 @@ public static class MenuSetup
     static readonly Color Panel = Design.Ink800;
     static readonly Color Paper = Design.Paper;
     static readonly Color Muted = Design.Muted;
-    static readonly Color Accent = Design.Ember;
+    static readonly Color Accent = Design.Accent;
     static readonly Color Slate = Design.Ink700;
 
     public static TMP_FontAsset display, body, strong;
@@ -119,7 +119,10 @@ public static class MenuSetup
 
     // ---------- 3D backdrop ----------
     /// The coast after dark, the same night as the race: Palm Bay's sky cube, moon, sea and grade, reused from what
-    /// TrackSetup built, with the kart on its turntable under a cyan rim and a warm key, the film's meet.
+    /// TrackSetup built. Two sets on one beach: the street meet the title looks at (MenuMeet), toward the moon, and
+    /// behind the camera the turntable the kart is chosen on, under a warm key.
+    static readonly Vector3 MeetAt = new Vector3(8f, 0f, 40f);
+
     static Transform Vista()
     {
         RenderSettings.skybox = AssetDatabase.LoadAssetAtPath<Material>(Art + "Materials/Sky_beach.mat") ?? AssetDatabase.LoadAssetAtPath<Material>(Art + "Materials/Sky.mat");
@@ -157,15 +160,17 @@ public static class MenuSetup
         {
             float a = i / 18f * Mathf.PI * 2f + (float)rnd.NextDouble() * 0.3f;
             float r = 26f + (float)rnd.NextDouble() * 40f;
-            Place(Art + $"Models/Props/Pirate/{palms[rnd.Next(palms.Length)]}.fbx", pirate,
-                  new Vector3(Mathf.Sin(a) * r, 0, Mathf.Cos(a) * r), (float)rnd.NextDouble() * 360f, 1.6f + (float)rnd.NextDouble() * 1.1f);
+            var at = new Vector3(Mathf.Sin(a) * r, 0, Mathf.Cos(a) * r);
+            string palm = palms[rnd.Next(palms.Length)]; float yaw = (float)rnd.NextDouble() * 360f, size = 1.6f + (float)rnd.NextDouble() * 1.1f;
+            if (!MenuMeet.Covers(MeetAt, at)) Place(Art + $"Models/Props/Pirate/{palm}.fbx", pirate, at, yaw, size);   // none on the road
         }
         for (int i = 0; i < 10; i++)
         {
             float a = i / 10f * Mathf.PI * 2f + 0.4f;
-            Place(Art + "Models/Props/Pirate/rocks-sand-b.fbx", pirate,
-                  new Vector3(Mathf.Sin(a) * (34f + i * 2f), -0.3f, Mathf.Cos(a) * (34f + i * 2f)), i * 37f, 2.2f);
+            var at = new Vector3(Mathf.Sin(a) * (34f + i * 2f), -0.3f, Mathf.Cos(a) * (34f + i * 2f));
+            if (!MenuMeet.Covers(MeetAt, at)) Place(Art + "Models/Props/Pirate/rocks-sand-b.fbx", pirate, at, i * 37f, 2.2f);
         }
+        var meet = MenuMeet.Build(MeetAt);
 
         // The kart stands on a turntable that turns with it (CharacterCarousel/GaragePanel rotate this transform). A kart
         // swivelling over bare sand read as floating; the disc gives the tyres something to stand on. Mount grounds the
@@ -197,10 +202,6 @@ public static class MenuSetup
         Lighthouse(new Vector3(-55f, 0f, 120f));
 
         var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
-        // Park it on the orbit so the scene reads correctly when opened or screenshotted; MenuBackdrop takes over at runtime.
-        camGo.transform.position = new Vector3(7.9f, 3.6f, -6.9f);
-        camGo.transform.LookAt(new Vector3(0, 1.3f, 0));
-        camGo.transform.rotation *= Quaternion.Euler(0, -13f, 0);
         var cam = camGo.AddComponent<Camera>();
         cam.fieldOfView = 30; cam.nearClipPlane = 0.2f; cam.farClipPlane = 300; cam.clearFlags = CameraClearFlags.Skybox;
         camGo.AddComponent<AudioListener>();
@@ -210,11 +211,9 @@ public static class MenuSetup
         new SerializedObject(drift).Do(s =>
         {
             s.FindProperty("target").objectReferenceValue = podium;
-            s.FindProperty("radius").floatValue = 12.5f;
-            s.FindProperty("height").floatValue = 4.7f;
-            s.FindProperty("speed").floatValue = 5f;
-            s.FindProperty("look").floatValue = 1.7f;
+            s.FindProperty("meet").objectReferenceValue = meet;
         });
+        drift.Snap(false);     // parked on the title's pose, so the scene reads right when opened or screenshotted
 
         var volume = new GameObject("Post").AddComponent<UnityEngine.Rendering.Volume>();
         volume.isGlobal = true;
@@ -320,38 +319,13 @@ public static class MenuSetup
     {
         var screen = Rect("Title", parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject;
 
-        // The film plays behind the title, edge to edge (it is 16:9 on a 20:9 screen: it covers, and loses a little top
-        // and bottom). The kart on its turntable belongs to the screens that choose one. Silent: the menu has its own
-        // music. tools: the clip is the teaser at 720p (ffmpeg, see Assets/_Game/Video/README.md).
-        var film = Rect("Film", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-        var filmImage = film.gameObject.AddComponent<RawImage>();
-        filmImage.raycastTarget = false;
-        var fit = film.gameObject.AddComponent<AspectRatioFitter>();
-        fit.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent; fit.aspectRatio = 16f / 9f;
-        film.localScale = Vector3.one * 1.12f;   // past the safe area too: the screen sits inside it, and a strip by the camera cutout showed
-        const string rtPath = "Assets/_Game/Video/TeaserRT.renderTexture";
-        var rt = AssetDatabase.LoadAssetAtPath<RenderTexture>(rtPath);
-        if (rt == null) { rt = new RenderTexture(1280, 720, 0) { name = "TeaserRT" }; AssetDatabase.CreateAsset(rt, rtPath); }
-        filmImage.texture = rt;
-        var clip = AssetDatabase.LoadAssetAtPath<UnityEngine.Video.VideoClip>("Assets/_Game/Video/teaser.mp4");
-        if (clip == null) Debug.LogWarning("[menu] Assets/_Game/Video/teaser.mp4 missing: the title plays over black");
-        var player = film.gameObject.AddComponent<UnityEngine.Video.VideoPlayer>();
-        player.clip = clip; player.renderMode = UnityEngine.Video.VideoRenderMode.RenderTexture; player.targetTexture = rt;
-        player.isLooping = true; player.playOnAwake = true; player.waitForFirstFrame = true; player.skipOnDrop = true;
-        player.audioOutputMode = UnityEngine.Video.VideoAudioOutputMode.None;
-
-        // The film is dimmed a little everywhere (a bright close-up behind the wordmark ate it), then the scrim
-        // below darkens the side the words stand on.
-        var dim = Rect("FilmDim", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-        dim.localScale = Vector3.one * 1.12f;
-        var dimImage = dim.gameObject.AddComponent<Image>(); dimImage.color = new Color(0.02f, 0.04f, 0.06f, 0.42f); dimImage.raycastTarget = false;
-
-        // A scrim, not a card: the title has to stay legible over the film without boxing it in.
+        // Behind the title is the street meet (MenuMeet): the drivers by their karts, the teaser on the hoarding.
+        // A scrim, not a card: the title has to stay legible over it without boxing it in.
         var plate = Rect("Plate", screen.transform, new Vector2(0, 0), new Vector2(0.47f, 1f), Vector2.zero, Vector2.zero);
         // The scrim is its own layer behind the content: overhanging the plate itself would drag every child
         // label with it, because they are anchored to the plate's corners.
         var scrim = Rect("Scrim", plate, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-        scrim.offsetMin = new Vector2(-320, -320); scrim.offsetMax = new Vector2(420, 320);   // cover the camera cutout, and reach past the wordmark
+        scrim.offsetMin = new Vector2(-320, -320); scrim.offsetMax = new Vector2(260, 320);   // cover the camera cutout, and reach past the wordmark
         var fade = scrim.gameObject.AddComponent<Image>();
         fade.sprite = FadeSprite();
         fade.color = Deep;
@@ -391,6 +365,19 @@ public static class MenuSetup
 
         var cog = IconButton("Settings", plate, "icon_cog", new Vector2(0, 0), new Vector2(810, 64), new Vector2(96, 96));
         Wire(cog, nameof(ScreenFlow.ShowSettings));
+
+        // The wordmark is the film's own lockup (tools/brand/make_lockup.py lifts it from the teaser's title frames):
+        // the gold letters on their violet shell, the tagline in its badge. It stands in for the typeset title and the
+        // eyebrow over it, and the on-chain line moves up under it.
+        foreach (var typeset in new[] { "Title1", "Title2", "Kicker" })
+            if (plate.Find(typeset) is Transform old) Object.DestroyImmediate(old.gameObject);
+        var lockup = UiSprite(Art + "Textures/UI/kartel_lockup.png");
+        if (lockup == null) Debug.LogWarning("[menu] no kartel_lockup.png: run tools/brand/make_lockup.py");
+        var logo = Rect("Logo", plate, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -84), new Vector2(1120, 410));
+        logo.pivot = new Vector2(0, 1);
+        var mark = logo.gameObject.AddComponent<Image>();
+        mark.sprite = lockup; mark.preserveAspect = true; mark.raycastTarget = false;
+        plate.Find("Sub").GetComponent<RectTransform>().anchoredPosition = new Vector2(120, -512);
 
         return screen;
     }
@@ -989,7 +976,7 @@ public static class MenuSetup
         colours.pressedColor = new Color(0.88f, 0.88f, 0.88f, 1f);
         colours.fadeDuration = 0.06f;
         button.colors = colours;
-        var label = Label(name + "Label", rt, display, caption, textSize, textColour, TextAlignmentOptions.Center,
+        var label = Label(name + "Label", rt, display, caption, textSize, tint == Design.Accent ? Design.OnAccent : textColour, TextAlignmentOptions.Center,
                           new Vector2(0.5f, 0.5f), Vector2.zero, dims);
         label.rectTransform.anchorMin = Vector2.zero;
         label.rectTransform.anchorMax = Vector2.one;
@@ -1014,6 +1001,21 @@ public static class MenuSetup
         img.color = Paper;
         img.raycastTarget = false;
         return button;
+    }
+
+    /// A picture used as UI: made a sprite on first use (uncompressed, no mips: it is a logo).
+    static Sprite UiSprite(string path)
+    {
+        var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+        if (importer == null) return null;
+        if (importer.textureType != TextureImporterType.Sprite || importer.mipmapEnabled)
+        {
+            importer.textureType = TextureImporterType.Sprite; importer.spriteImportMode = SpriteImportMode.Single;
+            importer.alphaIsTransparency = true; importer.mipmapEnabled = false;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.SaveAndReimport();
+        }
+        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
     }
 
     static Sprite Sprite(string name) => AssetDatabase.LoadAssetAtPath<Sprite>(Art + $"Textures/UI/Kit/{name}.png");

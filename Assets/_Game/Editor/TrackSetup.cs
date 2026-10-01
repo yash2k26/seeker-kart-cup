@@ -758,7 +758,7 @@ public static partial class TrackSetup
         var display = MenuSetup.display;
         var body = MenuSetup.body;
         var paper = Design.Paper;
-        var sand = Design.Muted;      // the HUD's secondary text; Ember is reserved for the primary control
+        var sand = Design.Muted;      // the HUD's secondary text; the accent is reserved for the primary control
 
         var canvasGo = new GameObject("HUD", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         var canvas = canvasGo.GetComponent<Canvas>();
@@ -779,12 +779,12 @@ public static partial class TrackSetup
         var steering = canvasGo.AddComponent<SteerButtons>();
         new SerializedObject(steering).Do(s => s.FindProperty("input").objectReferenceValue = input);
 
-        // One accent: GAS is the action a thumb holds for the whole race, so it carries Ember and nothing else does.
+        // One accent: GAS is the action a thumb holds for the whole race, so it carries the accent and nothing else does.
         // The item button lights up only while an item is actually armed (RaceHud tints it), which is a state, not chrome.
         var ink = Design.Ink700;
         Button("SteerLeft", safe.transform, input, HoldButton.Control.SteerLeft, ink, new Vector2(0, 0), new Vector2(64, 64), new Vector2(240, 184), "", display, steering, "arrow_basic_w");
         Button("SteerRight", safe.transform, input, HoldButton.Control.SteerRight, ink, new Vector2(0, 0), new Vector2(328, 64), new Vector2(240, 184), "", display, steering, "arrow_basic_e");
-        Button("Gas", safe.transform, input, HoldButton.Control.Accelerate, Design.Ember, new Vector2(1, 0), new Vector2(-64, 64), new Vector2(288, 184), "GAS", display, steering);
+        Button("Gas", safe.transform, input, HoldButton.Control.Accelerate, Design.Accent, new Vector2(1, 0), new Vector2(-64, 64), new Vector2(288, 184), "GAS", display, steering);
         Button("Drift", safe.transform, input, HoldButton.Control.Drift, ink, new Vector2(1, 0), new Vector2(-376, 64), new Vector2(224, 184), "DRIFT", display, steering);
         Button("Brake", safe.transform, input, HoldButton.Control.Brake, ink, new Vector2(1, 0), new Vector2(-624, 64), new Vector2(184, 150), "BRAKE", display, steering);
         var itemBtn = Button("Item", safe.transform, input, HoldButton.Control.Item, ink, new Vector2(1, 0), new Vector2(-64, 272), new Vector2(288, 128), "ITEM", display, steering);
@@ -805,7 +805,7 @@ public static partial class TrackSetup
         var fill = fillRt.gameObject.AddComponent<Image>();
         fill.sprite = Design.Row;
         fill.type = Image.Type.Filled; fill.fillMethod = Image.FillMethod.Horizontal; fill.fillAmount = 0f;
-        fill.color = Design.Ember; fill.raycastTarget = false;
+        fill.color = Design.Accent; fill.raycastTarget = false;
 
         // Pause: top centre, out of both thumbs' way. Back on Android does the same thing.
         var pauseBtn = IconButton("Pause", safe.transform, "icon_pause", new Vector2(0.5f, 1), new Vector2(0, -20), new Vector2(104, 104));
@@ -854,7 +854,7 @@ public static partial class TrackSetup
                 a.FindProperty("pillLabel").objectReferenceValue = camBtn.GetComponentInChildren<TMP_Text>();
                 a.FindProperty("picker").objectReferenceValue = picker.gameObject;
                 Fill(a.FindProperty("optionPills"), optionPills.Cast<Object>().ToArray());
-                a.FindProperty("accent").colorValue = Design.Ember;
+                a.FindProperty("accent").colorValue = Design.Accent;
                 a.FindProperty("idle").colorValue = Design.Ink700;
             });
         }
@@ -895,7 +895,7 @@ public static partial class TrackSetup
         Text("Headline", card, display, "PAUSED", 82, Design.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -50), new Vector2(800, 100));
 
         var menu = new GameObject("PauseMenu").AddComponent<PauseMenu>();
-        var resume = TextButton("Resume", card, "RESUME", Design.Ember, paper, 48, display, new Vector2(0.5f, 0), new Vector2(0, 244), new Vector2(580, 124));
+        var resume = TextButton("Resume", card, "RESUME", Design.Accent, paper, 48, display, new Vector2(0.5f, 0), new Vector2(0, 244), new Vector2(580, 124));
         var restart = TextButton("Restart", card, "RESTART", slate, paper, 38, display, new Vector2(0.5f, 0), new Vector2(-152, 80), new Vector2(276, 112));
         var quit = TextButton("Quit", card, "QUIT", slate, paper, 38, display, new Vector2(0.5f, 0), new Vector2(152, 80), new Vector2(276, 112));
         UnityEditor.Events.UnityEventTools.AddPersistentListener(resume.onClick, menu.Resume);
@@ -953,7 +953,7 @@ public static partial class TrackSetup
         var table = Text("Table", card, body, "", 44, paper, TextAlignmentOptions.TopLeft, new Vector2(0.5f, 1), new Vector2(0, -196), new Vector2(940, 420));
         var status = Text("Status", card, body, "", 36, Design.Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 228), new Vector2(900, 60));
 
-        var again = TextButton("Again", card, "NEXT RACE", Design.Ember, paper, 46, display, new Vector2(0.5f, 0), new Vector2(276, 80), new Vector2(500, 124));
+        var again = TextButton("Again", card, "NEXT RACE", Design.Accent, paper, 46, display, new Vector2(0.5f, 0), new Vector2(276, 80), new Vector2(500, 124));
         var menu = TextButton("Menu", card, "QUIT CUP", Design.Ink700, paper, 46, display, new Vector2(0.5f, 0), new Vector2(-276, 80), new Vector2(500, 124));
 
         var results = screen.gameObject.AddComponent<ResultsPanel>();
@@ -999,7 +999,7 @@ public static partial class TrackSetup
             return img;
         }
 
-        var label = Text(name + "Text", rt, font, caption, 44, Design.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, dims);
+        var label = Text(name + "Text", rt, font, caption, 44, tint == Design.Accent ? Design.OnAccent : Design.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, dims);
         label.rectTransform.anchorMin = Vector2.zero; label.rectTransform.anchorMax = Vector2.one;
         label.rectTransform.offsetMin = Vector2.zero; label.rectTransform.offsetMax = new Vector2(0, -4);
         return img;
@@ -1012,7 +1012,7 @@ public static partial class TrackSetup
         Design.AsPill(rt, tint);
         var button = rt.gameObject.AddComponent<UnityEngine.UI.Button>();
         rt.gameObject.AddComponent<PressFeel>();
-        var label = Text(name + "Label", rt, font, caption, size, textColour, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, dims);
+        var label = Text(name + "Label", rt, font, caption, size, tint == Design.Accent ? Design.OnAccent : textColour, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, dims);
         label.rectTransform.anchorMin = Vector2.zero; label.rectTransform.anchorMax = Vector2.one;
         label.rectTransform.offsetMin = Vector2.zero; label.rectTransform.offsetMax = new Vector2(0, -4);
         return button;
