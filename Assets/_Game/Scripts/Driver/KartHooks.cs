@@ -30,7 +30,7 @@ namespace KartCup
 
             caster = GetComponent<ItemCaster>();
             powers = GetComponent<KartPowers>();
-            if (caster != null && player) caster.castEvent.AddListener(() => AudioDirector.Instance?.UseItem());
+            if (caster != null && player) caster.castEvent.AddListener(() => AudioDirector.Instance?.UseItem(caster.item != null ? caster.item.itemName : null));
             if (caster != null) caster.castEvent.AddListener(() => castFrame = Time.frameCount);
             mount = ItemMount.On(k);   // the pod and the cradle (before the listener above runs they have noted what was fired)
         }
@@ -70,7 +70,7 @@ namespace KartCup
             {
                 if (caster.ammo > knownAmmo)
                 {
-                    if (isPlayer) AudioDirector.Instance?.Pickup();
+                    if (isPlayer) AudioDirector.Instance?.Pickup(caster.item != null ? caster.item.itemName : null);
                     if (powers != null && powers.bonusAmmo > 0) caster.ammo += powers.bonusAmmo;   // ATTACK: a shot on the house
                 }
                 knownAmmo = caster.ammo;
@@ -106,6 +106,7 @@ namespace KartCup
             body?.Kick(-0.3f);
             if (!isPlayer) return;
             HitStop.Do();
+            AudioDirector.Instance?.Hit();
             Haptics.Play(Haptics.Kind.Hit);
             CameraFeel.Instance?.Kick(-transform.forward, 1f);
         }

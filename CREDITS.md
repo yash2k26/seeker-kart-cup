@@ -22,3 +22,9 @@ Watercraft, Toy Car) and the UI kit under `Assets/_Game/Art/Textures/UI/Kit`.
 ## Fonts (SIL Open Font License, via Google Fonts)
 
 Anton, Barlow.
+
+## Audio
+
+- **Music** (`Assets/_Game/Audio/Music`): six original loops, synthesised in code (`tools/audio/game_music.py`), no samples and no third-party material. Nothing to credit.
+- **Item sounds** (`Assets/_Game/Audio/SFX/items`): synthesised in code (`tools/audio/game_sfx.py` and the teaser's own effects). Nothing to credit.
+- **Interface sounds, voice-over, jingles** (the rest of `Assets/_Game/Audio/SFX`): Kenney audio packs, CC0.

@@ -13,16 +13,24 @@ namespace KartCup
         public float fuse = 2.4f, radius = 8f, knock = 7f;
         public GameObject burst;             // the solar burst: core, sun-shaped shockwave, embers, glitter, gold light
         public ParticleSystem warn;          // the amber ring that pulses on the road once it has landed
+        public AudioClip land, tick;         // heard from where it is: the thump of it landing, the tick with each ring
 
-        float born; bool done, landed; Kart thrower; Vector3 groundUp = Vector3.up; Transform ball; Vector3 ballScale;
+        float born, nextTick; bool done, landed; Kart thrower; Vector3 groundUp = Vector3.up;
+        AudioSource voice; Transform ball; Vector3 ballScale;
 
-        public override void Initialize(ItemCastProperties props) { base.Initialize(props); born = Time.time; thrower = props.castKart; ball = transform.Find("Ball"); if (ball != null) ballScale = ball.localScale; }
+        public override void Initialize(ItemCastProperties props) { base.Initialize(props); born = Time.time; thrower = props.castKart; ball = transform.Find("Ball"); if (ball != null) ballScale = ball.localScale; voice = GetComponent<AudioSource>(); }
 
         // The burn: the ball throbs, faster as the fuse runs down.
         void Update()
         {
-            if (ball == null) return;
             float k = Mathf.Clamp01((Time.time - born) / fuse);
+            // the tick quickens and rises as the fuse runs down
+            if (landed && voice != null && tick != null && Time.time >= nextTick)
+            {
+                voice.pitch = Mathf.Lerp(0.9f, 1.5f, k); voice.PlayOneShot(tick, 0.9f);
+                nextTick = Time.time + Mathf.Lerp(0.42f, 0.14f, k);
+            }
+            if (ball == null) return;
             ball.localScale = ballScale * (1f + 0.16f * k * Mathf.Sin(Time.time * Mathf.Lerp(14f, 40f, k)));
         }
 
@@ -53,6 +61,7 @@ namespace KartCup
                     warn.transform.SetPositionAndRotation(transform.position - groundUp * 0.38f, Quaternion.FromToRotation(Vector3.up, groundUp) * Quaternion.Euler(90, 0, 0));
                     warn.Play();
                 }
+                if (voice != null && land != null) voice.PlayOneShot(land, 1f);
             }
             base.OnCollisionEnter(hit);
         }

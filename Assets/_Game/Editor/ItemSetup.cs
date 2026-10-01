@@ -32,6 +32,7 @@ public static class ItemSetup
                 AssetDatabase.CreateAsset(m, Out + "Bomb.mat");
                 r.sharedMaterial = m;
             }
+            p.gameObject.AddComponent<KartCup.BurstOnDestroy>().fx = HitFx("BombHit", 6f, "bomb_explode");
         });
 
         var sun = SunBomb();
@@ -152,6 +153,8 @@ public static class ItemSetup
             Flat(warn);
         }
         bomb.warn = warn;
+        Voice(go, null, 10f, play: false);
+        bomb.land = Sound("bomb_land"); bomb.tick = Sound("bomb_tick");
         bomb.burst = SunBurst(bomb.radius, dot);
 
         var prefab = PrefabUtility.SaveAsPrefabAsset(go, Out + "SunBomb.prefab");
@@ -219,6 +222,7 @@ public static class ItemSetup
             var sz = glitter.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, tw);
             Fade(glitter, Color.white, new Color(1f, 0.8f, 0.4f));
         }
+        Voice(go, "solar_boom", 18f, play: true);
         var prefab = PrefabUtility.SaveAsPrefabAsset(go, Out + "SunBurst.prefab");
         Object.DestroyImmediate(go);
         return prefab;
@@ -379,6 +383,57 @@ public static class ItemSetup
         }
         var light = new GameObject("Glow").AddComponent<Light>(); light.transform.SetParent(model, false); light.transform.localPosition = new Vector3(0, 0, -0.5f);
         light.color = new Color(1f, 0.55f, 0.2f); light.intensity = 10f; light.range = 8f;
+        // heard from where it is: the launch as it leaves, the bang where it ends
+        Voice(go, nose == Blue ? "homing_launch" : "rocket_launch", 12f, play: true);
+        go.AddComponent<KartCup.BurstOnDestroy>().fx = HitFx("RocketHit", 5f, "rocket_impact");
+    }
+
+    const string SfxDir = "Assets/_Game/Audio/SFX/items/";
+    static AudioClip Sound(string name)
+    {
+        var c = AssetDatabase.LoadAssetAtPath<AudioClip>(SfxDir + name + ".ogg");
+        if (c == null) Debug.LogWarning($"[items] sound missing: {name}.ogg (run tools/audio/build-audio.sh)");
+        return c;
+    }
+
+    /// A 3D source on a thing in the world: mostly positional, full volume within `near` metres.
+    static AudioSource Voice(GameObject go, string clip, float near, bool play)
+    {
+        var a = go.GetComponent<AudioSource>();
+        if (a == null) a = go.AddComponent<AudioSource>();   // (not ??: in the editor a missing built-in component is a fake null)
+        a.clip = clip != null ? Sound(clip) : null; a.playOnAwake = play; a.loop = false;
+        a.spatialBlend = 0.75f; a.rolloffMode = AudioRolloffMode.Linear; a.minDistance = near; a.maxDistance = near * 8f; a.dopplerLevel = 0f;
+        return a;
+    }
+
+    /// What a rocket or a bomb leaves where it ends: a flash, sparks thrown out, a light, and its bang.
+    static GameObject HitFx(string name, float size, string sound)
+    {
+        var go = new GameObject(name);
+        var dot = Additive("FX_SunDot", Tex("dot"), new Color(1f, 0.34f, 0.05f) * 3f);
+        var light = new GameObject("Light").AddComponent<Light>(); light.transform.SetParent(go.transform, false); light.transform.localPosition = Vector3.up * 0.8f;
+        light.color = new Color(1f, 0.6f, 0.25f); light.intensity = 45f; light.range = size * 4f;
+        var flash = go.AddComponent<KartCup.SunFlash>(); flash.glow = light; flash.fade = 0.45f; flash.life = 2.5f;
+        var core = Particles("Core", go.transform, Additive("FX_SunCore", Tex("dot"), new Color(1f, 0.72f, 0.28f) * 2.6f), Vector3.up * 0.4f);
+        {
+            var m = core.main; m.startLifetime = 0.3f; m.startSpeed = 0f; m.startSize = size; m.maxParticles = 2;
+            Burst(core, 1);
+            var sz = core.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 0.2f), new Keyframe(0.3f, 1f), new Keyframe(1f, 0.7f)));
+            Fade(core, Color.white, new Color(1f, 0.6f, 0.2f));
+        }
+        var sparks = Particles("Sparks", go.transform, dot, Vector3.up * 0.3f);
+        {
+            var m = sparks.main; m.startLifetime = new ParticleSystem.MinMaxCurve(0.35f, 0.9f); m.startSpeed = new ParticleSystem.MinMaxCurve(5f, 15f);
+            m.startSize = new ParticleSystem.MinMaxCurve(0.1f, 0.26f); m.gravityModifier = 1.2f; m.maxParticles = 50;
+            Burst(sparks, 40);
+            var sh = sparks.shape; sh.enabled = true; sh.shapeType = ParticleSystemShapeType.Hemisphere; sh.radius = 0.4f; sh.rotation = new Vector3(-90, 0, 0);
+            Fade(sparks, new Color(1f, 0.95f, 0.75f), new Color(1f, 0.4f, 0.06f));
+            var r = sparks.GetComponent<ParticleSystemRenderer>(); r.renderMode = ParticleSystemRenderMode.Stretch; r.velocityScale = 0.05f; r.lengthScale = 1.5f;
+        }
+        Voice(go, sound, 14f, play: true);
+        var prefab = PrefabUtility.SaveAsPrefabAsset(go, Out + name + ".prefab");
+        Object.DestroyImmediate(go);
+        return prefab;
     }
 
     /// Resources/ItemMount: the pod on its strut with a muzzle flash, and the cradle with the two things it can
