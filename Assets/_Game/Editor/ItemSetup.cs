@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using PowerslideKartPhysics;
 using UnityEditor;
 using UnityEngine;
@@ -53,8 +54,11 @@ public static class ItemSetup
         if (Application.isBatchMode) EditorApplication.Exit(0);
     }
 
-    /// The sun bomb (Radiants' ask, 1 Oct 2026): the homing missile's physics with its brain swapped for SunBomb —
-    /// lobbed ahead, a short fuse, an area burst.
+    const string FxTex = "Assets/_Game/Art/Textures/FX/";
+
+    /// The sun bomb (Radiants' ask, 1 Oct 2026), as the teaser shows it: the film's own model (tools/blender/
+    /// export_sunbomb.py writes the FBX from the teaser kit) on the homing missile's physics, with SunBomb for a
+    /// brain — lobbed ahead, a burning fuse, an amber ring pulsing on the road, then the solar burst.
     static GameObject SunBomb()
     {
         var src = AssetDatabase.LoadAssetAtPath<GameObject>(PKP + "HomingItem.prefab");
@@ -64,8 +68,8 @@ public static class ItemSetup
         Object.DestroyImmediate(go.GetComponent<SpawnedProjectileItem>());
         for (int i = go.transform.childCount - 1; i >= 0; i--) Object.DestroyImmediate(go.transform.GetChild(i).gameObject);
         foreach (var r in go.GetComponents<Renderer>()) Object.DestroyImmediate(r);
-
         var sphere = go.GetComponent<SphereCollider>(); if (sphere != null) sphere.radius = 0.5f;   // the missile's is 1 m
+
         var bomb = go.AddComponent<KartCup.SunBomb>();
         bomb.launchHeight = 0.55f; bomb.startSpeed = 12f; bomb.targetSpeed = 0f; bomb.accel = 0f;
         bomb.inheritKartSpeed = true; bomb.maintainKartSpeed = false; bomb.moveInAir = false;
@@ -75,34 +79,239 @@ public static class ItemSetup
         bomb.homingAccuracy = 0f; bomb.findTargetWhileActive = false;
         bomb.kartSpinCount = 2; bomb.fuse = 2.4f; bomb.radius = 7f; bomb.knock = 7f;
 
-        // ponytail: drawn by hand (a lit ball that pulses, a flash that swells); Cartoon FX's Sun and Explosion looked
-        // right in the editor but its soft particles need the depth texture the phone's RP asset does not render.
-        var ball = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        ball.name = "Ball"; ball.transform.SetParent(go.transform, false); ball.transform.localScale = Vector3.one * 0.9f;
-        Object.DestroyImmediate(ball.GetComponent<Collider>());
-        ball.GetComponent<Renderer>().sharedMaterial = Flash();
-        var l = new GameObject("Glow").AddComponent<Light>(); l.transform.SetParent(go.transform, false);
-        l.color = new Color(1f, 0.7f, 0.3f); l.intensity = 8f; l.range = 8f;
-        bomb.flashMaterial = Flash();
+        // ---- the model: gold shell with amber grooves, twelve rays, the lit face, the fuse
+        var gold = new Color(1f, 0.58f, 0.05f); var hot = new Color(1f, 0.70f, 0.12f);
+        var slot = new System.Collections.Generic.Dictionary<string, Material>
+        {
+            ["sun_gold"]   = Lit("Sun_Gold",   gold, 1f, 0.62f, new Color(1f, 0.50f, 0.03f) * 0.75f),   // all metal: a headlight on it comes back gold, not white
+            ["sun_groove"] = Lit("Sun_Groove", new Color(0.16f, 0.05f, 0.008f), 1f, 0.4f, Color.black),
+            ["sun_trim"]   = Lit("Sun_Trim",   new Color(0.62f, 0.27f, 0.03f), 1f, 0.6f, new Color(1f, 0.40f, 0.04f) * 0.35f),
+            ["sun_rays"]   = Lit("Sun_Rays",   new Color(1f, 0.64f, 0.07f), 1f, 0.65f, new Color(1f, 0.56f, 0.04f) * 1.1f),
+            ["sun_face"]   = Lit("Sun_Face",   new Color(0.16f, 0.05f, 0.008f), 0.3f, 0.65f, new Color(1f, 0.85f, 0.4f) * 2.6f),
+            ["sun_dark"]   = Lit("Sun_Dark",   new Color(0.03f, 0.02f, 0.015f), 0.6f, 0.55f, Color.black),
+            ["sun_rope"]   = Lit("Sun_Rope",   new Color(0.30f, 0.19f, 0.09f), 0f, 0.2f, Color.black),
+            ["sun_ember"]  = Lit("Sun_Ember",  Color.white, 0f, 0.5f, new Color(1f, 0.95f, 0.8f) * 8f),
+        };
+        var fbx = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Art/Models/Items/SunBomb.fbx");
+        var tip = new Vector3(0, 0.55f, 0);
+        if (fbx != null)
+        {
+            var ball = (GameObject)PrefabUtility.InstantiatePrefab(fbx, go.transform);
+            PrefabUtility.UnpackPrefabInstance(ball, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+            ball.name = "Ball";
+            var mr = ball.GetComponentInChildren<MeshRenderer>(); var mf = ball.GetComponentInChildren<MeshFilter>();
+            // the importer names every material "Lit", so slots go by position: the order export_sunbomb.py writes
+            string[] order = { "sun_gold", "sun_groove", "sun_trim", "sun_rays", "sun_face", "sun_dark", "sun_rope", "sun_ember" };
+            var ms = mr.sharedMaterials;
+            int emberSlot = System.Array.IndexOf(order, "sun_ember");
+            if (ms.Length != order.Length) Debug.LogError($"[items] SunBomb.fbx has {ms.Length} slots, expected {order.Length}: re-run tools/blender/export_sunbomb.py");
+            for (int i = 0; i < ms.Length && i < order.Length; i++) ms[i] = slot[order[i]];
+            mr.sharedMaterials = ms; mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            // the film's bomb is 0.73 m across its rays; in a race it has to read from a chase camera: 1.7 m
+            // (the importer's own rotation and scale stay: they are what stand the model up)
+            ball.transform.localPosition = Vector3.zero;
+            ball.transform.localRotation = Quaternion.Euler(0, 180, 0) * ball.transform.localRotation;   // the face looks back at whoever threw it
+            float across = Mathf.Max(mr.bounds.size.x, mr.bounds.size.y, mr.bounds.size.z);
+            ball.transform.localScale *= 1.7f / Mathf.Max(0.001f, across);
+            if (emberSlot >= 0)   // the fuse's burning end, for the sparks
+            {
+                var mesh = mf.sharedMesh; var tris = mesh.GetTriangles(emberSlot); var vs = mesh.vertices; var sum = Vector3.zero;
+                foreach (int t in tris) sum += vs[t];
+                if (tris.Length > 0) tip = go.transform.InverseTransformPoint(mf.transform.TransformPoint(sum / tris.Length));
+            }
+        }
+        else Debug.LogError("[items] SunBomb.fbx missing: run tools/blender/export_sunbomb.py");
+
+        var dot = Additive("FX_SunDot", Tex("dot"), new Color(1f, 0.34f, 0.05f) * 3f);   // low green: ACES pulls a bright orange toward lime
+        var glow = new GameObject("Glow").AddComponent<Light>(); glow.transform.SetParent(go.transform, false);
+        glow.color = new Color(1f, 0.72f, 0.2f); glow.intensity = 12f; glow.range = 9f;
+
+        // sparks spitting off the fuse, left behind in the air as it flies
+        var sparks = Particles("Sparks", go.transform, dot, tip);
+        {
+            var m = sparks.main; m.loop = true; m.startLifetime = new ParticleSystem.MinMaxCurve(0.15f, 0.4f); m.startSpeed = new ParticleSystem.MinMaxCurve(1f, 3.2f);
+            m.startSize = new ParticleSystem.MinMaxCurve(0.07f, 0.16f); m.gravityModifier = 0.5f; m.simulationSpace = ParticleSystemSimulationSpace.World; m.maxParticles = 60;
+            var e = sparks.emission; e.rateOverTime = 45f;
+            var sh = sparks.shape; sh.enabled = true; sh.shapeType = ParticleSystemShapeType.Cone; sh.angle = 40f; sh.radius = 0.03f; sh.rotation = new Vector3(-90, 0, 0);
+            Fade(sparks, new Color(1f, 0.95f, 0.7f), new Color(1f, 0.5f, 0.1f));
+        }
+        // the warning: an amber ring on the asphalt that swells to the blast radius, again and again, once it has landed
+        var warn = Particles("Warn", go.transform, Additive("FX_SunRing", Tex("ring"), new Color(1f, 0.26f, 0.02f) * 2.6f), new Vector3(0, -0.38f, 0));
+        {
+            // (not on awake: SunBomb plays it when the bomb lands)
+            var m = warn.main; m.loop = true; m.playOnAwake = false; m.startLifetime = 0.8f; m.startSpeed = 0f; m.startSize = bomb.radius * 2f; m.maxParticles = 4;
+            var e = warn.emission; e.rateOverTime = 2.2f; Burst(warn, 1);   // the first ring the moment it lands
+            var sz = warn.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.EaseInOut(0f, 0.25f, 1f, 1f));
+            Fade(warn, Color.white, Color.white);
+            Flat(warn);
+        }
+        bomb.warn = warn;
+        bomb.burst = SunBurst(bomb.radius, dot);
 
         var prefab = PrefabUtility.SaveAsPrefabAsset(go, Out + "SunBomb.prefab");
         Object.DestroyImmediate(go);
         return prefab;
     }
 
-    /// The burst's material: unlit, transparent, so the flash can fade. An asset, so the shader ships in the build.
-    static Material Flash()
+    /// The burst, after the film: a gold-white core, a sun-shaped shockwave across the road, embers thrown out in
+    /// streaks, firework arcs, glitter that hangs and twinkles, and a light that turns the night gold for a moment.
+    static GameObject SunBurst(float radius, Material dot)
     {
-        const string path = Out + "SunFlash.mat";
+        var go = new GameObject("SunBurst");
+        var light = new GameObject("Light").AddComponent<Light>(); light.transform.SetParent(go.transform, false); light.transform.localPosition = Vector3.up * 1.2f;
+        light.color = new Color(1f, 0.74f, 0.3f); light.intensity = 140f; light.range = radius * 5f;
+        var flash = go.AddComponent<KartCup.SunFlash>(); flash.glow = light; flash.fade = 1.3f; flash.life = 4f;
+
+        var core = Particles("Core", go.transform, Additive("FX_SunCore", Tex("dot"), new Color(1f, 0.72f, 0.28f) * 2.6f), Vector3.up * 0.3f);
+        {
+            var m = core.main; m.startLifetime = 0.5f; m.startSpeed = 0f; m.startSize = radius * 1.9f; m.maxParticles = 2;
+            Burst(core, 1);
+            var sz = core.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 0.15f), new Keyframe(0.25f, 1f), new Keyframe(1f, 0.8f)));
+            Fade(core, Color.white, new Color(1f, 0.7f, 0.3f));
+        }
+        var wave = Particles("Wave", go.transform, Additive("FX_SunWave", Tex("sunwave"), new Color(1f, 0.86f, 0.5f) * 2.4f), new Vector3(0, -0.36f, 0));
+        {
+            var m = wave.main; m.startLifetime = 0.6f; m.startSpeed = 0f; m.startSize = radius * 3.2f; m.maxParticles = 2;
+            m.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+            Burst(wave, 1);
+            var sz = wave.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 0.1f, 0, 4f), new Keyframe(0.35f, 0.8f), new Keyframe(1f, 1f)));
+            Fade(wave, Color.white, new Color(1f, 0.8f, 0.4f));
+            Flat(wave);
+        }
+        var embers = Particles("Embers", go.transform, dot, Vector3.zero);
+        {
+            var m = embers.main; m.startLifetime = new ParticleSystem.MinMaxCurve(0.5f, 1.3f); m.startSpeed = new ParticleSystem.MinMaxCurve(6f, 19f);
+            m.startSize = new ParticleSystem.MinMaxCurve(0.12f, 0.3f); m.gravityModifier = 1f; m.maxParticles = 120;
+            Burst(embers, 90);
+            var sh = embers.shape; sh.enabled = true; sh.shapeType = ParticleSystemShapeType.Hemisphere; sh.radius = 0.6f; sh.rotation = new Vector3(-90, 0, 0);
+            var lim = embers.limitVelocityOverLifetime; lim.enabled = true; lim.drag = 1.8f;
+            Fade(embers, new Color(1f, 0.95f, 0.75f), new Color(1f, 0.45f, 0.08f));
+            var r = embers.GetComponent<ParticleSystemRenderer>(); r.renderMode = ParticleSystemRenderMode.Stretch; r.velocityScale = 0.05f; r.lengthScale = 1.6f;
+        }
+        var arcs = Particles("Arcs", go.transform, dot, Vector3.zero);
+        {
+            var m = arcs.main; m.startLifetime = new ParticleSystem.MinMaxCurve(1.0f, 1.7f); m.startSpeed = new ParticleSystem.MinMaxCurve(13f, 22f);
+            m.startSize = new ParticleSystem.MinMaxCurve(0.16f, 0.26f); m.gravityModifier = 2.2f; m.maxParticles = 24;
+            Burst(arcs, 18);
+            var sh = arcs.shape; sh.enabled = true; sh.shapeType = ParticleSystemShapeType.Cone; sh.angle = 38f; sh.radius = 0.4f; sh.rotation = new Vector3(-90, 0, 0);
+            Fade(arcs, new Color(1f, 0.85f, 0.6f), new Color(1f, 0.4f, 0.08f));
+            var tr = arcs.trails; tr.enabled = true; tr.lifetime = 0.28f; tr.dieWithParticles = false; tr.inheritParticleColor = true;
+            tr.widthOverTrail = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
+            arcs.GetComponent<ParticleSystemRenderer>().trailMaterial = dot;
+        }
+        var glitter = Particles("Glitter", go.transform, Additive("FX_SunGlitter", Tex("sparkle"), new Color(1f, 0.85f, 0.5f) * 4f), Vector3.up * 0.4f);
+        {
+            var m = glitter.main; m.startLifetime = new ParticleSystem.MinMaxCurve(1.4f, 3.2f); m.startSpeed = new ParticleSystem.MinMaxCurve(0.5f, 5f);
+            m.startSize = new ParticleSystem.MinMaxCurve(0.4f, 1.1f); m.gravityModifier = 0.08f; m.maxParticles = 150;
+            m.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 0.5f);
+            Burst(glitter, 140);
+            var sh = glitter.shape; sh.enabled = true; sh.shapeType = ParticleSystemShapeType.Hemisphere; sh.radius = radius * 0.7f; sh.radiusThickness = 1f; sh.rotation = new Vector3(-90, 0, 0);
+            var lim = glitter.limitVelocityOverLifetime; lim.enabled = true; lim.drag = 2.5f;
+            var noise = glitter.noise; noise.enabled = true; noise.strength = 0.7f; noise.frequency = 0.6f;
+            // the twinkle: each one flares and dims a few times before it goes out
+            var tw = new AnimationCurve(); for (int i = 0; i <= 10; i++) tw.AddKey(i / 10f, (i % 2 == 0 ? 0.25f : 1f) * (1f - i / 12f));
+            var sz = glitter.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, tw);
+            Fade(glitter, Color.white, new Color(1f, 0.8f, 0.4f));
+        }
+        var prefab = PrefabUtility.SaveAsPrefabAsset(go, Out + "SunBurst.prefab");
+        Object.DestroyImmediate(go);
+        return prefab;
+    }
+
+    static ParticleSystem Particles(string name, Transform parent, Material mat, Vector3 at)
+    {
+        var go = new GameObject(name); go.transform.SetParent(parent, false); go.transform.localPosition = at;
+        var ps = go.AddComponent<ParticleSystem>();
+        var m = ps.main; m.loop = false; m.duration = 1f; m.playOnAwake = true; m.simulationSpace = ParticleSystemSimulationSpace.World; m.scalingMode = ParticleSystemScalingMode.Shape;
+        var e = ps.emission; e.rateOverTime = 0f;
+        var sh = ps.shape; sh.enabled = false;
+        var r = go.GetComponent<ParticleSystemRenderer>(); r.sharedMaterial = mat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false;
+        return ps;
+    }
+
+    /// Lies the particles in the system's own ground plane (its local XZ), so SunBomb can tilt them to the road's
+    /// slope: a world-horizontal quad fourteen metres wide is half under the tarmac on any banked corner.
+    static void Flat(ParticleSystem ps)
+    {
+        // a quad mesh, not a billboard: a mesh particle with Local alignment takes the transform's orientation exactly
+        ps.transform.localRotation = Quaternion.Euler(90, 0, 0);
+        var r = ps.GetComponent<ParticleSystemRenderer>(); r.renderMode = ParticleSystemRenderMode.Mesh; r.mesh = Resources.GetBuiltinResource<Mesh>("Quad.fbx"); r.alignment = ParticleSystemRenderSpace.Local;
+    }
+
+    static void Burst(ParticleSystem ps, int count) { var e = ps.emission; e.SetBursts(new[] { new ParticleSystem.Burst(0f, (short)count) }); }
+
+    /// Colour a -> b over the life, alpha in fast and out slowly.
+    static void Fade(ParticleSystem ps, Color a, Color b)
+    {
+        var g = new Gradient();
+        g.SetKeys(new[] { new GradientColorKey(a, 0f), new GradientColorKey(b, 1f) },
+                  new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.08f), new GradientAlphaKey(0.7f, 0.55f), new GradientAlphaKey(0f, 1f) });
+        var c = ps.colorOverLifetime; c.enabled = true; c.color = g;
+    }
+
+    static Material Lit(string name, Color baseColor, float metallic, float smoothness, Color emission)
+    {
+        string path = Out + name + ".mat";
         var m = AssetDatabase.LoadAssetAtPath<Material>(path);
-        if (m != null) return m;
-        m = new Material(Shader.Find("Universal Render Pipeline/Unlit")) { name = "SunFlash" };
-        m.SetColor("_BaseColor", new Color(1f, 0.9f, 0.5f, 1f));
-        m.SetFloat("_Surface", 1); m.SetFloat("_Blend", 0); m.SetFloat("_ZWrite", 0);
-        m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha); m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        m.renderQueue = 3000; m.SetOverrideTag("RenderType", "Transparent"); m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-        AssetDatabase.CreateAsset(m, path);
+        if (m == null) { m = new Material(Shader.Find("Universal Render Pipeline/Lit")) { name = name }; AssetDatabase.CreateAsset(m, path); }
+        m.SetColor("_BaseColor", baseColor); m.SetFloat("_Metallic", metallic); m.SetFloat("_Smoothness", smoothness);
+        if (emission.maxColorComponent > 0f) { m.EnableKeyword("_EMISSION"); m.SetColor("_EmissionColor", emission); m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None; }
+        EditorUtility.SetDirty(m);
         return m;
+    }
+
+    /// An additive, unlit particle material: light on top of the frame, no depth texture needed (the phone has none).
+    static Material Additive(string name, Texture2D tex, Color hdr)
+    {
+        string path = Out + name + ".mat";
+        var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (m == null) { m = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit")) { name = name }; AssetDatabase.CreateAsset(m, path); }
+        m.SetTexture("_BaseMap", tex); m.SetColor("_BaseColor", hdr);
+        m.SetFloat("_Surface", 1); m.SetFloat("_Blend", 2); m.SetFloat("_ZWrite", 0); m.SetFloat("_Cull", 0);
+        m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha); m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.One);
+        m.SetFloat("_SoftParticlesEnabled", 0); m.SetFloat("_ColorMode", 0);
+        m.renderQueue = 3000; m.SetOverrideTag("RenderType", "Transparent"); m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); m.DisableKeyword("_SOFTPARTICLES_ON");
+        EditorUtility.SetDirty(m);
+        return m;
+    }
+
+    /// The four shapes the effects are drawn with, painted here so nothing is borrowed: a soft dot, a four-point
+    /// sparkle, a thin ring, and the sun-shaped shockwave (a spiked disc with a bright rim).
+    static Texture2D Tex(string kind)
+    {
+        string path = FxTex + "fx_" + kind + ".png";
+        var have = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+        if (have != null) return have;
+        Directory.CreateDirectory(FxTex);
+        int n = kind == "sunwave" || kind == "ring" ? 256 : 128;
+        var t = new Texture2D(n, n, TextureFormat.RGBA32, false);
+        for (int y = 0; y < n; y++)
+            for (int x = 0; x < n; x++)
+            {
+                float u = (x + 0.5f) / n * 2f - 1f, v = (y + 0.5f) / n * 2f - 1f, r = Mathf.Sqrt(u * u + v * v), a = 0f;
+                if (kind == "dot") a = Mathf.Pow(Mathf.Clamp01(1f - r), 2.2f);
+                else if (kind == "sparkle")
+                {
+                    float au = Mathf.Abs(u), av = Mathf.Abs(v);
+                    float arms = Mathf.Max(Mathf.Exp(-av * 26f) * Mathf.Clamp01(1f - au), Mathf.Exp(-au * 26f) * Mathf.Clamp01(1f - av));
+                    a = Mathf.Clamp01(arms * arms * 1.4f + Mathf.Pow(Mathf.Clamp01(1f - r * 3.2f), 2f));
+                }
+                else if (kind == "ring") a = Mathf.Clamp01(1f - Mathf.Abs(r - 0.88f) / 0.07f) + Mathf.Clamp01(1f - Mathf.Abs(r - 0.88f) / 0.2f) * 0.35f + (r < 0.88f ? 0.07f : 0f);
+                else if (kind == "sunwave")
+                {
+                    float ang = Mathf.Atan2(v, u), saw = Mathf.Abs(Mathf.Repeat(ang / (Mathf.PI * 2f) * 16f, 1f) - 0.5f) * 2f;   // 0 at a ray's tip
+                    float edge = Mathf.Lerp(0.96f, 0.62f, saw);                                                                 // sixteen rays
+                    float d = edge - r;
+                    a = d < 0f ? 0f : Mathf.Clamp01(1f - d / 0.09f) * 0.95f + Mathf.Clamp01(d / 0.1f) * 0.22f * Mathf.Clamp01(r * 1.6f);
+                }
+                t.SetPixel(x, y, new Color(1f, 1f, 1f, Mathf.Clamp01(a)));
+            }
+        File.WriteAllBytes(path, t.EncodeToPNG());
+        Object.DestroyImmediate(t);
+        AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+        var imp = (TextureImporter)AssetImporter.GetAtPath(path);
+        imp.alphaIsTransparency = true; imp.wrapMode = TextureWrapMode.Clamp; imp.mipmapEnabled = true; imp.SaveAndReimport();
+        return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
     }
 
     /// A copy of one of Powerslide's spawned-projectile prefabs, retuned.

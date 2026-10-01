@@ -16,8 +16,9 @@ public static class Playtest
     static bool camSet, noHud, vista, mobile;
     static string look = "Lighthouse", item;   // -item "Sun Bomb": the player throws it after GO and three frames follow it
     static int itemShot;
-    static readonly double[] itemTimes = { 0.5, 1.6, 2.7 };   // after the throw: in the air, burning, bursting
+    static readonly double[] itemTimes = { 0.5, 2.15, 2.55, 2.9, 3.8 };   // after the throw: in the air, burning, the burst, its wave, the glitter
     static double thrownAt = -1;
+    static Vector3 itemFrom, itemAt;   // a second camera for the item frames: beside the road, on where it lands
     static int prevQuality;
     static readonly double[] shotTimes = { 5, 12, 22, 34 };
 
@@ -71,10 +72,11 @@ public static class Playtest
             var race = Object.FindFirstObjectByType<RaceManager>();
             var caster = race != null && race.Player != null ? race.Player.GetComponent<ItemCaster>() : null;
             var def = Object.FindFirstObjectByType<ItemManager>()?.GetItem(item);
+            if (caster != null) { var k = race.Player.transform; itemAt = k.position + k.forward * 11f + Vector3.up * 0.6f; itemFrom = k.position + k.forward * 3f + k.right * 7f + Vector3.up * 2.4f; }
             if (caster != null && def != null) { caster.GiveItem(def); caster.Cast(); thrownAt = t; Debug.Log($"[playtest] threw {item} at {t:0.0}s: ammo now {caster.ammo}, active {race.Player.GetComponent<Kart>().active}, spinning {race.Player.GetComponent<Kart>().spinningOut}, state {race.state}"); }
             else { Debug.LogError($"[playtest] cannot throw {item}: caster {(caster != null)}, item {(def != null)}"); thrownAt = t; }
         }
-        if (thrownAt >= 0 && itemShot < itemTimes.Length && t >= thrownAt + itemTimes[itemShot]) { Capture($"item{track}-{itemShot}"); var bombs = Object.FindObjectsByType<SunBomb>(FindObjectsSortMode.None);
+        if (thrownAt >= 0 && itemShot < itemTimes.Length && t >= thrownAt + itemTimes[itemShot]) { Capture($"item{track}-{itemShot}"); SideShot($"item{track}-{itemShot}-side"); var bombs = Object.FindObjectsByType<SunBomb>(FindObjectsSortMode.None);
             Debug.Log($"[playtest] item frame {itemShot}: {bombs.Length} sun bomb(s){string.Concat(bombs.Select(b => $" at {b.transform.position}"))}, {Object.FindObjectsByType<Kart>(FindObjectsSortMode.None).Count(k => k.spinningOut)} kart(s) spinning"); itemShot++; }
         if (captureAt >= 0 && t >= captureAt)
         {
@@ -146,6 +148,24 @@ public static class Playtest
         go.transform.position = from; go.transform.LookAt(at);
         vc.fieldOfView = 46f;
         Shoot(vc, name + "-vista");
+        Object.Destroy(go);
+    }
+
+    static void SideShot(string name)
+    {
+        var cam = Camera.main; if (cam == null) return;
+        var go = new GameObject("ItemCam");
+        var vc = go.AddComponent<Camera>(); vc.CopyFrom(cam);
+        go.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>().renderPostProcessing = true;
+        go.transform.position = itemFrom; go.transform.LookAt(itemAt); vc.fieldOfView = 50f;
+        Shoot(vc, name);
+        var bomb = Object.FindFirstObjectByType<SunBomb>();
+        if (bomb != null)   // and the item itself, from its face side, close
+        {
+            var b = bomb.transform;
+            go.transform.position = b.position - b.forward * 2.6f + b.right * 1.2f + Vector3.up * 0.9f; go.transform.LookAt(b.position); vc.fieldOfView = 40f;
+            Shoot(vc, name.Replace("-side", "-close"));
+        }
         Object.Destroy(go);
     }
 
