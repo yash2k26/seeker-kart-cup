@@ -579,7 +579,7 @@ public static partial class TrackSetup
         {
             mat.shader = terrainShader;
             mat.SetColor("_BaseColor", Color.white); mat.SetFloat("_ShadowTint", 0.5f);
-            mat.SetFloat("_Wrap", V.id == "speedway" ? 0.55f : 0.3f);   // a 17 deg sun barely grazes a flat field: wrap the lambert so dusk stays readable
+            mat.SetFloat("_Wrap", V.sun.x < 20f && !V.night ? 0.55f : 0.3f);   // a 17 deg sun barely grazes a flat field: wrap the lambert so dusk stays readable
             var detail = string.IsNullOrEmpty(V.groundDetail) ? null : Tex("Surfaces/" + V.groundDetail);
             mat.SetTexture("_DetailMap", detail);
             mat.SetFloat("_DetailTile", V.groundDetailTile); mat.SetFloat("_DetailStrength", detail != null ? 0.85f : 0f);
@@ -598,8 +598,8 @@ public static partial class TrackSetup
         if (!float.IsNaN(V.sea)) Water("Water", new Vector3(0, V.sea, 0), 200f);
         if (V.lakeRadius > 0f) Water("Lake", new Vector3(V.lake.x, -1.3f, V.lake.y), V.lakeRadius * 0.3f);
 
-        // After dark the karts spawn with their lamps lit (RaceSpawner reads this marker).
-        if (V.night)
+        // After dark (or at dusk, in mist) the karts spawn with their lamps lit (RaceSpawner reads this marker).
+        if (V.night || V.headlights)
         {
             var night = new GameObject("Night").AddComponent<NightScene>();
             new SerializedObject(night).Do(s =>
@@ -1160,7 +1160,7 @@ public static partial class TrackSetup
         m.SetFloat("_Tile", 3f); m.SetFloat("_PuddleTile", 38f); m.SetFloat("_BumpScale", V.night ? 0.7f : 1f);
         m.SetFloat("_Wet", V.wet); m.SetFloat("_Puddles", 0.65f);
         m.SetFloat("_LaneOffset", HalfWidth * 0.5f); m.SetFloat("_LaneHalf", 3.4f);
-        m.SetColor("_Tint", V.night ? new Color(1.7f, 1.68f, 1.7f) : new Color(0.75f, 0.75f, 0.78f));   // the tile is dark; night lifts it for the lamps
+        m.SetColor("_Tint", V.roadTint > 0f ? new Color(V.roadTint, V.roadTint, V.roadTint * 1.01f) : V.night ? new Color(1.7f, 1.68f, 1.7f) : new Color(0.75f, 0.75f, 0.78f));   // the tile is dark; night lifts it for the lamps
         EditorUtility.SetDirty(m);
         return m;
     }

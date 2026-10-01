@@ -9,6 +9,7 @@ Shader "KartCup/Glow"
         _Color ("Colour", Color) = (1, 0.62, 0.28, 1)
         _Strength ("Strength", Float) = 1
         _Near ("Near fade (m)", Float) = 5
+        _Flicker ("Flicker (0 = steady, 1 = each glow pulses on its own beat)", Range(0, 1)) = 0
     }
     SubShader
     {
@@ -31,6 +32,7 @@ Shader "KartCup/Glow"
                 float4 _Color;
                 float _Strength;
                 float _Near;
+                float _Flicker;
             CBUFFER_END
 
             struct A { float4 positionOS : POSITION; float2 uv : TEXCOORD0; float2 uv2 : TEXCOORD1; float4 color : COLOR; };
@@ -51,7 +53,10 @@ Shader "KartCup/Glow"
                 o.uv = i.uv;
                 // gone when the camera is inside it, so a lamp passed close does not white the frame out
                 float near = saturate(-centreVS.z / _Near);
-                o.tint = _Color.rgb * i.color.rgb * (i.color.a * _Strength * near * keep);
+                // fireflies: a pulse per glow, its rate and phase from where it hangs
+                float h = frac(sin(dot(centreWS.xz, float2(12.9898, 78.233))) * 43758.5453);
+                float pulse = lerp(1.0, saturate(sin(_Time.y * (1.1 + h * 2.3) + h * 40.0) * 1.6 - 0.2), _Flicker);
+                o.tint = _Color.rgb * i.color.rgb * (i.color.a * _Strength * near * keep * pulse);
                 o.powerFog = float2(i.uv2.y, ComputeFogFactor(o.positionCS.z));
                 return o;
             }

@@ -48,12 +48,16 @@ public static partial class TrackSetup
     /// phone lights a renderer by at most eight lights; the lights themselves cast no shadow.
     static readonly List<Vector3> lampHeads = new();
 
+    /// A material every map shares by name keeps Palm Bay's (the tunnel and the menu use them); the others get their own,
+    /// or the last map built would repaint everyone's lamps.
+    static string Own(string name) => V.id == "beach" ? name : $"{name}_{V.id}";
+
     static void SodiumLamps(Transform root)
     {
         if (V.lampEvery <= 0f) return;
         lampHeads.Clear();
         var pole = Plain("Lamp_Pole", new Color(0.16f, 0.17f, 0.19f));
-        var glow = Emissive("Lamp_Glow", Sodium, 3.2f);
+        var glow = Emissive(Own("Lamp_Glow"), V.lampColor, 3.2f);
         int n = centre.Length, step = Mathf.Max(1, Samples(V.lampEvery)), count = 0;
         for (int i = Samples(9f); i < n; i += step)
         {
@@ -62,7 +66,7 @@ public static partial class TrackSetup
             float side = c.HasValue ? c.Value.outside : 1f;      // `right` points into the island: +1 is the land side
             Lamp(root, i, side, pole, glow, ref count);
         }
-        Glows(root, "LampGlows", lampHeads, Sodium);
+        Glows(root, "LampGlows", lampHeads, V.lampColor, Own("Lamp_Halo"));
         Debug.Log($"[track] {count} sodium lamps");
     }
 
@@ -84,7 +88,7 @@ public static partial class TrackSetup
         light.transform.localPosition = new Vector3(0, H - 0.35f, Arm + 0.1f);
         light.transform.localRotation = Quaternion.Euler(90, 0, 0);
         lampHeads.Add(light.transform.position);
-        light.type = LightType.Spot; light.color = Sodium; light.intensity = 340f; light.range = 34f;   // 34 m at 30 m spacing: a 114 m road piece still fits its lamps and the headlights in eight lights
+        light.type = LightType.Spot; light.color = V.lampColor; light.intensity = 340f; light.range = 34f;   // 34 m at 30 m spacing: a 114 m road piece still fits its lamps and the headlights in eight lights
         light.spotAngle = 112f; light.innerSpotAngle = 40f; light.shadows = LightShadows.None;   // wide: the pool reaches well onto the road
         var capsule = lamp.gameObject.AddComponent<CapsuleCollider>();
         capsule.center = new Vector3(0, H / 2f, 0); capsule.height = H; capsule.radius = 0.16f;
@@ -114,7 +118,7 @@ public static partial class TrackSetup
                 count++;
             }
         }
-        var go = mb.Finish("Studs", root, new[] { Plain("Stud_Base", new Color(0.12f, 0.12f, 0.13f)), Emissive("Stud_Glow", Cyan, 3f) });
+        var go = mb.Finish("Studs", root, new[] { Plain("Stud_Base", new Color(0.12f, 0.12f, 0.13f)), Emissive(Own("Stud_Glow"), V.studColor, 3f) });
         GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
         Debug.Log($"[track] {count} road studs");
     }
@@ -448,16 +452,20 @@ public static partial class TrackSetup
 
     /// What the film's haze does round every lamp, without a volume: three additive quads per lamp in ONE mesh (a
     /// star at the glass, a halo, and a wide soft bloom of lit air), opened toward the eye by KartCup/Glow.
-    static void Glows(Transform root, string name, List<Vector3> at, Color colour)
+    // size in metres, falloff power, strength
+    // ponytail: two layers, not three. The third (a 22 m bloom of lit air round each lamp) looked best and cost the most:
+    // forty of them overlapping down a straight took Palm Bay to 41-43 fps on the test phone, and the Seeker is slower.
+    static readonly (float size, float power, float strength)[] LampLayers = { (10f, 2.4f, 0.85f), (2.2f, 1.4f, 3.0f) };
+
+    static void Glows(Transform root, string name, List<Vector3> at, Color colour, string material, (float size, float power, float strength)[] layers = null, float flicker = 0f)
     {
         if (at.Count == 0) return;
         var shader = Shader.Find("KartCup/Glow");
         if (shader == null) { Debug.LogWarning("[track] KartCup/Glow missing: no lamp halos"); return; }
-        var mat = LoadOrCreate(Art + "Materials/Lamp_Halo.mat", shader, Color.white);
-        mat.shader = shader; mat.SetColor("_Color", colour); mat.SetFloat("_Strength", 1f); mat.SetFloat("_Near", 5f);
+        var mat = LoadOrCreate(Art + $"Materials/{material}.mat", shader, Color.white);
+        mat.shader = shader; mat.SetColor("_Color", colour); mat.SetFloat("_Strength", 1f); mat.SetFloat("_Near", 5f); mat.SetFloat("_Flicker", flicker);
         EditorUtility.SetDirty(mat);
-        // size in metres, falloff power, strength
-        (float size, float power, float strength)[] layers = { (22f, 2.0f, 0.30f), (8f, 2.6f, 0.9f), (2.2f, 1.4f, 3.0f) };
+        layers ??= LampLayers;
         var v = new List<Vector3>(); var uv = new List<Vector2>(); var uv2 = new List<Vector2>(); var col = new List<Color>(); var tri = new List<int>();
         foreach (var world in at)
         {
@@ -476,6 +484,25 @@ public static partial class TrackSetup
         var bounds = mesh.bounds; bounds.Expand(30f); mesh.bounds = bounds;   // every vertex sits at a lamp: the quads open in the shader
         var go = Part(root, name, SaveMesh(mesh, name), mat, Vector3.zero, Vector3.one);
         go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+    }
+
+    /// Pine Ridge's fireflies: small green-gold lights hanging in the wood either side of the road, each pulsing on
+    /// its own beat (the glow shader's flicker). The same one-mesh glow as the lamps, so three hundred cost one draw.
+    static void Fireflies(Transform root, System.Random rnd)
+    {
+        if (V.fireflies <= 0) return;
+        var at = new List<Vector3>();
+        int n = centre.Length;
+        for (int k = 0; k < V.fireflies; k++)
+        {
+            int i = rnd.Next(n);
+            float side = rnd.Next(2) == 0 ? -1f : 1f, off = HalfWidth + Kerb + 2.5f + (float)rnd.NextDouble() * 20f;
+            var p = centre[i] + right[i] * (off * side);
+            p.y = V.shape(p.x, p.z) + 0.5f + (float)rnd.NextDouble() * 3.2f;
+            at.Add(p);
+        }
+        Glows(root, "Fireflies", at, V.fireflyColor, Own("Firefly_Glow"), new[] { (1.5f, 2.4f, 1.3f), (0.32f, 1.3f, 3.2f) }, 1f);
+        Debug.Log($"[track] {at.Count} fireflies");
     }
 
     static Mesh SaveMesh(Mesh mesh, string name)

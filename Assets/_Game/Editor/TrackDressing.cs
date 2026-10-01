@@ -274,6 +274,7 @@ public static partial class TrackSetup
         SodiumLamps(root);
         Studs(root);
         Tunnel(root, rnd);
+        Fireflies(root, rnd);
     }
 
     static void DressBeach(Transform root, System.Random rnd)
@@ -552,7 +553,9 @@ public static partial class TrackSetup
         // Floodlights every 35 m both sides, overhead signs at the entry to the two big turns, banners and billboards
         // on the corner outsides.
         Rhythm(root, "Racing", "lightPostLarge", 35f, 12f, 3f, phase: Samples(17f));
-        foreach (var go in new List<GameObject>(Lamps(root))) Glow(go, glow);
+        var heads = new List<Vector3>();
+        foreach (var go in new List<GameObject>(Lamps(root))) { Glow(go, glow); var b = Bounds(go); heads.Add(new Vector3(b.center.x, b.max.y - 0.6f, b.center.z)); }
+        Glows(root, "FloodGlows", heads, new Color(1f, 0.90f, 0.74f), Own("Lamp_Halo"));   // every floodlight wears its halo in the dusk
         var tight = Tightest();
         for (int k = 0; k < Mathf.Min(2, tight.Count); k++)
         {

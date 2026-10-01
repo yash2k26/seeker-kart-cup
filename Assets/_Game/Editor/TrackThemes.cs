@@ -33,6 +33,12 @@ public static partial class TrackSetup
         public bool night, studs, lighthouse, tunnel;
         public string sky, water = "Water", groundDetail;
         public float skyRotation, skyExposure = 1f, wet, lampEvery, groundDetailTile = 7f;
+        // The same kit on the other circuits, each in its own light: what colour the lamps and the studs burn, whether
+        // the karts run with headlights without it being night, how light the asphalt is, and (Pine Ridge) fireflies.
+        public Color lampColor = new(1f, 0.62f, 0.28f), studColor = new(0.10f, 0.75f, 1f), fireflyColor = new(0.75f, 1f, 0.35f);
+        public bool headlights;
+        public float roadTint;
+        public int fireflies;
     }
 
     static readonly Theme[] Themes =
@@ -57,7 +63,7 @@ public static partial class TrackSetup
             ambientSky = new Color(0.22f, 0.26f, 0.36f), ambientEquator = new Color(0.20f, 0.20f, 0.24f), ambientGround = new Color(0.09f, 0.08f, 0.08f),
             // the film's air is thick and a little warm from the lamps: the haze starts close and the far coast sinks into it
             fog = new Color(0.24f, 0.25f, 0.29f), fogStart = 22, fogEnd = 330, farClip = 470,
-            water = "Water_night", wet = 1f, lampEvery = 30f, studs = true, lighthouse = true, tunnel = true, groundDetail = "sand_diff",
+            water = "Water_night", wet = 1f, lampEvery = 36f, studs = true, lighthouse = true, tunnel = true, groundDetail = "sand_diff",
             post = p =>
             {
                 // The teaser's grade: filmic roll-off, teal shadows under warm lamps, bloom on every practical, a
@@ -83,16 +89,22 @@ public static partial class TrackSetup
                 return valley + m * (70f + 45f * TerrainGen.Ridged(x, z, 1f / 160f, 5f) + 8f * TerrainGen.Fbm(x, z, 1f / 45f, 2, 7f));
             },
             palette = AlpinePalette, ground = new Color(0.86f, 0.88f, 0.94f),
-            sun = new Vector3(22, -60, 0), sunColor = new Color(1f, 0.86f, 0.82f), sunIntensity = 1.05f,
-            // A thick atmosphere with a low sun turned the whole sky yellow-green and the fog hid the peaks: keep
-            // the atmosphere thin and blue, and let the mountains read before the fog takes them.
-            skyTint = new Color(0.40f, 0.56f, 0.86f), horizon = new Color(0.80f, 0.87f, 0.95f), exposure = 1.15f, atmosphere = 0.85f, sunSize = 0.035f, sunConvergence = 5f,
-            ambientSky = new Color(0.40f, 0.50f, 0.72f), ambientEquator = new Color(0.52f, 0.58f, 0.72f), ambientGround = new Color(0.50f, 0.56f, 0.70f),
-            fog = new Color(0.80f, 0.87f, 0.95f), fogStart = 150, fogEnd = 470, farClip = 600,
+            // Blue hour: the sun is gone behind the range, the snow holds the sky's blue, and the road is a string of
+            // warm lamps through it. Cold everywhere except where there is light: that contrast is the map.
+            sun = new Vector3(14, -60, 0), sunColor = new Color(0.72f, 0.80f, 1f), sunIntensity = 0.6f,
+            skyTint = new Color(0.16f, 0.24f, 0.55f), horizon = new Color(0.62f, 0.52f, 0.66f), exposure = 0.7f, atmosphere = 1.3f, sunSize = 0.03f, sunConvergence = 5f,
+            ambientSky = new Color(0.24f, 0.32f, 0.56f), ambientEquator = new Color(0.30f, 0.34f, 0.52f), ambientGround = new Color(0.20f, 0.24f, 0.38f),
+            fog = new Color(0.34f, 0.40f, 0.62f), fogStart = 35, fogEnd = 400, farClip = 520,
+            // (the lamps at 0.55: on snow a full sodium lamp blows the road and the kart under it to white)
+            lampEvery = 38f, lampColor = new Color(0.55f, 0.34f, 0.16f), studs = true, studColor = new Color(0.75f, 0.92f, 1f), wet = 0.45f, headlights = true, roadTint = 1.5f,
             post = p =>
             {
-                if (p.TryGet(out SplitToning split)) { split.highlights.value = new Color(0.90f, 0.95f, 1f); split.shadows.value = new Color(0.24f, 0.40f, 0.72f); }
-                if (p.TryGet(out ColorAdjustments g)) { g.saturation.value = 18f; g.colorFilter.value = new Color(0.96f, 0.98f, 1f); }
+                if (p.TryGet(out Tonemapping tone)) tone.mode.value = TonemappingMode.ACES;
+                if (p.TryGet(out ColorAdjustments g)) { g.postExposure.value = 0.95f; g.contrast.value = 12f; g.saturation.value = 14f; g.colorFilter.value = new Color(0.95f, 0.97f, 1f); }
+                if (p.TryGet(out SplitToning split)) { split.shadows.value = new Color(0.14f, 0.28f, 0.62f); split.highlights.value = new Color(1f, 0.82f, 0.60f); split.balance.value = -10f; }
+                if (p.TryGet(out Bloom bloom)) { bloom.threshold.value = 0.8f; bloom.intensity.value = 1.5f; bloom.scatter.value = 0.76f; }
+                if (p.TryGet(out Vignette vignette)) vignette.intensity.value = 0.32f;
+                if (p.TryGet(out FilmGrain grain)) grain.intensity.value = 0.2f;
             },
         },
         // Pine Ridge: tight and technical. Gentle inside the loop, strong ridged hills outside it, and a lake in the
@@ -110,10 +122,22 @@ public static partial class TrackSetup
                 return Mathf.Lerp(hills, -2.2f, basin);
             },
             palette = ForestPalette, ground = new Color(0.36f, 0.58f, 0.30f),
-            sun = new Vector3(34, -30, 0), sunColor = new Color(1f, 0.90f, 0.70f), sunIntensity = 1.05f,
-            skyTint = new Color(0.40f, 0.56f, 0.82f), horizon = new Color(0.76f, 0.82f, 0.84f), exposure = 1.2f, atmosphere = 0.95f, sunSize = 0.045f, sunConvergence = 5f,
-            ambientSky = new Color(0.30f, 0.40f, 0.52f), ambientEquator = new Color(0.36f, 0.40f, 0.30f), ambientGround = new Color(0.18f, 0.22f, 0.12f),
-            fog = new Color(0.72f, 0.80f, 0.84f), fogStart = 170, fogEnd = 420, farClip = 600,
+            // Golden mist: a low sun through thick air, so the trees ahead are shapes before they are trees, the
+            // headlights cut beams in it, amber studs mark the road and fireflies hang in the wood either side.
+            sun = new Vector3(11, -30, 0), sunColor = new Color(1f, 0.76f, 0.48f), sunIntensity = 1.15f,
+            skyTint = new Color(0.62f, 0.60f, 0.50f), horizon = new Color(0.92f, 0.80f, 0.58f), exposure = 1.05f, atmosphere = 1.5f, sunSize = 0.07f, sunConvergence = 3f,
+            ambientSky = new Color(0.44f, 0.46f, 0.40f), ambientEquator = new Color(0.46f, 0.44f, 0.30f), ambientGround = new Color(0.16f, 0.18f, 0.10f),
+            fog = new Color(0.80f, 0.72f, 0.50f), fogStart = 10, fogEnd = 190, farClip = 260,
+            studs = true, studColor = new Color(1f, 0.72f, 0.25f), wet = 0.35f, headlights = true, roadTint = 1.1f, fireflies = 320,
+            post = p =>
+            {
+                if (p.TryGet(out Tonemapping tone)) tone.mode.value = TonemappingMode.ACES;
+                if (p.TryGet(out ColorAdjustments g)) { g.postExposure.value = 1.0f; g.contrast.value = 10f; g.saturation.value = 8f; }
+                if (p.TryGet(out SplitToning split)) { split.shadows.value = new Color(0.20f, 0.36f, 0.30f); split.highlights.value = new Color(1f, 0.86f, 0.55f); split.balance.value = -6f; }
+                if (p.TryGet(out Bloom bloom)) { bloom.threshold.value = 0.72f; bloom.intensity.value = 1.7f; bloom.scatter.value = 0.82f; }
+                if (p.TryGet(out Vignette vignette)) vignette.intensity.value = 0.30f;
+                if (p.TryGet(out FilmGrain grain)) grain.intensity.value = 0.2f;
+            },
         },
         // Sunset Speedway: a stadium oval, near-flat infield, an outer bank so the stands have a backdrop. Measured
         // like the others: lap 1279 m, longest straight 216 m, 9 deg/sample at the chicane, 21 % of samples straight.
@@ -127,15 +151,20 @@ public static partial class TrackSetup
             },
             palette = SpeedwayPalette, ground = new Color(0.34f, 0.56f, 0.30f),
             // Low enough to read as dusk, high enough that a flat road still catches it: at 9-11 deg the ground went black.
-            sun = new Vector3(17, -120, 0), sunColor = new Color(1f, 0.68f, 0.42f), sunIntensity = 1.35f,
-            skyTint = new Color(0.34f, 0.32f, 0.64f), horizon = new Color(0.42f, 0.22f, 0.36f), exposure = 1.0f, atmosphere = 1.6f, sunSize = 0.06f, sunConvergence = 8f,
+            // (the sky used to be an acid yellow: a thick atmosphere under a 17 deg sun. Lower and thinner, it runs
+            // orange at the horizon into violet overhead; the terrain's wrapped lambert keeps the infield readable.)
+            sun = new Vector3(7, -120, 0), sunColor = new Color(1f, 0.60f, 0.36f), sunIntensity = 1.45f,
+            skyTint = new Color(0.46f, 0.30f, 0.62f), horizon = new Color(0.42f, 0.22f, 0.36f), exposure = 1.0f, atmosphere = 1.15f, sunSize = 0.07f, sunConvergence = 6f,
             ambientSky = new Color(0.30f, 0.30f, 0.52f), ambientEquator = new Color(0.56f, 0.36f, 0.40f), ambientGround = new Color(0.24f, 0.17f, 0.22f),
-            fog = new Color(0.34f, 0.19f, 0.32f), fogStart = 180, fogEnd = 420, farClip = 450,
+            fog = new Color(0.34f, 0.19f, 0.32f), fogStart = 70, fogEnd = 420, farClip = 450,
+            // Magenta dusk under the floodlights: a wet oval that mirrors the sky, hot-pink studs, every floodlight haloed.
+            studs = true, studColor = new Color(1f, 0.22f, 0.55f), wet = 0.6f, headlights = true, roadTint = 1.2f,
             post = p =>
             {
                 // The camera is LDR, so an HDR lamp head clamps to white: the only way it blooms is a threshold under 1.
-                if (p.TryGet(out Bloom bloom)) { bloom.threshold.value = 0.82f; bloom.intensity.value = 1.3f; }
-                if (p.TryGet(out ColorAdjustments g)) { g.postExposure.value = 0.8f; g.contrast.value = 16f; }
+                // (not ACES here: it pulled the orange sky to an acid yellow)
+                if (p.TryGet(out Bloom bloom)) { bloom.threshold.value = 0.8f; bloom.intensity.value = 1.5f; bloom.scatter.value = 0.76f; }
+                if (p.TryGet(out ColorAdjustments g)) { g.postExposure.value = 0.88f; g.contrast.value = 16f; }
                 if (p.TryGet(out SplitToning split)) { split.highlights.value = new Color(1f, 0.74f, 0.46f); split.shadows.value = new Color(0.28f, 0.20f, 0.50f); }
             },
         },

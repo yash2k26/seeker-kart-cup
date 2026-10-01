@@ -25,6 +25,7 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
+    - _Flicker: 0
     - _Near: 5
     - _Strength: 1
     m_Colors:

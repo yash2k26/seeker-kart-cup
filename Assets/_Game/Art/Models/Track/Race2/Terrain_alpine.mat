@@ -33,7 +33,7 @@ Material:
     - _DetailStrength: 0
     - _DetailTile: 7
     - _ShadowTint: 0.5
-    - _Wrap: 0.3
+    - _Wrap: 0.55
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
