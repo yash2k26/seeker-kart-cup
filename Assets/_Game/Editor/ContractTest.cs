@@ -41,7 +41,7 @@ public static class ContractTest
         EditorSceneManager.OpenScene($"Assets/_Game/Scenes/Race{track}.unity", OpenSceneMode.Single);
         start = EditorApplication.timeSinceStartup;
         driving = false;
-        introAt = countdownAt = podiumAt = cardAt = introFrame = podiumFrame = -1; podiumRacers = 0; tunnelFrame = false;
+        introAt = countdownAt = podiumAt = cardAt = introFrame = podiumFrame = -1; podiumRacers = 0; tunnelFrame = false; surveyAt = -1; surveyN = 0;
         // arm a starting item the way the shop does: one rocket in the pack, picked as the loadout
         startItem = "<not checked>";
         KartCup.Inventory.Add("rocket", 1); KartCup.Inventory.Loadout = "rocket";
@@ -108,6 +108,7 @@ public static class ContractTest
     // ---- the ceremony around the race: prize shot, 3-2-1, race, podium, results card ----
     static double introAt = -1, countdownAt = -1, podiumAt = -1, cardAt = -1, introFrame = -1, podiumFrame = -1;
     static bool tunnelFrame;
+    static double surveyAt = -1; static int surveyN;   // -survey: a frame every 2 s of the drive, to look round the whole lap
     static string startItem = "<not checked>";
     static int packBefore;
     static int podiumRacers;
@@ -118,6 +119,8 @@ public static class ContractTest
         bool active = show != null && show.Active;
         if (introAt < 0 && active && race.state == RaceManager.State.Idle) { introAt = t; Debug.Log($"[contract] flow: prize shot at {t:F1}s"); }
         if (introAt > 0 && introFrame < 0 && t - introAt > 2.2) { introFrame = t; Frame("flow-intro"); }
+        if (race.state == RaceManager.State.Racing && surveyN < 24 && t - surveyAt > 2.0 && System.Environment.GetCommandLineArgs().Contains("-survey"))
+        { surveyAt = t; Frame($"lap-{surveyN++:00}"); Debug.Log($"[contract] survey {surveyN - 1} at {race.Player.transform.position}"); }
         // one frame from inside the tunnel, if the map has one: the race camera, mid-drive
         if (!tunnelFrame && race.state == RaceManager.State.Racing)
         {

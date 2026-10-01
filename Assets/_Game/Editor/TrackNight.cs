@@ -57,7 +57,7 @@ public static partial class TrackSetup
         int n = centre.Length, step = Mathf.Max(1, Samples(V.lampEvery)), count = 0;
         for (int i = Samples(9f); i < n; i += step)
         {
-            if (InTunnel(i)) continue;
+            if (InTunnel(i) || InTunnel(Wrap(i + Samples(20f), n)) || InTunnel(Wrap(i - Samples(20f), n))) continue;   // nor at the portals: a lamp there lights the tube and crowds out its own bars
             var c = CornerAt(i);
             float side = c.HasValue ? c.Value.outside : 1f;      // `right` points into the island: +1 is the land side
             Lamp(root, i, side, pole, glow, ref count);
@@ -84,7 +84,7 @@ public static partial class TrackSetup
         light.transform.localPosition = new Vector3(0, H - 0.35f, Arm + 0.1f);
         light.transform.localRotation = Quaternion.Euler(90, 0, 0);
         lampHeads.Add(light.transform.position);
-        light.type = LightType.Spot; light.color = Sodium; light.intensity = 340f; light.range = 40f;
+        light.type = LightType.Spot; light.color = Sodium; light.intensity = 340f; light.range = 34f;   // 34 m at 30 m spacing: a 114 m road piece still fits its lamps and the headlights in eight lights
         light.spotAngle = 112f; light.innerSpotAngle = 40f; light.shadows = LightShadows.None;   // wide: the pool reaches well onto the road
         var capsule = lamp.gameObject.AddComponent<CapsuleCollider>();
         capsule.center = new Vector3(0, H / 2f, 0); capsule.height = H; capsule.radius = 0.16f;
@@ -268,7 +268,9 @@ public static partial class TrackSetup
         var lit = Shader.Find("Universal Render Pipeline/Lit");
         var concrete = LoadOrCreate(Art + "Materials/Tunnel_Concrete.mat", lit, Color.white);
         concrete.SetTexture("_BaseMap", Tex("Surfaces/concrete_diff")); concrete.SetTexture("_BumpMap", Tex("Surfaces/concrete_nor"));
-        concrete.EnableKeyword("_NORMALMAP"); concrete.SetFloat("_Smoothness", 0.3f); concrete.SetColor("_BaseColor", new Color(0.8f, 0.8f, 0.82f));
+        concrete.EnableKeyword("_NORMALMAP"); concrete.SetFloat("_Smoothness", 0.3f); concrete.SetColor("_BaseColor", new Color(0.62f, 0.62f, 0.65f));
+        // the bars point down, so the walls only catch their edge: a faint warm glow stands in for the bounce off the road
+        concrete.EnableKeyword("_EMISSION"); concrete.SetColor("_EmissionColor", new Color(0.16f, 0.10f, 0.05f)); concrete.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
         concrete.SetTextureScale("_BaseMap", Vector2.one / 2.7f);
         EditorUtility.SetDirty(concrete);
         var rock = Plain("Tunnel_Rock", new Color(0.30f, 0.29f, 0.28f));
@@ -286,32 +288,38 @@ public static partial class TrackSetup
         outer.Add(new Vector2(W + T, WallH)); outer.Add(new Vector2(W + T, 0f));
         var along = new float[profile.Count]; for (int k = 1; k < profile.Count; k++) along[k] = along[k - 1] + Vector2.Distance(profile[k], profile[k - 1]);
 
-        var mb = new MeshBuilder();
-        const int Inner = 0, Outer = 1;
+        const int Inner = 0, Outer = 1, Pieces = 4;
         Vector3 At(int i, Vector2 p) => centre[i] + right[i] * p.x + Vector3.up * p.y;
-        for (int k = 0; k < tunnelCount; k++)
+        // In four pieces: a mesh is lit by at most eight lights, and one 96 m tube wanted its own bars, the kart's
+        // headlights and the nearest street lamps all at once — whole stretches of wall went black.
+        for (int piece = 0; piece < Pieces; piece++)
         {
-            int i = Wrap(tunnelStart + k, n), j = Wrap(i + 1, n);
-            float u0 = arc[i], u1 = arc[i] + Vector3.Distance(centre[i], centre[j]);
-            var axisI = centre[i] + Vector3.up * WallH * 0.6f;
-            for (int q = 0; q < profile.Count - 1; q++)
+            var mb = new MeshBuilder();
+            int k0 = tunnelCount * piece / Pieces, k1 = tunnelCount * (piece + 1) / Pieces;
+            for (int k = k0; k < k1; k++)
             {
-                var a = At(i, profile[q]); var b = At(i, profile[q + 1]); var c = At(j, profile[q + 1]); var d = At(j, profile[q]);
-                mb.QuadToward(Inner, a, b, c, d, axisI - (a + b + c + d) / 4f, new Vector2(along[q], u0), new Vector2(along[q + 1], u0), new Vector2(along[q + 1], u1), new Vector2(along[q], u1));
-                var oa = At(i, outer[q]); var ob = At(i, outer[q + 1]); var oc = At(j, outer[q + 1]); var od = At(j, outer[q]);
-                mb.QuadToward(Outer, oa, ob, oc, od, (oa + ob + oc + od) / 4f - axisI);
-            }
-            // portal faces: the ring between the two profiles at each end
-            if (k == 0 || k == tunnelCount - 1)
-            {
-                int e = k == 0 ? i : j; var toward = Forward(e) * (k == 0 ? -1f : 1f);
+                int i = Wrap(tunnelStart + k, n), j = Wrap(i + 1, n);
+                float u0 = arc[i], u1 = arc[i] + Vector3.Distance(centre[i], centre[j]);
+                var axisI = centre[i] + Vector3.up * WallH * 0.6f;
                 for (int q = 0; q < profile.Count - 1; q++)
-                    mb.QuadToward(Outer, At(e, profile[q]), At(e, profile[q + 1]), At(e, outer[q + 1]), At(e, outer[q]), toward);
+                {
+                    var a = At(i, profile[q]); var b = At(i, profile[q + 1]); var c = At(j, profile[q + 1]); var d = At(j, profile[q]);
+                    mb.QuadToward(Inner, a, b, c, d, axisI - (a + b + c + d) / 4f, new Vector2(along[q], u0), new Vector2(along[q + 1], u0), new Vector2(along[q + 1], u1), new Vector2(along[q], u1));
+                    var oa = At(i, outer[q]); var ob = At(i, outer[q + 1]); var oc = At(j, outer[q + 1]); var od = At(j, outer[q]);
+                    mb.QuadToward(Outer, oa, ob, oc, od, (oa + ob + oc + od) / 4f - axisI);
+                }
+                // portal faces: the ring between the two profiles at each end
+                if (k == 0 || k == tunnelCount - 1)
+                {
+                    int e = k == 0 ? i : j; var toward = Forward(e) * (k == 0 ? -1f : 1f);
+                    for (int q = 0; q < profile.Count - 1; q++)
+                        mb.QuadToward(Outer, At(e, profile[q]), At(e, profile[q + 1]), At(e, outer[q + 1]), At(e, outer[q]), toward);
+                }
             }
+            var tube = mb.Finish(piece == 0 ? "Tunnel" : $"Tunnel_{piece}", root, new[] { concrete, rock });
+            GameObjectUtility.SetStaticEditorFlags(tube, StaticEditorFlags.BatchingStatic);
+            Count(tube);
         }
-        var tube = mb.Finish("Tunnel", root, new[] { concrete, rock });
-        GameObjectUtility.SetStaticEditorFlags(tube, StaticEditorFlags.BatchingStatic);
-        Count(tube);
         // Only the walls collide: a kart never reaches the roof, and TrackProbe's sweep (a kart's height and more) would.
         var walls = new MeshBuilder();
         for (int k = 0; k < tunnelCount; k++)
@@ -336,11 +344,12 @@ public static partial class TrackSetup
             bar.SetParent(root, false);
             bar.SetPositionAndRotation(centre[i] + Vector3.up * (WallH + Crown - 0.35f), Quaternion.LookRotation(Forward(i), Vector3.up));
             Part(bar, "Glass", quad, glow, Vector3.zero, new Vector3(2.6f, 0.5f, 1f), Quaternion.Euler(-90, 0, 0));
+            if (lights % 2 == 0) continue;   // every bar has its glass; every other one is a real light (four in the tube)
             var light = new GameObject("Light").AddComponent<Light>();
             light.transform.SetParent(bar, false);
             light.transform.localRotation = Quaternion.Euler(90, 0, 0);
-            light.type = LightType.Spot; light.color = Sodium; light.intensity = 240f; light.range = 26f;
-            light.spotAngle = 145f; light.innerSpotAngle = 60f; light.shadows = LightShadows.None;   // wide, so the walls catch it too
+            light.type = LightType.Spot; light.color = Sodium; light.intensity = 280f; light.range = 36f;
+            light.spotAngle = 172f; light.innerSpotAngle = 130f; light.shadows = LightShadows.None;   // wide, so the walls catch it too
         }
         var strips = new MeshBuilder();
         for (int k = 0; k < tunnelCount; k++)
@@ -371,28 +380,40 @@ public static partial class TrackSetup
         var rocks = new[] { "rocks-sand-a", "rocks-sand-b", "rocks-sand-c" };
         var pile = new GameObject("TunnelRock").transform;
         pile.SetParent(root, false);
+        // Heights are measured from the ROAD: it runs metres above zero here, and rocks placed by absolute height
+        // hung inside the bore and dipped into the portal's mouth. Over the tube a rock's foot sits just inside the
+        // shell's thickness at that point of the arch, so nothing shows from within.
+        float Shell(float x) { float c = Mathf.Clamp(x / (W + T), -1f, 1f); return WallH + Mathf.Sqrt(1f - c * c) * (Crown + T) - 0.35f; }
         for (int k = 0; k <= tunnelCount; k += 3)
         {
             int i = Wrap(tunnelStart + k, n);
             foreach (float side in new[] { -1f, 1f })
             {
-                var p = At(i, new Vector2((W + 3f + (float)rnd.NextDouble() * 4f) * side, 0f));
-                Prop(pile, "Pirate", rocks[rnd.Next(rocks.Length)], new Vector3(p.x, -0.6f, p.z), (float)rnd.NextDouble() * 360f, 6f + (float)rnd.NextDouble() * 5f);
+                // a rock is about as wide as it is tall: stand it far enough out that none of it comes through the wall
+                float tall = 6f + (float)rnd.NextDouble() * 5f;
+                var p = At(i, new Vector2((W + T + 1f + tall * 0.6f + (float)rnd.NextDouble() * 3f) * side, 0f));
+                Prop(pile, "Pirate", rocks[rnd.Next(rocks.Length)], new Vector3(p.x, centre[i].y - 0.6f, p.z), (float)rnd.NextDouble() * 360f, tall);
             }
             for (int c = 0; c < 2; c++)
             {
-                var p = At(i, new Vector2(((float)rnd.NextDouble() - 0.5f) * 1.6f * W, 0f));
-                Prop(pile, "Pirate", rocks[rnd.Next(rocks.Length)], new Vector3(p.x, WallH + Crown - 3f, p.z), (float)rnd.NextDouble() * 360f, 5f + (float)rnd.NextDouble() * 5f);
+                float x = ((float)rnd.NextDouble() - 0.5f) * 1.6f * W;
+                var p = At(i, new Vector2(x, 0f));
+                Prop(pile, "Pirate", rocks[rnd.Next(rocks.Length)], new Vector3(p.x, centre[i].y + Shell(x), p.z), (float)rnd.NextDouble() * 360f, 5f + (float)rnd.NextDouble() * 5f);
             }
         }
         foreach (int e in new[] { tunnelStart, Wrap(tunnelStart + tunnelCount, n) })
+        {
+            float into = e == tunnelStart ? 1f : -1f;            // along the road, toward the inside of the tube
             for (int r = 0; r < 9; r++)
             {
                 float t = (r + 0.5f) / 9f;                       // across the portal, left to right
-                var p = At(e, new Vector2(Mathf.Lerp(-W - 2f, W + 2f, t), 0f)) + Forward(e) * ((float)rnd.NextDouble() * 6f - 3f);
                 bool crown = Mathf.Abs(t - 0.5f) < 0.3f;
-                Prop(pile, "Pirate", rocks[rnd.Next(rocks.Length)], new Vector3(p.x, crown ? WallH + Crown - 2f : -0.5f, p.z), (float)rnd.NextDouble() * 360f, 5f + (float)rnd.NextDouble() * 4f + (crown ? 5f : 0f));
+                // over the arch, set back from the face; beside it, clear of the opening: never in the mouth
+                float x = crown ? Mathf.Lerp(-W, W, t) : Mathf.Sign(t - 0.5f) * (W + T + 5f + (float)rnd.NextDouble() * 4f);
+                var p = At(e, new Vector2(x, 0f)) + Forward(e) * into * (crown ? 1.5f + (float)rnd.NextDouble() * 3f : (float)rnd.NextDouble() * 5f - 1f);
+                Prop(pile, "Pirate", rocks[rnd.Next(rocks.Length)], new Vector3(p.x, centre[e].y + (crown ? Shell(x) : -0.5f), p.z), (float)rnd.NextDouble() * 360f, 5f + (float)rnd.NextDouble() * 4f + (crown ? 4f : 0f));
             }
+        }
         Debug.Log($"[track] tunnel {TunnelLength:F0} m from sample {tunnelStart}, {lights} light bars, {cleared} props cleared from its path");
     }
 
@@ -436,7 +457,7 @@ public static partial class TrackSetup
         mat.shader = shader; mat.SetColor("_Color", colour); mat.SetFloat("_Strength", 1f); mat.SetFloat("_Near", 5f);
         EditorUtility.SetDirty(mat);
         // size in metres, falloff power, strength
-        (float size, float power, float strength)[] layers = { (30f, 2.0f, 0.26f), (8f, 2.6f, 0.9f), (2.2f, 1.4f, 3.0f) };
+        (float size, float power, float strength)[] layers = { (22f, 2.0f, 0.30f), (8f, 2.6f, 0.9f), (2.2f, 1.4f, 3.0f) };
         var v = new List<Vector3>(); var uv = new List<Vector2>(); var uv2 = new List<Vector2>(); var col = new List<Color>(); var tri = new List<int>();
         foreach (var world in at)
         {

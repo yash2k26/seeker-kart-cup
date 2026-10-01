@@ -24,6 +24,7 @@ Shader "KartCup/Glow"
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            #pragma multi_compile_fog
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
@@ -33,27 +34,34 @@ Shader "KartCup/Glow"
             CBUFFER_END
 
             struct A { float4 positionOS : POSITION; float2 uv : TEXCOORD0; float2 uv2 : TEXCOORD1; float4 color : COLOR; };
-            struct V { float4 positionCS : SV_POSITION; float2 uv : TEXCOORD0; float3 tint : TEXCOORD1; float power : TEXCOORD2; };
+            struct V { float4 positionCS : SV_POSITION; float2 uv : TEXCOORD0; float3 tint : TEXCOORD1; float2 powerFog : TEXCOORD2; };
 
             V vert (A i)
             {
                 V o;
                 float3 centreWS = TransformObjectToWorld(i.positionOS.xyz);
                 float3 centreVS = TransformWorldToView(centreWS);
-                centreVS.xy += i.uv * (i.uv2.x * 0.5);
+                // Past its reach a glow is not drawn at all (the quad collapses): the wide haze layers are the costly
+                // ones on a phone, forty of them overlapping down a straight, and beyond ~100 m the fog has them anyway.
+                float dist = -centreVS.z;
+                float reach = i.uv2.x > 12.0 ? 110.0 : 240.0;
+                float keep = saturate((reach - dist) / 30.0);
+                centreVS.xy += i.uv * (i.uv2.x * 0.5) * step(0.001, keep);
                 o.positionCS = TransformWViewToHClip(centreVS);
                 o.uv = i.uv;
                 // gone when the camera is inside it, so a lamp passed close does not white the frame out
                 float near = saturate(-centreVS.z / _Near);
-                o.tint = _Color.rgb * i.color.rgb * (i.color.a * _Strength * near);
-                o.power = i.uv2.y;
+                o.tint = _Color.rgb * i.color.rgb * (i.color.a * _Strength * near * keep);
+                o.powerFog = float2(i.uv2.y, ComputeFogFactor(o.positionCS.z));
                 return o;
             }
 
             float4 frag (V i) : SV_Target
             {
                 float r = saturate(1.0 - length(i.uv));
-                return float4(i.tint * pow(r, i.power), 1);
+                // the haze swallows a far lamp like anything else: without this every lamp on the lap shows at once
+                float3 c = MixFogColor(i.tint * pow(r, i.powerFog.x), 0, i.powerFog.y);
+                return float4(c, 1);
             }
             ENDHLSL
         }
