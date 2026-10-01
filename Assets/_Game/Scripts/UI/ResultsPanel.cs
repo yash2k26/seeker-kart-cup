@@ -89,7 +89,14 @@ namespace KartCup
             bool mine = top.Count > 0 && top[0] == Cup.PlayerCharacter;
             string heading = mine ? (cupPodium ? "YOU TAKE THE CUP!" : "YOU WIN!")
                 : top.Count > 0 ? $"{Name(top[0]).ToUpperInvariant()} {(cupPodium ? "TAKES THE CUP!" : "WINS!")}" : "";
-            StartCoroutine(Ceremony(top.Select(c => Podium(c, Name(c))).ToList(), heading, 1.4f));
+            // with money on the room, each place's card carries what it paid (the room's last race settles it)
+            var paid = RoomClient.Instance != null && RoomClient.Instance.Room != null && RoomClient.Instance.Room.IsPaid && final ? RoomClient.Instance.Room : null;
+            StartCoroutine(Ceremony(top.Select((c, i) =>
+            {
+                var w = Podium(c, Name(c));
+                if (paid != null && i < paid.prizes.Count) w.prize = "+" + WalletFlow.Amount(paid.prizes[i], paid.currency);
+                return w;
+            }).ToList(), heading, 1.4f));
         }
 
         // ---------- the podium, then the card ----------

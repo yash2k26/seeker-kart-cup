@@ -49,11 +49,9 @@ public static class PodiumSetup
         var silver = Metal("Trophy_Silver", lit, new Color(0.83f, 0.86f, 0.9f));
         var bronze = Metal("Trophy_Bronze", lit, new Color(0.78f, 0.45f, 0.22f));
         var plinthMat = Plain("Podium_Plinth", lit, Design.Ink900, 0.45f);
-        var blockMat = Plain("Podium_Block", lit, Design.Paper, 0.25f);
-        var floorMat = Plain("Podium_Floor", lit, Design.Ink700, 0.15f);
-        var backMat = Plain("Podium_Backdrop", lit, Design.Ink800, 0.1f);
-        var carpetMat = Plain("Podium_Carpet", lit, Design.Ember, 0.1f);
-        var popperMat = Plain("Podium_Popper", lit, Design.Ember, 0.35f);
+        var blockMat = Plain("Podium_Block", lit, new Color(0.05f, 0.07f, 0.09f), 0.82f);
+        var floorMat = Plain("Podium_Floor", lit, new Color(0.02f, 0.03f, 0.04f), 0.55f);
+        var popperMat = Metal("Podium_Popper", lit, new Color(1f, 0.74f, 0.2f));
         var confettiMat = Confetti("Podium_Confetti");
         var cup = Save(CupMesh(), "trophy_cup");
         var cone = Save(PopperMesh(), "popper_cone");
@@ -62,22 +60,37 @@ public static class PodiumSetup
         var cylinder = Resources.GetBuiltinResource<Mesh>("Cylinder.fbx");
 
         // ---- the stage ----
+        // A night stage in the game's own gold: a black gloss floor ringed in light, the sun turning slowly behind the
+        // podium, the blocks dark with their place lit on the front, glitter rising through all of it. Nothing
+        // borrowed from a paddock (the banner towers, the flags and the red carpet are gone).
         var root = new GameObject("PodiumStage");
         var show = root.AddComponent<PodiumShow>();
-        Part(root.transform, "Floor", cylinder, floorMat, new Vector3(0, -0.1f, 0), new Vector3(26, 0.1f, 26));
-        Part(root.transform, "Carpet", cube, carpetMat, new Vector3(0, 0.012f, -4.6f), new Vector3(1.6f, 0.02f, 8f));
-        Part(root.transform, "Backdrop", cube, backMat, new Vector3(0, 3.9f, 3.6f), new Vector3(15f, 7.8f, 0.4f));
-        Part(root.transform, "BackdropTrim", cube, carpetMat, new Vector3(0, 0.35f, 3.38f), new Vector3(15f, 0.7f, 0.06f));
+        var goldC = Hex("FFC83A"); var silverC = new Color(0.83f, 0.88f, 0.95f); var bronzeC = new Color(0.95f, 0.55f, 0.28f);
+        Part(root.transform, "Floor", cylinder, floorMat, new Vector3(0, -0.1f, 0), new Vector3(30, 0.1f, 30));
+        // The stage brings its own night: a dark drum round it, drawn from the inside, so the ceremony looks the same
+        // on a snowfield at blue hour as on the coast after dark.
+        var drum = Part(root.transform, "Drum", cylinder, Inside("Podium_Drum", new Color(0.025f, 0.04f, 0.065f)), new Vector3(0, 13f, 0), new Vector3(40f, 15f, 40f));
+        var ringMat = Glow("Podium_Ring", "fx_ring", goldC * 0.75f);
+        var ring = Part(root.transform, "FloorRing", quad, ringMat, new Vector3(0, 0.02f, 0.2f), new Vector3(13f, 13f, 1f));
+        ring.localRotation = Quaternion.Euler(90, 0, 0);
+        var sunMat = Glow("Podium_Sun", SunTexture(), goldC * 0.62f);
+        var sun = Part(root.transform, "Sun", quad, sunMat, new Vector3(0, 4.6f, 5.2f), new Vector3(9.5f, 9.5f, 1f));
+        var turn = sun.gameObject.AddComponent<Rotor>(); turn.period = 46f; turn.axis = Vector3.forward;
+        Part(root.transform, "SunHalo", quad, Glow("Podium_Halo", "fx_dot", goldC * 0.42f), new Vector3(0, 4.6f, 5.6f), new Vector3(22f, 22f, 1f));
 
         var metals = new[] { gold, silver, bronze };
-        var spots = new Transform[3]; var trophies = new Transform[3]; var plates = new TMP_Text[3];
+        var glows = new[] { Emit("Podium_GlowGold", lit, goldC, 2.2f), Emit("Podium_GlowSilver", lit, silverC, 1.6f), Emit("Podium_GlowBronze", lit, bronzeC, 1.8f) };
+        var tints = new[] { goldC, silverC, bronzeC };
+        var spots = new Transform[3]; var trophies = new Transform[3];
         for (int i = 0; i < 3; i++)
         {
             var (x, h) = Blocks[i];
-            var block = Part(root.transform, "Block" + Place[i], cube, blockMat, new Vector3(x, h / 2f, 0), new Vector3(BlockW, h, BlockD));
-            Part(root.transform, "Trim" + Place[i], cube, metals[i], new Vector3(x, h - 0.05f, -BlockD / 2f - 0.02f), new Vector3(BlockW, 0.1f, 0.04f));
-            var number = Text3D(root.transform, "Number" + Place[i], Place[i], Design.Display, Mathf.Min(h * 9f, 9f), Design.Ink800,
-                                new Vector3(x, h * 0.45f, -BlockD / 2f - 0.02f), new Vector2(BlockW, h * 0.9f));
+            Part(root.transform, "Block" + Place[i], cube, blockMat, new Vector3(x, h / 2f, 0), new Vector3(BlockW, h, BlockD));
+            // a lit edge along the top and the foot of each block, in its metal
+            Part(root.transform, "Trim" + Place[i], cube, glows[i], new Vector3(x, h - 0.03f, -BlockD / 2f - 0.02f), new Vector3(BlockW, 0.06f, 0.04f));
+            Part(root.transform, "Foot" + Place[i], cube, glows[i], new Vector3(x, 0.03f, -BlockD / 2f - 0.02f), new Vector3(BlockW, 0.06f, 0.04f));
+            var number = Text3D(root.transform, "Number" + Place[i], Place[i], Design.Display, Mathf.Min(h * 9f, 9f), tints[i],
+                                new Vector3(x, h * 0.47f, -BlockD / 2f - 0.02f), new Vector2(BlockW, h * 0.9f));
             number.fontStyle = FontStyles.Normal;
 
             var spot = new GameObject("Spot" + Place[i]).transform;
@@ -87,17 +100,7 @@ public static class PodiumSetup
             spots[i] = spot;
 
             trophies[i] = Trophy(root.transform, "Trophy" + Place[i], cup, metals[i], plinthMat, cube, new Vector3(x, h, -0.1f));
-            plates[i] = Text3D(root.transform, "Plate" + Place[i], "", Design.Strong, 2.6f, Design.Paper, new Vector3(x, h + 1.05f, -0.2f), new Vector2(1.9f, 1.2f));
         }
-
-        var title = Text3D(root.transform, "Title", "PRIZE POOL", Design.Display, 11f, Design.Paper, new Vector3(0, 6.55f, 3.35f), new Vector2(14f, 1.4f));
-        var subtitle = Text3D(root.transform, "Subtitle", "", Design.Display, 8f, Hex("FFC83A"), new Vector3(0, 5.4f, 3.35f), new Vector2(14f, 1.1f));
-
-        // Kit dressing either side of the backdrop: the racing kit's banner towers and chequered flags.
-        Kit(root.transform, "bannerTowerRed", new Vector3(-6.4f, 0, 2.6f), 170f, 7.5f);
-        Kit(root.transform, "bannerTowerGreen", new Vector3(6.4f, 0, 2.6f), 190f, 7.5f);
-        Kit(root.transform, "flagCheckers", new Vector3(-4.6f, 0, -2.2f), 160f, 3.2f);
-        Kit(root.transform, "flagCheckers", new Vector3(4.6f, 0, -2.2f), 200f, 3.2f);
 
         // Party poppers either side, aimed up over the podium; confetti rains through the ceremony.
         var poppers = new List<ParticleSystem>();
@@ -117,23 +120,38 @@ public static class PodiumSetup
         var rain = Particles(root.transform, "Rain", confettiMat, quad, rain: true);
         rain.transform.localPosition = new Vector3(0, 9f, 0.5f);
 
+        // gold dust rising off the floor the whole time, each mote flaring and dimming
+        {
+            var go = new GameObject("Glitter"); go.transform.SetParent(root.transform, false); go.transform.localPosition = new Vector3(0, 0.3f, 0.5f);
+            var ps = go.AddComponent<ParticleSystem>();
+            var m = ps.main; m.loop = true; m.playOnAwake = true; m.prewarm = true; m.startLifetime = new ParticleSystem.MinMaxCurve(2.5f, 5f);
+            m.startSpeed = new ParticleSystem.MinMaxCurve(0.25f, 0.9f); m.startSize = new ParticleSystem.MinMaxCurve(0.12f, 0.38f); m.maxParticles = 90;
+            m.simulationSpace = ParticleSystemSimulationSpace.World; m.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 0.5f);
+            var e = ps.emission; e.rateOverTime = 16f;
+            var sh = ps.shape; sh.shapeType = ParticleSystemShapeType.Box; sh.scale = new Vector3(13f, 0.4f, 7f); sh.rotation = new Vector3(-90, 0, 0);
+            var tw = new AnimationCurve(); for (int i = 0; i <= 8; i++) tw.AddKey(i / 8f, i == 0 || i == 8 ? 0f : i % 2 == 0 ? 0.3f : 1f);
+            var sz = ps.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, tw);
+            var r = go.GetComponent<ParticleSystemRenderer>(); r.sharedMaterial = Glow("Podium_Glitter", "fx_sparkle", goldC * 3.2f);
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+
         // Stage light: the ceremony plays in the race scene, and after dark the coast's moon is not enough to see a
-        // face by. Two warm spots from the front corners, no shadows.
+        // face by. Two warm spots from the front corners, a gold rim from behind; no shadows.
         foreach (float side in new[] { -1f, 1f })
         {
             var l = new GameObject(side < 0 ? "StageLightL" : "StageLightR").AddComponent<Light>();
             l.transform.SetParent(root.transform, false);
             l.transform.localPosition = new Vector3(6f * side, 7.5f, -8f);
             l.transform.LookAt(root.transform.position + new Vector3(0, 1.6f, 0));
-            l.type = LightType.Spot; l.spotAngle = 85f; l.innerSpotAngle = 50f; l.range = 30f; l.intensity = 110f;   // a 10 m throw
+            l.type = LightType.Spot; l.spotAngle = 85f; l.innerSpotAngle = 50f; l.range = 30f; l.intensity = 120f;   // a 10 m throw
             l.color = new Color(1f, 0.95f, 0.88f); l.shadows = LightShadows.None;
         }
-        var wash = new GameObject("StageWash").AddComponent<Light>();        // a cool wash up the backdrop and over the blocks
-        wash.transform.SetParent(root.transform, false);
-        wash.transform.localPosition = new Vector3(0, 9f, -9f);
-        wash.transform.LookAt(root.transform.position + new Vector3(0, 4f, 3.6f));
-        wash.type = LightType.Spot; wash.spotAngle = 75f; wash.innerSpotAngle = 40f; wash.range = 32f; wash.intensity = 60f;
-        wash.color = new Color(0.85f, 0.92f, 1f); wash.shadows = LightShadows.None;
+        var rim = new GameObject("StageRim").AddComponent<Light>();          // the sun behind them, on their shoulders
+        rim.transform.SetParent(root.transform, false);
+        rim.transform.localPosition = new Vector3(0, 6.5f, 5.5f);
+        rim.transform.LookAt(root.transform.position + new Vector3(0, 1.8f, 0));
+        rim.type = LightType.Spot; rim.spotAngle = 80f; rim.innerSpotAngle = 40f; rim.range = 24f; rim.intensity = 90f;
+        rim.color = new Color(1f, 0.74f, 0.3f); rim.shadows = LightShadows.None;
 
         var camGo = new GameObject("PodiumCam");
         camGo.transform.SetParent(root.transform, false);
@@ -144,11 +162,53 @@ public static class PodiumSetup
         cam.clearFlags = CameraClearFlags.Skybox;
         cam.enabled = false;
 
+        // ---- the words: a canvas on the stage's own camera (2400 x 1080, fitted by height like the menus) ----
+        var canvasGo = new GameObject("Overlay", typeof(RectTransform), typeof(Canvas), typeof(UnityEngine.UI.CanvasScaler), typeof(CanvasGroup));
+        canvasGo.transform.SetParent(root.transform, false);
+        var canvas = canvasGo.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceCamera; canvas.worldCamera = cam; canvas.planeDistance = 0.6f; canvas.sortingOrder = 5;
+        var scaler = canvasGo.GetComponent<UnityEngine.UI.CanvasScaler>();
+        scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize; scaler.referenceResolution = new Vector2(2400, 1080); scaler.matchWidthOrHeight = 1f;
+        var group = canvasGo.GetComponent<CanvasGroup>(); group.interactable = false; group.blocksRaycasts = false;
+
+        // a soft dark wedge behind the words, so they read over anything the camera finds
+        var scrim = UI("Scrim", canvasGo.transform, new Vector2(0, 0), new Vector2(0, 1), Vector2.zero, new Vector2(1500, 0));
+        scrim.pivot = new Vector2(0, 0.5f);
+        var scrimImg = scrim.gameObject.AddComponent<UnityEngine.UI.Image>(); scrimImg.sprite = Gradient("podium_scrim"); scrimImg.color = new Color(0.02f, 0.04f, 0.06f, 0.82f); scrimImg.raycastTarget = false;
+
+        var title = Words("Kicker", canvasGo.transform, Design.Strong, "PRIZE POOL", 40, Design.Ember, new Vector2(0, 1), new Vector2(120, -96), new Vector2(1200, 56));
+        title.characterSpacing = 14f;
+        var subtitle = Words("Big", canvasGo.transform, Design.Display, "", 210, goldC, new Vector2(0, 1), new Vector2(112, -150), new Vector2(1700, 236));
+        var hint = Words("Hint", canvasGo.transform, Design.Strong, "TAP TO SKIP", 28, Design.Muted, new Vector2(1, 0), new Vector2(-110, 64), new Vector2(500, 40));
+        hint.alignment = TextAlignmentOptions.Right; hint.characterSpacing = 10f;
+
+        var cards = new RectTransform[3]; var mains = new TMP_Text[3]; var notes = new TMP_Text[3];
+        string[] ordinal = { "1ST", "2ND", "3RD" };
+        for (int i = 0; i < 3; i++)
+        {
+            var card = UI("Card" + Place[i], canvasGo.transform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(120 + 270, -540 - i * 164), new Vector2(540, 148));
+            Design.AsCard(card, new Color(Design.Ink900.r, Design.Ink900.g, Design.Ink900.b, 0.9f)).raycastTarget = false;
+            var bar = UI("Bar", card, new Vector2(0, 0), new Vector2(0, 1), new Vector2(18, 0), new Vector2(10, -40));
+            var barImg = bar.gameObject.AddComponent<UnityEngine.UI.Image>(); barImg.color = tints[i]; barImg.raycastTarget = false;
+            var place = Words("Place", card, Design.Display, ordinal[i], 88, tints[i], new Vector2(0, 0.5f), new Vector2(46, 0), new Vector2(180, 104));
+            place.alignment = TextAlignmentOptions.Left;
+            mains[i] = Words("Main", card, Design.Display, "", 66, Design.Paper, new Vector2(0, 0.5f), new Vector2(214, 0), new Vector2(310, 92));
+            mains[i].alignment = TextAlignmentOptions.Left; mains[i].enableAutoSizing = true; mains[i].fontSizeMin = 34; mains[i].fontSizeMax = 66;
+            notes[i] = Words("Note", card, Design.Strong, "", 36, goldC, new Vector2(0, 0.5f), new Vector2(216, -40), new Vector2(306, 44));
+            notes[i].alignment = TextAlignmentOptions.Left;
+            cards[i] = card;
+        }
+        canvasGo.SetActive(false);                       // PodiumShow raises it with its camera
+
         var so = new SerializedObject(show);
         so.FindProperty("cam").objectReferenceValue = cam;
         Fill(so.FindProperty("spots"), spots);
         Fill(so.FindProperty("trophies"), trophies);
-        Fill(so.FindProperty("plates"), plates);
+        Fill(so.FindProperty("plates"), mains);
+        Fill(so.FindProperty("cardNotes"), notes);
+        Fill(so.FindProperty("cards"), cards);
+        so.FindProperty("overlay").objectReferenceValue = group;
+        so.FindProperty("hint").objectReferenceValue = hint;
         so.FindProperty("title").objectReferenceValue = title;
         so.FindProperty("subtitle").objectReferenceValue = subtitle;
         Fill(so.FindProperty("poppers"), poppers.ToArray());
@@ -168,7 +228,6 @@ public static class PodiumSetup
             e.FindPropertyRelative("outRight").quaternionValue = g.outRight;
         }
         so.FindProperty("pop").objectReferenceValue = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Game/Audio/SFX/podium/popper.wav");
-        so.FindProperty("namePlateHeight").floatValue = standH * 1.7f + 0.35f;   // PodiumShow.driverScale
         so.ApplyModifiedPropertiesWithoutUndo();
 
         PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
@@ -467,7 +526,101 @@ public static class PodiumSetup
         return g;
     }
 
+    // ---------- the overlay's pieces ----------
+
+    static RectTransform UI(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 offset, Vector2 dims)
+    {
+        var rt = (RectTransform)new GameObject(name, typeof(RectTransform)).transform;
+        rt.SetParent(parent, false);
+        rt.anchorMin = anchorMin; rt.anchorMax = anchorMax; rt.anchoredPosition = offset; rt.sizeDelta = dims;
+        return rt;
+    }
+
+    static TextMeshProUGUI Words(string name, Transform parent, TMP_FontAsset font, string text, float size, Color colour, Vector2 anchor, Vector2 offset, Vector2 dims)
+    {
+        var rt = UI(name, parent, anchor, anchor, offset, dims);
+        rt.pivot = anchor;
+        var t = rt.gameObject.AddComponent<TextMeshProUGUI>();
+        if (font != null) t.font = font;
+        t.text = text; t.fontSize = size; t.color = colour; t.alignment = TextAlignmentOptions.TopLeft;
+        t.raycastTarget = false; t.textWrappingMode = TextWrappingModes.NoWrap;
+        return t;
+    }
+
+    /// A sprite that is solid at its left edge and gone at its right: the wedge of dark the words sit on.
+    static Sprite Gradient(string name)
+    {
+        string path = Dir + name + ".png";
+        if (AssetDatabase.LoadAssetAtPath<Sprite>(path) == null)
+        {
+            var t = new Texture2D(256, 4, TextureFormat.RGBA32, false);
+            for (int x = 0; x < 256; x++) for (int y = 0; y < 4; y++) t.SetPixel(x, y, new Color(1, 1, 1, Mathf.Pow(1f - x / 255f, 1.6f)));
+            File.WriteAllBytes(path, t.EncodeToPNG()); Object.DestroyImmediate(t);
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+            var imp = (TextureImporter)AssetImporter.GetAtPath(path);
+            imp.textureType = TextureImporterType.Sprite; imp.alphaIsTransparency = true; imp.wrapMode = TextureWrapMode.Clamp; imp.mipmapEnabled = false; imp.SaveAndReimport();
+        }
+        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+    }
+
     // ---------- materials ----------
+
+    /// The sun behind the podium: sixteen rays round a soft disc, painted at 1024 so its edge stays clean nine metres wide.
+    static string SunTexture()
+    {
+        string path = Dir + "podium_sun.png";
+        if (AssetDatabase.LoadAssetAtPath<Texture2D>(path) == null)
+        {
+            const int n = 1024;
+            var t = new Texture2D(n, n, TextureFormat.RGBA32, false);
+            var px = new Color[n * n];
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    float u = (x + 0.5f) / n * 2f - 1f, v = (y + 0.5f) / n * 2f - 1f, r = Mathf.Sqrt(u * u + v * v);
+                    float saw = Mathf.Abs(Mathf.Repeat(Mathf.Atan2(v, u) / (Mathf.PI * 2f) * 16f, 1f) - 0.5f) * 2f;   // 0 at a ray's tip
+                    float edge = Mathf.Lerp(0.95f, 0.66f, saw), d = edge - r;
+                    float rays = Mathf.Clamp01(d / 0.006f) * (0.30f + 0.5f * Mathf.Clamp01(1f - d / 0.07f));                // a bright rim, a soft body
+                    float disc = Mathf.Clamp01((0.44f - r) / 0.006f) * 0.5f;
+                    px[y * n + x] = new Color(1, 1, 1, Mathf.Clamp01(Mathf.Max(rays, disc)));
+                }
+            t.SetPixels(px);
+            File.WriteAllBytes(path, t.EncodeToPNG()); Object.DestroyImmediate(t);
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+            var imp = (TextureImporter)AssetImporter.GetAtPath(path);
+            imp.alphaIsTransparency = true; imp.wrapMode = TextureWrapMode.Clamp; imp.mipmapEnabled = true; imp.maxTextureSize = 1024; imp.SaveAndReimport();
+        }
+        return path;
+    }
+
+    /// A dark surface seen from inside (front faces culled): the drum the stage stands in.
+    static Material Inside(string name, Color c)
+    {
+        var m = Mat(name, Shader.Find("Universal Render Pipeline/Unlit"));
+        m.SetColor("_BaseColor", c); m.SetFloat("_Cull", 1f);
+        return m;
+    }
+
+    /// Light drawn on top of the frame: one of the effect shapes (ItemSetup paints them, or a path to our own) in a colour past 1.
+    static Material Glow(string name, string texture, Color hdr)
+    {
+        var m = Mat(name, Shader.Find("Universal Render Pipeline/Particles/Unlit"));
+        var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(texture.EndsWith(".png") ? texture : $"Assets/_Game/Art/Textures/FX/{texture}.png");
+        if (tex == null) Debug.LogWarning($"[podium] {texture}.png missing: run ItemSetup.Build first");
+        m.SetTexture("_BaseMap", tex); m.SetColor("_BaseColor", hdr);
+        m.SetFloat("_Surface", 1); m.SetFloat("_Blend", 2); m.SetFloat("_ZWrite", 0); m.SetFloat("_Cull", 0);
+        m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha); m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.One);
+        m.renderQueue = 3000; m.SetOverrideTag("RenderType", "Transparent"); m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        return m;
+    }
+
+    static Material Emit(string name, Shader lit, Color c, float strength)
+    {
+        var m = Mat(name, lit);
+        m.SetColor("_BaseColor", c * 0.4f); m.SetFloat("_Metallic", 0f); m.SetFloat("_Smoothness", 0.5f);
+        m.EnableKeyword("_EMISSION"); m.SetColor("_EmissionColor", c * strength); m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+        return m;
+    }
 
     static Material Metal(string name, Shader lit, Color c)
     {
@@ -531,22 +684,24 @@ public static class PodiumSetup
         var cam = stage.GetComponentInChildren<Camera>(true);
         var systems = stage.GetComponentsInChildren<ParticleSystem>(true);
 
-        show.Prizes("PRIZE POOL", "0.03 SOL", new[] { "1ST\n0.0195 SOL", "2ND\n0.0105 SOL", "3RD\n—" });
+        show.Prizes("PRIZE POOL", "0.54 SOL", new[] { "1ST\n0.351 SOL", "2ND\n0.189 SOL", "3RD\n—" });
         Simulate(systems, 0.7f);
-        show.PoseCamera(0.2f); Shot(cam, "podium-prizes-close");
-        show.PoseCamera(4f); Shot(cam, "podium-prizes");
+        show.PoseCamera(0.9f); Canvas.ForceUpdateCanvases(); Shot(cam, "podium-prizes-close");
+        show.PoseCamera(4f); Canvas.ForceUpdateCanvases(); Shot(cam, "podium-prizes");
+        show.Prizes("RACE FOR GOLD", "PALM BAY", new[] { "1ST", "2ND", "3RD" });
+        show.PoseCamera(4f); Canvas.ForceUpdateCanvases(); Shot(cam, "podium-solo");
 
-        var top = new[] { "Driver_Toly", "Driver_Mert", "Driver_Bitsy" }.Select(n => new PodiumShow.Winner {
-            driver = AssetDatabase.LoadAssetAtPath<GameObject>(Drivers + n + ".prefab"), name = n.Replace("Driver_", "") }).ToList();
+        var top = new[] { "Driver_Toly", "Driver_Mert", "Driver_Bitsy" }.Select((n, k) => new PodiumShow.Winner {
+            driver = AssetDatabase.LoadAssetAtPath<GameObject>(Drivers + n + ".prefab"), name = n.Replace("Driver_", ""), prize = k == 0 ? "+0.351 SOL" : k == 1 ? "+0.189 SOL" : "" }).ToList();
         show.Winners("TOLY WINS!", top);
         foreach (var pose in Object.FindObjectsByType<PodiumPose>(FindObjectsSortMode.None)) pose.Apply(0.26f);   // top of a hop
         foreach (var smr in stage.scene.GetRootGameObjects().SelectMany(g => g.GetComponentsInChildren<SkinnedMeshRenderer>())) smr.updateWhenOffscreen = true;
         Simulate(systems, 1.1f);
-        show.PoseCamera(1f); Shot(cam, "podium-winners");
-        show.PoseCamera(5f); Shot(cam, "podium-winners-close");
+        show.PoseCamera(1f); Canvas.ForceUpdateCanvases(); Shot(cam, "podium-winners");
+        show.PoseCamera(5f); Canvas.ForceUpdateCanvases(); Shot(cam, "podium-winners-close");
         Simulate(systems, 3.2f);
         foreach (var pose in Object.FindObjectsByType<PodiumPose>(FindObjectsSortMode.None)) pose.Apply(0.03f);   // landing
-        show.PoseCamera(3f); Shot(cam, "podium-winners-late");
+        show.PoseCamera(3f); Canvas.ForceUpdateCanvases(); Shot(cam, "podium-winners-late");
 
         Preview.Batcher(true);
         Debug.Log("[podium] wrote Builds/podium-*.png");

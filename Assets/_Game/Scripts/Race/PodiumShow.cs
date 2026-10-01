@@ -18,8 +18,15 @@ namespace KartCup
         [SerializeField] Camera cam;
         [SerializeField] Transform[] spots = new Transform[3];      // where each place stands: 0 is the winner, centre
         [SerializeField] Transform[] trophies = new Transform[3];   // gold, silver, bronze, resting on their blocks
-        [SerializeField] TMP_Text title, subtitle;
-        [SerializeField] TMP_Text[] plates = new TMP_Text[3];       // on each block: the prize, or the racer's name
+        // The words are a screen overlay on the stage's own camera, not text standing in the scene: a kicker and one
+        // big gold line top left (the pot counts up into it), and a card per place along the bottom carrying who or
+        // what that place gets. Everything is posed from the shot's clock, so a still at t is the animation at t.
+        [SerializeField] TMP_Text title, subtitle;                  // the kicker, and the big line
+        [SerializeField] TMP_Text[] plates = new TMP_Text[3];       // each card's main line: the prize, or the racer's name
+        [SerializeField] TMP_Text[] cardNotes = new TMP_Text[3];    // each card's second line (the prize under a name)
+        [SerializeField] RectTransform[] cards = new RectTransform[3];
+        [SerializeField] CanvasGroup overlay;
+        [SerializeField] TMP_Text hint;
         [SerializeField] ParticleSystem[] poppers = new ParticleSystem[0];
         [SerializeField] ParticleSystem rain;
         [SerializeField] AudioClip pop;
@@ -36,7 +43,6 @@ namespace KartCup
         [SerializeField] float[] trophyScale = { 1f, 0.8f, 0.68f };
         // The racers stand taller on the podium than in their karts, and the trophies are made to be seen from a phone.
         [SerializeField] float driverScale = 1.7f, trophySize = 1.9f;
-        [SerializeField] float namePlateHeight = 2.3f;   // above each block's top
         const float TrophyHeight = 0.545f;                // plinth and cup at scale 1 (PodiumSetup.CupMesh)
 
         public bool Active { get; private set; }
@@ -52,7 +58,11 @@ namespace KartCup
         bool winnersShot;
         Vector3 focus;
 
-        public struct Winner { public GameObject driver; public string name; }
+        public struct Winner { public GameObject driver; public string name; public string prize; }
+
+        // the big line, when it is an amount ("0.54 SOL"): counted up from nothing
+        float amount; string amountUnit, amountFormat, bigText;
+        float cardsFrom = 0.9f;
 
         /// The stage for this race scene, made on first use.
         public static PodiumShow Ensure()
@@ -94,9 +104,16 @@ namespace KartCup
             ClearDrivers();
             for (int i = 0; i < trophies.Length; i++) ResetTrophy(i);
             if (title != null) title.text = heading;
-            if (subtitle != null) subtitle.text = amount;
-            // each place's line floats just over its own trophy
-            for (int i = 0; i < plates.Length; i++) if (plates[i] != null) { plates[i].text = places != null && i < places.Count ? places[i] : ""; Plate(i, TrophyHeight * Size(i) + 0.4f); }
+            Big(amount);
+            // a card per place: "1ST" and what it pays (or, with no money on the race, the metal)
+            string[] metal = { "GOLD", "SILVER", "BRONZE" };
+            for (int i = 0; i < plates.Length; i++)
+            {
+                var line = places != null && i < places.Count ? places[i] : "";
+                int cut = line.IndexOf('\n');
+                Card(i, cut < 0 ? metal[Mathf.Min(i, 2)] : line[(cut + 1)..].Trim(), "");
+            }
+            cardsFrom = 1.5f;
             focus = trophies.Length > 0 && trophies[0] != null ? trophies[0].position + Vector3.up * TrophyHeight * Size(0) * 0.55f : transform.position + Vector3.up * 2f;
             Pop();
         }
@@ -109,19 +126,19 @@ namespace KartCup
             Begin();
             winnersShot = true;
             ClearDrivers();
-            if (title != null) title.text = heading;
-            if (subtitle != null) subtitle.text = "";
+            if (title != null) title.text = "RACE OVER";
+            Big(heading);
+            cardsFrom = 0.8f;
             for (int i = 0; i < spots.Length && i < trophies.Length; i++)
             {
                 ResetTrophy(i);
-                if (plates[i] != null) { plates[i].text = ""; Plate(i, namePlateHeight + (i == 0 ? 0.5f : 0f)); }
-                if (top == null || i >= top.Count || top[i].driver == null) continue;
+                bool there = top != null && i < top.Count && top[i].driver != null;
+                Card(i, there ? top[i].name.ToUpperInvariant() : "", there ? top[i].prize : "");
+                if (!there) continue;
                 var d = Instantiate(top[i].driver, spots[i].position, spots[i].rotation);
                 d.name = "Podium_" + top[i].name;
                 d.transform.localScale *= driverScale;
                 spawned.Add(d);
-                // the winner's name is the title; second and third wear theirs overhead
-                if (plates[i] != null) plates[i].text = i == 0 ? "" : top[i].name.ToUpperInvariant();
                 var rig = RigFor(top[i].driver.name);
                 var torso = Stand(d, rig.hold);
                 var holder = d.AddComponent<PodiumPose>();
@@ -152,6 +169,7 @@ namespace KartCup
             if (!Active) return;
             Active = false;
             if (cam != null) cam.enabled = false;
+            if (overlay != null) overlay.gameObject.SetActive(false);     // (a camera canvas with its camera off draws as an overlay)
             if (raceCam != null) raceCam.enabled = true;
             foreach (var go in hiddenHud) if (go != null) go.SetActive(true);
             hiddenHud.Clear();
@@ -165,8 +183,11 @@ namespace KartCup
         /// The camera `t` seconds into the current shot.
         public void PoseCamera(float t)
         {
+            PoseOverlay(t);
             if (cam == null) return;
             var stage = transform;
+            // the words own the left of the frame: the camera stands off to that side, so the podium sits right of centre
+            var aside = stage.right * -2.3f;
             if (!winnersShot)
             {
                 // Start close on the gold trophy, pull back to the whole podium and the title: the reveal.
@@ -175,8 +196,8 @@ namespace KartCup
                 var far = stage.position + stage.forward * -11.5f + Vector3.up * 3.2f;
                 var lookNear = focus;
                 var lookFar = stage.position + Vector3.up * 2.4f;
-                cam.transform.position = Vector3.Lerp(near, far, k) + stage.right * Mathf.Sin(t * 0.4f) * 0.6f;
-                cam.transform.rotation = Quaternion.LookRotation(Vector3.Lerp(lookNear, lookFar, k) - cam.transform.position, Vector3.up);
+                cam.transform.position = Vector3.Lerp(near, far, k) + stage.right * Mathf.Sin(t * 0.4f) * 0.6f + aside * k;
+                cam.transform.rotation = Quaternion.LookRotation(Vector3.Lerp(lookNear, lookFar, k) + aside * k - cam.transform.position, Vector3.up);
             }
             else
             {
@@ -185,12 +206,60 @@ namespace KartCup
                 float orbit = Mathf.Sin(t * 0.35f) * 9f;
                 var dir = Quaternion.AngleAxis(orbit, Vector3.up) * -stage.forward;
                 var pos = stage.position + dir * Mathf.Lerp(11.5f, 8.2f, k) + Vector3.up * Mathf.Lerp(1.8f, 2.6f, k);
+                pos += aside;
                 cam.transform.position = pos;
-                cam.transform.rotation = Quaternion.LookRotation(Vector3.Lerp(stage.position + Vector3.up * 2.9f, focus, k * 0.5f) - pos, Vector3.up);
+                cam.transform.rotation = Quaternion.LookRotation(Vector3.Lerp(stage.position + Vector3.up * 2.9f, focus, k * 0.5f) + aside - pos, Vector3.up);
             }
         }
 
         static float Ease(float x) => 1f - (1f - x) * (1f - x) * (1f - x);
+
+        // ---------- the overlay ----------
+
+        /// The big line: an amount is remembered as a number to count up to; anything else is just said.
+        void Big(string text)
+        {
+            bigText = text ?? ""; amountUnit = null;
+            var m = System.Text.RegularExpressions.Regex.Match(bigText, @"^\s*([0-9]+(?:\.([0-9]+))?)\s+(\S+)");
+            if (m.Success && float.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out amount))
+            { amountUnit = m.Groups[3].Value; amountFormat = "F" + m.Groups[2].Value.Length; }
+        }
+
+        void Card(int i, string main, string note)
+        {
+            if (i < plates.Length && plates[i] != null)
+            {
+                plates[i].text = main ?? "";
+                // alone on the card it sits on the centre line; with a second line under it, above
+                var at = plates[i].rectTransform.anchoredPosition;
+                plates[i].rectTransform.anchoredPosition = new Vector2(at.x, string.IsNullOrEmpty(note) ? 0f : 24f);
+            }
+            if (i < cardNotes.Length && cardNotes[i] != null) cardNotes[i].text = note ?? "";
+            if (i < cards.Length && cards[i] != null) cards[i].gameObject.SetActive(!string.IsNullOrEmpty(main));
+        }
+
+        /// A value that overshoots and settles: 0 before `from`, 1 after `from + dur`.
+        static float Pop(float t, float from, float dur)
+        {
+            float x = Mathf.Clamp01((t - from) / dur);
+            return x <= 0f ? 0f : x < 0.7f ? Mathf.SmoothStep(0f, 1.12f, x / 0.7f) : Mathf.Lerp(1.12f, 1f, (x - 0.7f) / 0.3f);
+        }
+
+        void PoseOverlay(float t)
+        {
+            if (overlay == null) return;
+            overlay.alpha = Mathf.Clamp01(t / 0.25f);
+            if (title != null) title.rectTransform.anchoredPosition = new Vector2(Mathf.Lerp(40f, 120f, Ease(Mathf.Clamp01(t / 0.4f))), title.rectTransform.anchoredPosition.y);
+            if (subtitle != null)
+            {
+                subtitle.rectTransform.localScale = Vector3.one * Mathf.Max(0.001f, Pop(t, 0.15f, 0.5f));
+                // the pot counts up as the camera pulls back
+                subtitle.text = amountUnit != null ? (amount * Ease(Mathf.Clamp01((t - 0.35f) / 1.3f))).ToString(amountFormat, System.Globalization.CultureInfo.InvariantCulture) + " " + amountUnit : bigText;
+            }
+            for (int i = 0; i < cards.Length; i++)
+                if (cards[i] != null) cards[i].localScale = Vector3.one * Mathf.Max(0.001f, Pop(t, cardsFrom + 0.2f * i, 0.32f));
+            if (hint != null) hint.alpha = Mathf.Clamp01((t - 2.2f) / 0.5f) * (0.55f + 0.45f * Mathf.Sin(t * 3f));
+        }
 
         // ---------- helpers ----------
 
@@ -203,6 +272,7 @@ namespace KartCup
             raceCam = Camera.main != null && Camera.main != cam ? Camera.main : null;
             if (raceCam != null) raceCam.enabled = false;
             if (cam != null) cam.enabled = true;
+            if (overlay != null) overlay.gameObject.SetActive(true);
             // The race HUD goes; the results card and the pause overlay stay available above the shot.
             var hud = FindAnyObjectByType<RaceHud>();
             var safe = hud != null ? hud.transform.Find("SafeArea") : null;
@@ -216,14 +286,6 @@ namespace KartCup
             foreach (var p in poppers) if (p != null) { p.Clear(); p.Play(); }
             if (pop != null) AudioDirector.Instance?.Play(pop, 0.9f, Random.Range(0.95f, 1.05f));
             Haptics.Play(Haptics.Kind.Win);
-        }
-
-        /// A plate floats `height` above its block, over the trophy before the race and over the racer after it.
-        void Plate(int i, float height)
-        {
-            if (i >= plates.Length || plates[i] == null || i >= spots.Length || spots[i] == null) return;
-            var p = plates[i].transform.position;
-            plates[i].transform.position = new Vector3(p.x, spots[i].position.y + height, p.z);
         }
 
         void ResetTrophy(int i)

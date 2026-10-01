@@ -185,13 +185,13 @@ public static class MenuSetup
         EditorUtility.SetDirty(discMat);
         disc.GetComponent<MeshRenderer>().sharedMaterial = discMat;
 
-        // The rim glows cyan (the film's LED strips), a warm key and a cool fill pick the kart out of the night, and
-        // the lighthouse turns out past the palms.
-        // its own glow, dimmer than the road studs': on the phone their material bloomed the ring out to white
-        var glow = ContentSetup.LoadOrCreate(Art + "Materials/Rim_Glow.mat", Shader.Find("Universal Render Pipeline/Unlit"));
-        glow.SetColor("_BaseColor", new Color(0.10f, 0.75f, 1f) * 1.35f);
-        EditorUtility.SetDirty(glow);
-        Ring(podium, "Rim", 3.42f, 3.6f, 0.115f, glow);
+        // A plain dark rim (it used to glow cyan, like a neon sign under the kart): the platform is a stand, the kart is
+        // the thing to look at. A warm key and a cool fill pick the kart out of the night, and the lighthouse turns
+        // out past the palms.
+        var rimMat = ContentSetup.LoadOrCreate(Art + "Materials/Rim_Dark.mat", Shader.Find("Universal Render Pipeline/Lit"));
+        rimMat.SetColor("_BaseColor", new Color(0.07f, 0.08f, 0.09f)); rimMat.SetFloat("_Smoothness", 0.55f); rimMat.SetFloat("_Metallic", 0.6f);
+        EditorUtility.SetDirty(rimMat);
+        Ring(podium, "Rim", 3.42f, 3.6f, 0.115f, rimMat);
         Spot("KeyLight", new Vector3(6f, 7f, -4f), new Vector3(0, 1f, 0), new Color(1f, 0.82f, 0.58f), 48f, 55f);
         Spot("FillLight", new Vector3(-7f, 5f, 6f), new Vector3(0, 1f, 0), new Color(0.7f, 0.8f, 1f), 18f, 70f);
         Lighthouse(new Vector3(-55f, 0f, 120f));
@@ -320,12 +320,38 @@ public static class MenuSetup
     {
         var screen = Rect("Title", parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject;
 
-        // A scrim, not a card: the title has to stay legible over a live 3D beach without boxing it in.
+        // The film plays behind the title, edge to edge (it is 16:9 on a 20:9 screen: it covers, and loses a little top
+        // and bottom). The kart on its turntable belongs to the screens that choose one. Silent: the menu has its own
+        // music. tools: the clip is the teaser at 720p (ffmpeg, see Assets/_Game/Video/README.md).
+        var film = Rect("Film", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        var filmImage = film.gameObject.AddComponent<RawImage>();
+        filmImage.raycastTarget = false;
+        var fit = film.gameObject.AddComponent<AspectRatioFitter>();
+        fit.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent; fit.aspectRatio = 16f / 9f;
+        film.localScale = Vector3.one * 1.12f;   // past the safe area too: the screen sits inside it, and a strip by the camera cutout showed
+        const string rtPath = "Assets/_Game/Video/TeaserRT.renderTexture";
+        var rt = AssetDatabase.LoadAssetAtPath<RenderTexture>(rtPath);
+        if (rt == null) { rt = new RenderTexture(1280, 720, 0) { name = "TeaserRT" }; AssetDatabase.CreateAsset(rt, rtPath); }
+        filmImage.texture = rt;
+        var clip = AssetDatabase.LoadAssetAtPath<UnityEngine.Video.VideoClip>("Assets/_Game/Video/teaser.mp4");
+        if (clip == null) Debug.LogWarning("[menu] Assets/_Game/Video/teaser.mp4 missing: the title plays over black");
+        var player = film.gameObject.AddComponent<UnityEngine.Video.VideoPlayer>();
+        player.clip = clip; player.renderMode = UnityEngine.Video.VideoRenderMode.RenderTexture; player.targetTexture = rt;
+        player.isLooping = true; player.playOnAwake = true; player.waitForFirstFrame = true; player.skipOnDrop = true;
+        player.audioOutputMode = UnityEngine.Video.VideoAudioOutputMode.None;
+
+        // The film is dimmed a little everywhere (a bright close-up behind the wordmark ate it), then the scrim
+        // below darkens the side the words stand on.
+        var dim = Rect("FilmDim", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        dim.localScale = Vector3.one * 1.12f;
+        var dimImage = dim.gameObject.AddComponent<Image>(); dimImage.color = new Color(0.02f, 0.04f, 0.06f, 0.42f); dimImage.raycastTarget = false;
+
+        // A scrim, not a card: the title has to stay legible over the film without boxing it in.
         var plate = Rect("Plate", screen.transform, new Vector2(0, 0), new Vector2(0.47f, 1f), Vector2.zero, Vector2.zero);
         // The scrim is its own layer behind the content: overhanging the plate itself would drag every child
         // label with it, because they are anchored to the plate's corners.
         var scrim = Rect("Scrim", plate, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-        scrim.offsetMin = new Vector2(-320, -320); scrim.offsetMax = new Vector2(0, 320);   // cover the camera cutout
+        scrim.offsetMin = new Vector2(-320, -320); scrim.offsetMax = new Vector2(420, 320);   // cover the camera cutout, and reach past the wordmark
         var fade = scrim.gameObject.AddComponent<Image>();
         fade.sprite = FadeSprite();
         fade.color = Deep;
