@@ -30,14 +30,14 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // ---------- 0. config: live prices, catalog, fee tiers ----------
 {
   const cfg = await (await fetch(`${BASE}/v1/config`)).json();
-  check('config carries treasury fields and fee tiers', 'treasuryOwner' in cfg && cfg.fees.SOL.length === 5 && cfg.fees.SKR.length === 5);
-  check('catalog is quoted in both currencies from a USD peg', cfg.catalog.length >= 14 && cfg.catalog.every(i => typeof i.usd === 'number' && /^\d+$/.test(i.price.SKR)));
+  check('config carries treasury fields and fee tiers', 'treasuryOwner' in cfg && cfg.fees.SOL.length === 6 && cfg.fees.SKR.length === 5);
+  check('catalog is priced in SOL and quoted in both currencies', cfg.catalog.length >= 14 && cfg.catalog.every(i => typeof i.sol === 'number' && !('usd' in i) && /^\d+$/.test(i.price.SKR)));
   const rally = cfg.catalog.find(i => i.sku === 'paint.rally'), hero = cfg.catalog.find(i => i.sku === 'kart.firetruck');
   check('the SKR-only paint has no SOL price', rally && rally.price.SOL === '' && rally.skrOnly === true);
-  check('a $4.99 hero kart is a clean SKR amount (multiple of 5 SKR)', hero && BigInt(hero.price.SKR) % 5000000n === 0n && BigInt(hero.price.SKR) > 0n, hero?.price?.SKR);
-  check('SOL is quoted at a 20% premium over SKR', hero && Math.abs(Number(hero.price.SOL) / 1e9 * cfg.usd.SOL / (Number(hero.price.SKR) / 1e6 * cfg.usd.SKR) - 1.2) < 0.08, `${hero?.price?.SOL} lamports @ $${cfg.usd.SOL}`);
+  check('a hero kart is 0.15 SOL and a clean SKR amount (multiple of 5 SKR)', hero?.price?.SOL === '150000000' && BigInt(hero.price.SKR) % 5000000n === 0n && BigInt(hero.price.SKR) > 0n, hero?.price?.SKR);
+  check('SOL is quoted at a 20% premium over SKR', hero && Math.abs(Number(hero.price.SOL) / 1e9 * cfg.rates.SOL / (Number(hero.price.SKR) / 1e6 * cfg.rates.SKR) - 1.2) < 0.08, `${hero?.price?.SOL} lamports @ $${cfg.rates.SOL}`);
   check('bundles list what they grant', cfg.catalog.find(i => i.sku === 'bundle.garage')?.grants?.length > 10);
-  console.log(`   (SKR $${cfg.usd.SKR} · SOL $${cfg.usd.SOL} · ${cfg.usd.source})`);
+  console.log(`   (SKR $${cfg.rates.SKR} · SOL $${cfg.rates.SOL} · ${cfg.rates.source})`);
 }
 
 // ---------- 0a. solo races start now; they are finished at the end, when enough wall time has passed ----------

@@ -18,7 +18,7 @@ namespace KartCup
 
         public bool IsFree => string.IsNullOrEmpty(sku);
         public int Total => speed + turbo + grip + armor + attack;
-        public double Usd => KartPricing.UsdFor(Total);
+        public double Sol => KartPricing.SolFor(Total);
         public string Tier => KartPricing.TierFor(Total);
 
         /// Two pips is the free karts' middle; every pip either way is a few percent, so a Hero kart is quicker but

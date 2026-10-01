@@ -1,6 +1,7 @@
-// USD pegs → live token amounts. Every live crypto shop does this (research/23 §D.44): a kart costs $2.99, and the
-// number of SKR or SOL that is today is computed here, cached for five minutes, with a hard fallback so a dead price
-// API never takes the shop down. SOL is accepted at +20%: SKR is the discount rail (the $10k SKR-integration hook).
+// Everything is priced in SOL (catalog.ts) and paid in SOL or SKR; no dollar figure is shown or charged anywhere.
+// The SKR price is the SOL price at today's SOL/SKR rate, less the premium below: SKR is the discount rail. The two
+// market rates are fetched here, cached for five minutes, with a hard fallback so a dead price API never takes the
+// shop down.
 import type { Currency } from './catalog';
 
 // Jupiter prices the SKR mint itself, and answers a Worker. CoinGecko is the second try: its edge returns 403 to a
@@ -35,18 +36,11 @@ export async function rates(env: { RATES_JSON?: string }): Promise<Rates> {
   return cache ?? { ...FALLBACK, at: Date.now(), source: 'fallback' };
 }
 
-/** Base units for a USD price. Rounded to clean amounts so the sheet reads "150 SKR", never "152.83 SKR". */
-export function baseUnits(usd: number, currency: Currency, r: Rates): bigint {
-  if (currency === 'SKR') {
-    const skr = usd / r.SKR;
-    const clean = skr >= 50 ? Math.round(skr / 5) * 5 : Math.max(1, Math.round(skr));
-    return BigInt(clean) * 1_000_000n;
-  }
-  const sol = (usd * SOL_PREMIUM) / r.SOL;
-  return BigInt(Math.max(1, Math.round(sol * 10_000))) * 100_000n;   // 0.0001 SOL steps
-}
-
-export function usdOf(base: bigint | string, currency: Currency, r: Rates): number {
-  const b = Number(BigInt(base));
-  return currency === 'SKR' ? (b / 1e6) * r.SKR : (b / 1e9) * r.SOL;
+/** Base units for a price in SOL: the SOL amount itself, or its SKR equivalent less the premium, rounded to a clean
+ *  amount so the sheet reads "555 SKR", never "553.27 SKR". */
+export function baseUnits(sol: number, currency: Currency, r: Rates): bigint {
+  if (currency === 'SOL') return BigInt(Math.max(1, Math.round(sol * 10_000))) * 100_000n;   // 0.0001 SOL steps
+  const skr = sol * r.SOL / r.SKR / SOL_PREMIUM;
+  const clean = skr >= 50 ? Math.round(skr / 5) * 5 : Math.max(1, Math.round(skr));
+  return BigInt(clean) * 1_000_000n;
 }

@@ -57,12 +57,11 @@ namespace KartCup
         [Serializable] public class RoomCreated { public string code, url; }
         [Serializable] public class PublicRoom { public string code, host, fee, currency; public int players, maxPlayers; public List<string> tracks = new(); public long createdAt; }
         [Serializable] public class PublicRooms { public List<PublicRoom> rooms = new(); }
-        [Serializable] public class ShopItem { public string sku, kind, name, blurb, item; public int qty; public double usd; public bool skrOnly, onSale = true; public List<string> grants; public Dictionary<string, int> powers; public Dictionary<string, string> price = new(); }
+        [Serializable] public class ShopItem { public string sku, kind, name, blurb, item; public int qty; public double sol; public bool skrOnly, onSale = true; public List<string> grants; public Dictionary<string, int> powers; public Dictionary<string, string> price = new(); }
         [Serializable] public class ConfigDto
         {
             public string treasuryOwner, treasuryAta, skrMint;
             public bool paidRooms; public int cutBps, hostShareBps, minPaidPlayers, maxPlayers;
-            public Dictionary<string, double> usd = new();             // currency -> USD rate ("source" key is absent here)
             public Dictionary<string, List<string>> fees = new();      // currency -> base-unit tiers
             public Dictionary<string, List<int>> splits = new();       // paid players -> % per place
             public List<ShopItem> catalog = new();

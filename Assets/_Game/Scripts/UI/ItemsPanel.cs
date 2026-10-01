@@ -82,15 +82,15 @@ namespace KartCup
                 var p = packs[i]; int owned = Inventory.Count(p.id);
                 if (rowLabels.Length > i && rowLabels[i] != null) rowLabels[i].text = owned > 0 ? $"{p.name.ToUpperInvariant()}   <alpha=#99>{owned} OWNED" : p.name.ToUpperInvariant();
                 var item = KartApi.Cfg?.Item(p.sku);
-                if (rowPrices.Length > i && rowPrices[i] != null) rowPrices[i].text = item != null ? Skr(item) : $"${p.usd:0.00}";
+                if (rowPrices.Length > i && rowPrices[i] != null) rowPrices[i].text = item != null ? Skr(item) : $"{p.sol:0.###} SOL";
                 var img = rows[i] != null ? rows[i].GetComponent<Image>() : null;
                 if (img != null) img.color = i == focus ? rowFocus : rowIdle;
             }
             var f = packs[Mathf.Clamp(focus, 0, packs.Length - 1)];
             var fi = KartApi.Cfg?.Item(f.sku);
             if (blurbLabel != null)
-                blurbLabel.text = message ?? (fi != null ? $"{f.blurb}   ·   {Skr(fi)}  ·  ≈ ${fi.usd:0.00}"
-                                            : KartApi.Cfg == null ? $"{f.blurb}   ·   ${f.usd:0.00}  ·  connect to buy" : f.blurb);
+                blurbLabel.text = message ?? (fi != null ? $"{f.blurb}   ·   {Skr(fi)}  or  {Sol(fi)}"
+                                            : KartApi.Cfg == null ? $"{f.blurb}   ·   {f.sol:0.###} SOL" : f.blurb);
             var l = Inventory.Find(Inventory.Loadout);
             if (loadoutLabel != null)
                 loadoutLabel.text = l == null || Inventory.Count(l.id) <= 0 ? "START WITH:  NOTHING" : $"START WITH:  {l.item.ToUpperInvariant()}   ({Inventory.Count(l.id)} LEFT)";

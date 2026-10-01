@@ -267,15 +267,13 @@ namespace KartCup
         void Status(string s) { LastStatus = s; Debug.Log("[wallet] " + s); onStatus?.Invoke(s); }
         public static string Short(string w) => string.IsNullOrEmpty(w) || w.Length < 8 ? w : $"{w[..4]}…{w[^4..]}";
 
-        /// "0.05 SOL" / "25 SKR" from base units, with ≈USD when the config knows the rate.
+        /// "0.05 SOL" / "25 SKR" from base units. Money reads in SOL or SKR everywhere; there is no dollar figure.
+        /// ponytail: `withUsd` is ignored and stays only so the callers that still pass it compile.
         public static string Amount(string baseUnits, string currency, bool withUsd = false)
         {
             if (!ulong.TryParse(baseUnits, out var b)) return "";
             double v = currency == "SOL" ? b / 1e9 : b / 1e6;
-            string s = currency == "SOL" ? $"{v:0.###} SOL" : $"{v:0.##} SKR";
-            var cfg = KartApi.Cfg;
-            if (withUsd && cfg?.usd != null && cfg.usd.TryGetValue(currency, out var rate) && rate > 0) s += $" (≈${v * rate:0.00})";
-            return s;
+            return currency == "SOL" ? $"{v:0.###} SOL" : $"{v:0.##} SKR";
         }
     }
 }

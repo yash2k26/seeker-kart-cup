@@ -24,7 +24,7 @@ namespace KartCup
         static readonly (string label, string fee, string currency)[] Fees =
         {
             ("FREE RACE", "0", "SOL"),
-            ("0.01 SOL", "10000000", "SOL"), ("0.05 SOL", "50000000", "SOL"), ("0.1 SOL", "100000000", "SOL"),
+            ("0.01 SOL", "10000000", "SOL"), ("0.05 SOL", "50000000", "SOL"), ("0.1 SOL", "100000000", "SOL"), ("0.15 SOL", "150000000", "SOL"),
             ("5 SKR", "5000000", "SKR"), ("25 SKR", "25000000", "SKR"), ("100 SKR", "100000000", "SKR"),
         };
 
@@ -95,7 +95,7 @@ namespace KartCup
         {
             if (trackLabel != null) trackLabel.text = trackChoice < 0 ? $"GRAND PRIX  ·  {Tracks.Count} RACES" : Tracks.At(trackChoice).name.ToUpperInvariant();
             var f = Fees[feeChoice];
-            if (feeLabel != null) feeLabel.text = f.fee == "0" ? f.label : f.label + Usd(f.fee, f.currency);
+            if (feeLabel != null) feeLabel.text = f.label;
             if (visibilityLabel != null) visibilityLabel.text = isPublic ? "PUBLIC  ·  ANYONE CAN JOIN" : "PRIVATE  ·  INVITE ONLY";
         }
 
@@ -162,14 +162,6 @@ namespace KartCup
             else { if (status != null && (string.IsNullOrEmpty(status.text) || status.text.StartsWith("Joining"))) Say("No room with that code"); client.Leave(); }
         }
 
-        /// "  ·  ≈$1.21" when the Worker's rates are known, else nothing.
-        static string Usd(string baseUnits, string currency)
-        {
-            var cfg = KartApi.Cfg;
-            if (cfg?.usd == null || !cfg.usd.TryGetValue(currency, out var rate) || rate <= 0 || !ulong.TryParse(baseUnits, out var b)) return "";
-            double v = currency == "SOL" ? b / 1e9 : b / 1e6;
-            return $"  ·  ≈${v * rate:0.00}";
-        }
 
         void Say(string s) { if (status != null) status.text = s; }
     }

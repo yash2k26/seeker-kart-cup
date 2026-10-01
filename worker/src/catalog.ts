@@ -8,30 +8,31 @@ export type Currency = 'SOL' | 'SKR';
 export const DECIMALS: Record<Currency, number> = { SOL: 9, SKR: 6 };
 
 export type Powers = { speed: number; turbo: number; grip: number; armor: number; attack: number };
-export type Sku = { sku: string; kind: 'kart' | 'paint' | 'bundle' | 'item'; name: string; blurb: string; usd: number; skrOnly?: boolean; grants?: string[]; until?: string;
+export type Sku = { sku: string; kind: 'kart' | 'paint' | 'bundle' | 'item'; name: string; blurb: string; sol: number; skrOnly?: boolean; grants?: string[]; until?: string;
                     powers?: Powers; item?: string; qty?: number };
 
 /** A kart's price follows its powers: five of 0..5 pips, and the total lands on a rung. The phone carries the same
  *  table and rule (KartSetup.cs, KartPricing.cs), so a card reads right before the Worker has quoted it. */
-export function usdForPowers(p: Powers): number {
+export function solForPowers(p: Powers): number {
   const total = p.speed + p.turbo + p.grip + p.armor + p.attack;
-  return total <= 11 ? 0 : total <= 15 ? 2.99 : total <= 19 ? 4.99 : 7.99;
+  return total <= 11 ? 0 : total <= 15 ? 0.10 : total <= 19 ? 0.15 : 0.25;
 }
 const kart = (id: string, name: string, blurb: string, speed: number, turbo: number, grip: number, armor: number, attack: number): Sku => {
   const powers = { speed, turbo, grip, armor, attack };
-  return { sku: 'kart.' + id, kind: 'kart', name, blurb, powers, usd: usdForPowers(powers) };
+  return { sku: 'kart.' + id, kind: 'kart', name, blurb, powers, sol: solForPowers(powers) };
 };
-const pack = (id: string, item: string, name: string, blurb: string, qty: number, usd: number): Sku =>
-  ({ sku: `item.${id}${qty}`, kind: 'item', name, blurb, item, qty, usd });
+const pack = (id: string, item: string, name: string, blurb: string, qty: number, sol: number): Sku =>
+  ({ sku: `item.${id}${qty}`, kind: 'item', name, blurb, item, qty, sol });
 
-// research/23: sell karts, paint and what you take into a race, never drivers (three are real people). Paint $0.99;
-// karts by their powers, Street $2.99 and Hero $4.99; packs of three race items at $0.49; and two bundles: the
-// Founder's Pack is the intended purchase, the Full Garage is the anchor that makes it look sane.
+// research/23: sell karts, paint and what you take into a race, never drivers (three are real people). Every price
+// is in SOL (1 Oct 2026: no dollars anywhere; SKR is derived from it in prices.ts). Karts by their powers: Street
+// 0.10, Hero 0.15, Legend 0.25. Paint 0.03; packs of three race items 0.01; and two bundles: the Founder's Pack is
+// the intended purchase, the Full Garage is the anchor that makes it look sane.
 export const CATALOG: Sku[] = [
-  { sku: 'paint.sunset',   kind: 'paint', name: 'Sunset',   blurb: 'Ember fading to gold.',                    usd: 0.99 },
-  { sku: 'paint.midnight', kind: 'paint', name: 'Midnight', blurb: 'Deep navy, gloss black trim.',             usd: 0.99 },
-  { sku: 'paint.rally',    kind: 'paint', name: 'SKR Rally', blurb: 'Seeker violet. Only ever sold for SKR.',  usd: 0.99, skrOnly: true },
-  { sku: 'paint.white',    kind: 'paint', name: 'White',    blurb: 'Clean white. Shows every scratch.',       usd: 0.99 },
+  { sku: 'paint.sunset',   kind: 'paint', name: 'Sunset',   blurb: 'Ember fading to gold.',                    sol: 0.03 },
+  { sku: 'paint.midnight', kind: 'paint', name: 'Midnight', blurb: 'Deep navy, gloss black trim.',             sol: 0.03 },
+  { sku: 'paint.rally',    kind: 'paint', name: 'SKR Rally', blurb: 'Seeker violet. Only ever sold for SKR.',  sol: 0.03, skrOnly: true },
+  { sku: 'paint.white',    kind: 'paint', name: 'White',    blurb: 'Clean white. Shows every scratch.',       sol: 0.03 },
 
   // SPEED, TURBO, GRIP, ARMOR, ATTACK — Street karts total 14, Hero karts 18 (the free five total 10)
   kart('taxi',             'Mempool',       'Takes everyone for a ride.',            3, 3, 2, 3, 3),
@@ -44,25 +45,25 @@ export const CATALOG: Sku[] = [
   kart('race-future',      'Photon',        'Low, wide, glued to the road.',         5, 4, 5, 2, 2),
 
   // packs: the item name is the ItemManager's, the count is credited to the phone's inventory when the purchase verifies
-  pack('rocket',  'Rocket',      'Rockets x3',  'Straight, fast, no manners.',                3, 0.49),
-  pack('homing',  'Homing Item', 'Homing x3',   'Finds the kart ahead and turns it round.',   3, 0.49),
-  pack('bomb',    'Bomb',        'Bombs x3',    'Drops behind you. Waits.',                   3, 0.49),
-  pack('nitro',   'Nitro',       'Nitro x3',    'A turbo with the lid off.',                  3, 0.49),
-  pack('bouncer', 'Bouncer',     'Bouncers x3', 'Off the walls until it finds someone.',      3, 0.49),
-  pack('sunbomb', 'Sun Bomb',    'Sun Bombs x3', 'Lob it, count to two, stand well back.',    3, 0.79),
+  pack('rocket',  'Rocket',      'Rockets x3',  'Straight, fast, no manners.',                3, 0.01),
+  pack('homing',  'Homing Item', 'Homing x3',   'Finds the kart ahead and turns it round.',   3, 0.01),
+  pack('bomb',    'Bomb',        'Bombs x3',    'Drops behind you. Waits.',                   3, 0.01),
+  pack('nitro',   'Nitro',       'Nitro x3',    'A turbo with the lid off.',                  3, 0.01),
+  pack('bouncer', 'Bouncer',     'Bouncers x3', 'Off the walls until it finds someone.',      3, 0.01),
+  pack('sunbomb', 'Sun Bomb',    'Sun Bombs x3', 'Lob it, count to two, stand well back.',    3, 0.015),
 
   { sku: 'bundle.founder', kind: 'bundle', name: "Founder's Pack", blurb: 'Photon, Hotfix, Mempool, Slasher, two paints and the Founder badge. Sold once, never again.',
-    usd: 9.99, until: '2027-01-10T00:00:00Z', grants: ['kart.race-future', 'kart.firetruck', 'kart.taxi', 'kart.police', 'paint.sunset', 'paint.midnight', 'badge.founder'] },
+    sol: 0.35, until: '2027-01-10T00:00:00Z', grants: ['kart.race-future', 'kart.firetruck', 'kart.taxi', 'kart.police', 'paint.sunset', 'paint.midnight', 'badge.founder'] },
   { sku: 'bundle.garage',  kind: 'bundle', name: 'Full Garage', blurb: 'Every kart and paint, including the ones we add this season, plus the Founder badge.',
-    usd: 19.99, grants: ['kart.taxi', 'kart.van', 'kart.hatchback-sports', 'kart.police', 'kart.firetruck', 'kart.garbage-truck', 'kart.tractor', 'kart.race-future',
+    sol: 0.6, grants: ['kart.taxi', 'kart.van', 'kart.hatchback-sports', 'kart.police', 'kart.firetruck', 'kart.garbage-truck', 'kart.tractor', 'kart.race-future',
                          'paint.sunset', 'paint.midnight', 'paint.rally', 'paint.white', 'badge.founder'] },
 ];
 
-/** A price quote for the client: the USD peg and today's base units per currency (env PRICES_JSON overrides base units by sku). */
+/** A price quote for the client: today's base units per currency (env PRICES_JSON overrides base units by sku). */
 export function quote(item: Sku, r: Rates, pricesJson?: string): Record<Currency, string> {
   let over: Record<string, Partial<Record<Currency, string>>> = {};
   try { over = pricesJson ? JSON.parse(pricesJson) : {}; } catch { /* keep computed */ }
-  const q: Record<Currency, string> = { SKR: baseUnits(item.usd, 'SKR', r).toString(), SOL: baseUnits(item.usd, 'SOL', r).toString() };
+  const q: Record<Currency, string> = { SKR: baseUnits(item.sol, 'SKR', r).toString(), SOL: baseUnits(item.sol, 'SOL', r).toString() };
   if (item.skrOnly) q.SOL = '';
   const o = over[item.sku];
   if (o && typeof o === 'object') for (const k of ['SKR', 'SOL'] as Currency[]) if (o[k]) q[k] = o[k]!;
@@ -91,7 +92,7 @@ export function grantsOf(sku: string): string[] {
 // Entry fees a host may pick. A whitelist, not a free field: it keeps the pool maths and the UI chips in step and
 // caps how much a first-time host can accidentally put on the line.
 export const FEE_TIERS: Record<Currency, string[]> = {
-  SOL: ['0', '10000000', '50000000', '100000000', '500000000'],     // free, 0.01, 0.05, 0.1, 0.5 SOL
+  SOL: ['0', '10000000', '50000000', '100000000', '150000000', '500000000'],     // free, 0.01, 0.05, 0.1, 0.15, 0.5 SOL
   SKR: ['0', '5000000', '25000000', '100000000', '500000000'],      // free, 5, 25, 100, 500 SKR
 };
 

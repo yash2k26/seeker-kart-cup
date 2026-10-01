@@ -98,7 +98,7 @@ export async function config(_req: Request, env: Env) {
   const r = await rates(env);
   return json({
     treasuryOwner, treasuryAta, skrMint: env.SKR_MINT,
-    usd: { SKR: r.SKR, SOL: r.SOL, source: r.source },
+    rates: { SKR: r.SKR, SOL: r.SOL, source: r.source },   // market rates behind the SKR quote; not shown to players
     paidRooms: env.PAID_ROOMS === '1' && canPayOut(env) && !geoBlocked(env, geoOf(_req, env)), cutBps: Number(env.HOUSE_CUT_BPS ?? '1000'), hostShareBps: HOST_SHARE_BPS, minPaidPlayers: MIN_PAID_PLAYERS, maxPlayers: MAX_PLAYERS,
     fees: FEE_TIERS, splits: SPLITS, catalog: catalogQuoted(r, env.PRICES_JSON),
   });

@@ -163,9 +163,9 @@ namespace KartCup
 
         static string Skr(KartApi.ShopItem i) => WalletFlow.Amount(i.price.GetValueOrDefault("SKR"), "SKR");
         static string Sol(KartApi.ShopItem i) => WalletFlow.Amount(i.price.GetValueOrDefault("SOL"), "SOL");
-        static string Price(KartApi.ShopItem i) => i == null ? (KartApi.Cfg == null ? "PRICES LOADING…" : "NOT FOR SALE") : $"{Skr(i)}  ·  ≈ ${i.usd:0.00}" + (string.IsNullOrEmpty(i.price.GetValueOrDefault("SOL")) ? "  ·  SKR ONLY" : $"   or {Sol(i)}");
+        static string Price(KartApi.ShopItem i) => i == null ? (KartApi.Cfg == null ? "PRICES LOADING…" : "NOT FOR SALE") : $"{Skr(i)}" + (string.IsNullOrEmpty(i.price.GetValueOrDefault("SOL")) ? "  ·  SKR ONLY" : $"   or {Sol(i)}");
         /// A kart's price reads offline too: the powers say what it costs before the Worker quotes it in SKR and SOL.
-        static string KartPrice(KartApi.ShopItem i, KartDef def) => i == null ? (KartApi.Cfg == null ? $"${def.Usd:0.00}  ·  {def.Tier}" : "NOT FOR SALE") : $"{Skr(i)}  ·  ≈ ${i.usd:0.00}  ·  {def.Tier}";
+        static string KartPrice(KartApi.ShopItem i, KartDef def) => i == null ? (KartApi.Cfg == null ? $"{def.Sol:0.##} SOL  ·  {def.Tier}" : "NOT FOR SALE") : $"{Skr(i)}  or  {Sol(i)}  ·  {def.Tier}";
 
         public void Primary()
         {
