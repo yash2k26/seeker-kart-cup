@@ -69,6 +69,7 @@ public static class LookSetup
             if (mat.shader.name.Contains("Water")) continue;                  // the water shader animates its own scroll
             if (mat.shader.name.Contains("Terrain")) continue;                // reads vertex colour; Simple Lit would drop it
             if (mat.shader.name.Contains("Road") || mat.shader.name.Contains("Beam") || mat.shader.name.Contains("Glow")) continue;   // the PBR road and the lighthouse beam are their own shaders
+            if (mat.shader.name.Contains("Contact")) continue;                // the title's contact shadow: on Simple Lit it is a white slab under each kart
             var map = mat.HasProperty("_BaseMap") ? mat.GetTexture("_BaseMap") : null;
             var tint = mat.HasProperty("_BaseColor") ? mat.GetColor("_BaseColor") : Color.white;
             mat.shader = lit;

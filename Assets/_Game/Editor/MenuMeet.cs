@@ -185,7 +185,7 @@ public static class MenuMeet
 
         // A soft dark patch under the kart and, below, under the driver: the moon's shadow falls metres away, and
         // without contact they hover.
-        Contact(slot, new Vector3(box.center.x, 0.012f, box.center.z), new Vector2(box.size.x, box.size.z) * 1.55f);
+        Contact(slot, new Vector3(box.center.x, 0.04f, box.center.z), new Vector2(box.size.x, box.size.z) * 1.55f);
 
         var model = PodiumSetup.ModelOf(AssetDatabase.GetAssetPath(driverPrefab));
         AnimationClip Take(string take, bool loop) => PodiumSetup.Clip(model, take, $"meet_{take}_{who}", loop);
@@ -232,7 +232,7 @@ public static class MenuMeet
         var toWorld = body.bones.Select((bone, i) => bone.localToWorldMatrix * skin.bindposes[i]).ToArray();
         var ys = skin.vertices.Select((v, i) => toWorld[weights[i].boneIndex0].MultiplyPoint3x4(v).y).ToList();
         d.transform.position += Vector3.up * (slot.position.y + floor - ys.Min());
-        if (floor == 0f) Contact(slot, new Vector3(holder.localPosition.x, 0.014f, holder.localPosition.z), Vector2.one * 0.75f * scale);
+        if (floor == 0f) Contact(slot, new Vector3(holder.localPosition.x, 0.045f, holder.localPosition.z), Vector2.one * 0.75f * scale);
         // The race turns its karts' shadows off (twelve of them, on a phone) and lets the blob stand in. Three parked
         // ones can afford the moon's: long, toward the camera.
         foreach (var r in slot.GetComponentsInChildren<Renderer>().Where(r => r.name != "BlobShadow" && r.name != "Contact"))
@@ -299,8 +299,9 @@ public static class MenuMeet
     /// of a kart; a parked one, seen from the kerb, wants its whole footprint dark and a soft edge past it.
     static void Contact(Transform parent, Vector3 at, Vector2 size)
     {
-        var mat = ContentSetup.LoadOrCreate(Mats + "Meet_Contact.mat", Shader.Find("KartCup/Contact"));
-        mat.SetFloat("_Strength", 0.8f); EditorUtility.SetDirty(mat);
+        var shader = Shader.Find("KartCup/Contact");
+        var mat = ContentSetup.LoadOrCreate(Mats + "Meet_Contact.mat", shader);
+        mat.shader = shader; mat.SetFloat("_Strength", 0.8f); EditorUtility.SetDirty(mat);   // LoadOrCreate keeps whatever shader an existing material has
         var blob = GameObject.CreatePrimitive(PrimitiveType.Quad);
         Object.DestroyImmediate(blob.GetComponent<Collider>());
         blob.name = "Contact"; blob.transform.SetParent(parent, false);
