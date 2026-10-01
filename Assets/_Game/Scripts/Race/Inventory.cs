@@ -16,6 +16,7 @@ namespace KartCup
             new() { id = "bomb",    item = "Bomb",        name = "Bombs x3",    blurb = "Drops behind you. Waits.",                sku = "item.bomb3",    qty = 3, usd = 0.49 },
             new() { id = "nitro",   item = "Nitro",       name = "Nitro x3",    blurb = "A turbo with the lid off.",               sku = "item.nitro3",   qty = 3, usd = 0.49 },
             new() { id = "bouncer", item = "Bouncer",     name = "Bouncers x3", blurb = "Off the walls until it finds someone.",    sku = "item.bouncer3", qty = 3, usd = 0.49 },
+            new() { id = "sunbomb", item = "Sun Bomb",    name = "Sun Bombs x3", blurb = "Lob it, count to two, stand well back.", sku = "item.sunbomb3", qty = 3, usd = 0.79 },
         };
 
         public static Def Find(string id) { foreach (var p in Packs) if (p.id == id) return p; return null; }

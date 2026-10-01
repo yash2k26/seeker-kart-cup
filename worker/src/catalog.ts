@@ -49,6 +49,7 @@ export const CATALOG: Sku[] = [
   pack('bomb',    'Bomb',        'Bombs x3',    'Drops behind you. Waits.',                   3, 0.49),
   pack('nitro',   'Nitro',       'Nitro x3',    'A turbo with the lid off.',                  3, 0.49),
   pack('bouncer', 'Bouncer',     'Bouncers x3', 'Off the walls until it finds someone.',      3, 0.49),
+  pack('sunbomb', 'Sun Bomb',    'Sun Bombs x3', 'Lob it, count to two, stand well back.',    3, 0.79),
 
   { sku: 'bundle.founder', kind: 'bundle', name: "Founder's Pack", blurb: 'Photon, Hotfix, Mempool, Slasher, two paints and the Founder badge. Sold once, never again.',
     usd: 9.99, until: '2027-01-10T00:00:00Z', grants: ['kart.race-future', 'kart.firetruck', 'kart.taxi', 'kart.police', 'paint.sunset', 'paint.midnight', 'badge.founder'] },

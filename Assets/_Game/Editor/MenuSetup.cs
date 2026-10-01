@@ -831,7 +831,7 @@ public static class MenuSetup
         var rows = new Button[packs.Length]; var rowLabels = new TMP_Text[packs.Length]; var rowPrices = new TMP_Text[packs.Length];
         for (int i = 0; i < packs.Length; i++)
         {
-            var rt = Rect("Row" + i, card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -302 - i * 50), new Vector2(600, 44));
+            var rt = Rect("Row" + i, card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -290 - i * 42), new Vector2(600, 40));   // six packs clear the PAY button
             rt.pivot = new Vector2(0, 1);
             Design.AsRow(rt, Design.Ink700);
             rows[i] = rt.gameObject.AddComponent<Button>();

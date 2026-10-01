@@ -14,7 +14,10 @@ public static class Playtest
     static double start, captureAt = -1;
     static int shot, track = 1, cam = -1;
     static bool camSet, noHud, vista, mobile;
-    static string look = "Lighthouse";
+    static string look = "Lighthouse", item;   // -item "Sun Bomb": the player throws it after GO and three frames follow it
+    static int itemShot;
+    static readonly double[] itemTimes = { 0.5, 1.6, 2.7 };   // after the throw: in the air, burning, bursting
+    static double thrownAt = -1;
     static int prevQuality;
     static readonly double[] shotTimes = { 5, 12, 22, 34 };
 
@@ -38,6 +41,8 @@ public static class Playtest
         mobile = args.Contains("-mobile");   // the phone's quality tier (Forward, eight lights per object), restored on exit
         look = "Lighthouse";
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-look") look = args[i + 1];   // what the vista frames look at
+        item = null; itemShot = 0; thrownAt = -1;
+        for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-item") item = args[i + 1];
         prevQuality = QualitySettings.GetQualityLevel();
         if (mobile) QualitySettings.SetQualityLevel(0, true);
         EditorSceneManager.OpenScene($"Assets/_Game/Scenes/Race{track}.unity", OpenSceneMode.Single);
@@ -61,6 +66,16 @@ public static class Playtest
             if (shot == 3 && race != null && race.Player != null) race.Finish(race.Player);   // results card in the frame
             captureAt = t + 0.6;                                                              // after the entrance has landed
         }
+        if (item != null && thrownAt < 0 && t >= 11)
+        {
+            var race = Object.FindFirstObjectByType<RaceManager>();
+            var caster = race != null && race.Player != null ? race.Player.GetComponent<ItemCaster>() : null;
+            var def = Object.FindFirstObjectByType<ItemManager>()?.GetItem(item);
+            if (caster != null && def != null) { caster.GiveItem(def); caster.Cast(); thrownAt = t; Debug.Log($"[playtest] threw {item} at {t:0.0}s: ammo now {caster.ammo}, active {race.Player.GetComponent<Kart>().active}, spinning {race.Player.GetComponent<Kart>().spinningOut}, state {race.state}"); }
+            else { Debug.LogError($"[playtest] cannot throw {item}: caster {(caster != null)}, item {(def != null)}"); thrownAt = t; }
+        }
+        if (thrownAt >= 0 && itemShot < itemTimes.Length && t >= thrownAt + itemTimes[itemShot]) { Capture($"item{track}-{itemShot}"); var bombs = Object.FindObjectsByType<SunBomb>(FindObjectsSortMode.None);
+            Debug.Log($"[playtest] item frame {itemShot}: {bombs.Length} sun bomb(s){string.Concat(bombs.Select(b => $" at {b.transform.position}"))}, {Object.FindObjectsByType<Kart>(FindObjectsSortMode.None).Count(k => k.spinningOut)} kart(s) spinning"); itemShot++; }
         if (captureAt >= 0 && t >= captureAt)
         {
             Capture($"play{track}-{shot}");
