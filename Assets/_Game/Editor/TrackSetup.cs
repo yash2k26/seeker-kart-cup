@@ -335,7 +335,9 @@ public static partial class TrackSetup
 
         var root = new GameObject("Track");
         var preset = AssetDatabase.LoadAssetAtPath<GroundSurfacePreset>(PKP + "Prefabs/GroundSurfacePresets/Default Road.asset");
-        foreach (var road in Strips("Road", root.transform, roadMat, -HalfWidth, HalfWidth, 0.02f, metres: true))
+        // The road in twice the pieces of everything else: it is half the screen, shaded per pixel by every light that
+        // reaches its piece (eight at most). At ~55 m a piece holds three lamps and the headlights, not all eight.
+        foreach (var road in Strips("Road", root.transform, roadMat, -HalfWidth, HalfWidth, 0.02f, metres: true, pieces: Chunks * 2))
         {
             road.AddComponent<MeshCollider>();
             road.AddComponent<GroundSurface>().props = preset;
@@ -410,12 +412,12 @@ public static partial class TrackSetup
     const int Chunks = 12;
     static float[] arc;      // metres along the lap at each sample, for textured strips
     static List<GameObject> Strips(string name, Transform parent, Material mat, float from, float to, float height,
-                                   int on = 0, int off = 0, int phase = 0, bool metres = false)
+                                   int on = 0, int off = 0, int phase = 0, bool metres = false, int pieces = Chunks)
     {
         var list = new List<GameObject>();
         Mesh container = null;                       // the first piece's asset holds the rest as sub-assets
-        int n = centre.Length, per = (n + Chunks - 1) / Chunks;
-        for (int k = 0; k < Chunks; k++)
+        int n = centre.Length, per = (n + pieces - 1) / pieces;
+        for (int k = 0; k < pieces; k++)
         {
             int start = k * per, count = Mathf.Min(per, n - start);
             if (count <= 0) break;

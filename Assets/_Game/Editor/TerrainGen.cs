@@ -11,7 +11,9 @@ public static class TerrainGen
 {
     public const int Cells = 128;           // 128 x 8 m = 1024 m across, 32k faces: within the 45k budget
     public const float Cell = 8f;
-    const int ChunkCells = 32;              // 4x4 chunks so the frustum culls the far side of the map
+    // 8x8 chunks: the frustum culls the far side of the map, and (after dark) a chunk small enough that only the few
+    // lamps near it light it. At 4x4 every chunk took the full eight lights per pixel and the rest popped.
+    const int ChunkCells = 16;
     public const float Half = Cells * Cell * 0.5f;
 
     /// What a palette gets to decide a face's colour.
