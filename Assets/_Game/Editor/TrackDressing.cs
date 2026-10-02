@@ -287,7 +287,7 @@ public static partial class TrackSetup
 
         StartLine(root, 5, null);
         Lighthouse(root);
-        Groves(root, rnd, "Pirate", palms, 7f, 11f, Solid.Trunk, clutter, 1.4f, Solid.Solid, 1.1f);
+        Groves(root, rnd, "Pirate", palms, 7f, 11f, Solid.Trunk, clutter, 1.4f, Solid.Solid, 1.45f);
         Cover(root, rnd, "Pirate", new[] { "patch-sand", "patch-sand-foliage", "patch-sand" }, 110, 5f, 10f, 4f, 60f, byWidth: true);
         // no pennant flags: after dark the lamps are the rhythm down the straights
 
@@ -318,6 +318,8 @@ public static partial class TrackSetup
             Prop(root, "Pirate", "boat-row-small", new Vector3(Mathf.Sin(a + 0.08f) * 440f, -0.3f, Mathf.Cos(a + 0.08f) * 440f), (float)rnd.NextDouble() * 360f, 11f);
             Prop(root, "Pirate", "boat-row-small", new Vector3(Mathf.Sin(a - 0.12f) * 452f, -0.3f, Mathf.Cos(a - 0.12f) * 452f), (float)rnd.NextDouble() * 360f, 10f);
         }
+
+        BeachTown(root, rnd);
 
         // The shore: a palm treeline above the tide line and rocks in the surf, then buoys out past it.
         Ring(root, rnd, "Pirate", palms, 335f, 398f, 120, 8f, 12f, minY: 0.4f);

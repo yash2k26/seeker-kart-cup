@@ -22,6 +22,8 @@ public static class Playtest
     static Vector3 itemFrom, itemAt;   // a second camera for the item frames: beside the road, on where it lands
     static int prevQuality;
     static readonly double[] shotTimes = { 5, 12, 22, 34 };
+    static readonly double[] introTimes = { 2.2, 3.4, 4.6, 7.2 };   // the drone's lap before the flag, and a turbo pad from above
+    static int introShot;
 
     [MenuItem("Build/Playtest 30s")]
     public static void Run()
@@ -49,7 +51,7 @@ public static class Playtest
         if (mobile) QualitySettings.SetQualityLevel(0, true);
         EditorSceneManager.OpenScene($"Assets/_Game/Scenes/Race{track}.unity", OpenSceneMode.Single);
         start = EditorApplication.timeSinceStartup;
-        shot = 0;
+        shot = 0; introShot = 0;
         EditorApplication.update += Tick;
         EditorApplication.EnterPlaymode();
     }
@@ -60,6 +62,35 @@ public static class Playtest
         double t = EditorApplication.timeSinceStartup - start;
         if (!camSet && cam >= 0 && t > 1) { camSet = true; var a = Object.FindFirstObjectByType<CameraAngles>(); a?.Set(cam); a?.Toggle(); }   // picker open for the first shots
 
+        if (introShot < introTimes.Length && t >= introTimes[introShot])
+        {
+            Capture($"intro{track}-{introShot}");
+            var pads = GameObject.Find("TurboPads");
+            if (introShot == 0 && pads != null && pads.transform.childCount > 0)
+            {
+                var pad = pads.transform.GetChild(0);
+                itemFrom = pad.position - pad.forward * 16f + Vector3.up * 7f + pad.right * 5f; itemAt = pad.position;
+                SideShot($"pad{track}");
+                Debug.Log($"[playtest] {pads.transform.childCount} turbo pad(s), first at {pad.position}");
+            }
+            if (introShot == 0)
+            {
+                // every corner wall must stop what comes at it from the road (a mesh collider only stops its faces' front)
+                var walls = GameObject.Find("Barriers"); int stops = 0, outside = 0, all = 0;
+                if (walls != null)
+                    foreach (var wall in walls.GetComponentsInChildren<MeshCollider>())
+                    {
+                        // the collider's own slab (TrackSetup.Wall): per sample its foot, top, and the two set half a metre back.
+                        // (The drawn mesh is no use here: static batching has replaced it with the scene's combined one.)
+                        var v = wall.sharedMesh.vertices; int mid = v.Length / 8 * 4;
+                        Vector3 foot = wall.transform.TransformPoint(v[mid]), toRoad = wall.transform.TransformDirection(v[mid] - v[mid + 2]).normalized;
+                        all++; if (wall.Raycast(new Ray(foot + toRoad * 3f + Vector3.up * 0.9f, -toRoad), out _, 6f)) stops++;
+                        if (wall.Raycast(new Ray(foot - toRoad * 3.5f + Vector3.up * 0.9f, toRoad), out _, 6f)) outside++;
+                    }
+                Debug.Log($"[playtest] barriers: {stops} of {all} stop a kart coming from the road, {outside} from behind");
+            }
+            introShot++;
+        }
         if (shot < shotTimes.Length && captureAt < 0 && t >= shotTimes[shot])
         {
             var pause = Object.FindFirstObjectByType<PauseMenu>();

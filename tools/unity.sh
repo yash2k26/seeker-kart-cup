@@ -16,5 +16,5 @@ start=$(date +%s)
 QUIT=-quit; [[ "$M" == Playtest.* || "$M" == ContractTest.* || "$M" == RoomSmoke.* || "$M" == MenuPlay.* ]] && QUIT=""
 "$UNITY" -batchmode -projectPath . -executeMethod "$M" -logFile "$LOG" "$@" $QUIT && rc=0 || rc=$?
 echo "== $M exit $rc in $(( $(date +%s) - start ))s — $LOG"
-grep -E "error CS|Exception:|Error:|\[(track|menu|menuplay|look|content|preview|playtest|cuptest|contract|probe|road|karts|build)\]" "$LOG" | grep -v "Warning" | head -60
+grep -E "error CS|Exception:|Error:|\[(track|menu|menuplay|race|items|look|content|preview|playtest|cuptest|contract|probe|road|karts|build)\]" "$LOG" | grep -v "Warning" | head -60
 exit $rc

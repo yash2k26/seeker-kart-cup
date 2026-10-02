@@ -37,6 +37,7 @@ public static class ItemSetup
 
         var sun = SunBomb();
         Mount();
+        TurboPad();
 
         var src = AssetDatabase.LoadAssetAtPath<GameObject>(PKP + "Items.prefab");
         if (src == null) { Debug.LogError("[items] Powerslide Items.prefab missing"); if (Application.isBatchMode) EditorApplication.Exit(1); return; }
@@ -283,6 +284,40 @@ public static class ItemSetup
         m.renderQueue = 3000; m.SetOverrideTag("RenderType", "Transparent"); m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); m.DisableKeyword("_SOFTPARTICLES_ON");
         EditorUtility.SetDirty(m);
         return m;
+    }
+
+    /// Resources/TurboPad: a strip of chevrons running up the road over a soft glow, a trigger a kart's height tall,
+    /// and Powerslide's BoostPad (a Turbo's worth of boost and its kick). TurboPad.cs lays them at the start of a race.
+    static void TurboPad()
+    {
+        const float W = 6.5f, L = 11f;
+        var quad = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
+        var root = new GameObject("TurboPad");
+        root.AddComponent<KartCup.TurboPad>();
+        var boost = root.AddComponent<BoostPad>();
+        boost.boostAmount = 3f; boost.boostForce = 5f; boost.delayInterval = 1f;      // the Turbo item's 3 / 5
+        var trigger = root.AddComponent<BoxCollider>();
+        trigger.isTrigger = true; trigger.center = new Vector3(0, 1.2f, 0); trigger.size = new Vector3(W, 2.4f, L);
+        Transform Flat(string name, Material m, float y, float w, float l)
+        {
+            var go = new GameObject(name); go.transform.SetParent(root.transform, false);
+            go.transform.localPosition = new Vector3(0, y, 0); go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);   // a quad's up becomes the road's forward
+            go.transform.localScale = new Vector3(w, l, 1f);
+            go.AddComponent<MeshFilter>().sharedMesh = quad;
+            var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = m; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false;
+            return go.transform;
+        }
+        var gold = new Color(1f, 0.62f, 0.12f);
+        Flat("Glow", Additive("FX_TurboGlow", Tex("dot"), gold * 0.9f), 0f, W * 1.7f, L * 1.5f);
+        // the chevrons are drawn and moved by their own shader (a particle material takes no tiling or offset)
+        var shader = Shader.Find("KartCup/TurboPad");
+        var chevrons = AssetDatabase.LoadAssetAtPath<Material>(Out + "FX_TurboArrows.mat");
+        if (chevrons == null) { chevrons = new Material(shader) { name = "FX_TurboArrows" }; AssetDatabase.CreateAsset(chevrons, Out + "FX_TurboArrows.mat"); }
+        chevrons.shader = shader; chevrons.SetColor("_Color", gold); EditorUtility.SetDirty(chevrons);
+        Flat("Arrows", chevrons, 0.02f, W, L);
+        Directory.CreateDirectory("Assets/_Game/Resources");
+        PrefabUtility.SaveAsPrefabAsset(root, "Assets/_Game/Resources/TurboPad.prefab");
+        Object.DestroyImmediate(root);
     }
 
     /// The four shapes the effects are drawn with, painted here so nothing is borrowed: a soft dot, a four-point

@@ -36,13 +36,19 @@ public static class LookSetup
         // paying for a cascade split we would never see on a phone.
         Set(so, "m_MainLightShadowsSupported", true);
         Set(so, "m_MainLightRenderingMode", 1);
-        Set(so, "m_MainLightShadowmapResolution", 2048);
-        Set(so, "m_ShadowDistance", 75f);
+        Set(so, "m_MainLightShadowmapResolution", 4096);   // 3 cm a texel over 60 m: at 2048 over 75 every shadow edge was a staircase
+        Set(so, "m_ShadowDistance", 60f);
         Set(so, "m_ShadowCascadeCount", 1);
         Set(so, "m_ShadowDepthBias", 1.0f);
         Set(so, "m_ShadowNormalBias", 0.8f);
         Set(so, "m_SoftShadowsSupported", true);
-        Set(so, "m_SoftShadowQuality", 1);          // low: a 2-tap filter, cheap on mobile
+        Set(so, "m_SoftShadowQuality", 2);          // medium: low's 2-tap filter left the edges blocky
+        // The phone's panel at its own resolution (QualitySettings lifts the fixed-DPI cap), so the HUD and menus are
+        // drawn sharp; the 3D at 0.85 of that, brought up by FSR instead of the panel's bilinear stretch, which is what
+        // made the whole picture look pixelated at the old 1829 x 823.
+        Set(so, "m_RenderScale", 0.85f);
+        Set(so, "m_UpscalingFilter", 3);            // FSR 1.0
+        Set(so, "m_MSAA", 4);
         Set(so, "m_ConservativeEnclosingSphere", true);
         // The night map: HDR so the lamps, studs and moon bloom from real values, and the sodium lamps and headlights
         // as per-pixel lights (eight per renderer; the road is built in chunks for it). Light shadows stay off.
@@ -69,7 +75,7 @@ public static class LookSetup
             if (mat.shader.name.Contains("Water")) continue;                  // the water shader animates its own scroll
             if (mat.shader.name.Contains("Terrain")) continue;                // reads vertex colour; Simple Lit would drop it
             if (mat.shader.name.Contains("Road") || mat.shader.name.Contains("Beam") || mat.shader.name.Contains("Glow")) continue;   // the PBR road and the lighthouse beam are their own shaders
-            if (mat.shader.name.Contains("Contact")) continue;                // the title's contact shadow: on Simple Lit it is a white slab under each kart
+            if (mat.shader.name.Contains("Contact") || mat.shader.name.Contains("Pool")) continue;                // the title's contact shadow: on Simple Lit it is a white slab under each kart
             var map = mat.HasProperty("_BaseMap") ? mat.GetTexture("_BaseMap") : null;
             var tint = mat.HasProperty("_BaseColor") ? mat.GetColor("_BaseColor") : Color.white;
             mat.shader = lit;

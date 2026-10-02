@@ -49,8 +49,8 @@ namespace KartCup
             StartCoroutine(Intro());
         }
 
-        /// Before the flag: the ceremony stage with the trophies this race is for (a solo race has no money on it, so the
-        /// plates just name the places), poppers and all; then the grid and the 3-2-1. A tap skips it.
+        /// Before the flag: this race's turbo pads are laid, then a drone's lap of the circuit under its name (PodiumShow),
+        /// then the grid and the 3-2-1. A tap skips the lap.
         IEnumerator Intro()
         {
             var race = RaceManager.Instance;
@@ -59,8 +59,9 @@ namespace KartCup
             Loadout(race);
             if (show == null) { race.BeginCountdown(); yield break; }
             race.Hold();
-            show.Prizes("RACE FOR GOLD", Tracks.At(Cup.TrackIndex).name.ToUpperInvariant(), new[] { "1ST", "2ND", "3RD" });
-            float until = Time.time + PodiumShow.PrizeSeconds, skippable = Time.time + 0.6f;
+            TurboPad.Spawn(System.Environment.TickCount);
+            show.Prizes(Tracks.At(Cup.TrackIndex).kicker, Tracks.At(Cup.TrackIndex).name.ToUpperInvariant(), new[] { "1ST", "2ND", "3RD" });
+            float until = Time.time + show.IntroSeconds, skippable = Time.time + 0.6f;
             while (Time.time < until && !(Time.time > skippable && PodiumShow.Tapped())) yield return null;
             show.End();
             race.BeginCountdown();

@@ -59,8 +59,9 @@ public static partial class TrackSetup
             // The cube's centre column faces +Z and _Rotation turns the sky the other way: the image's moon (36 deg
             // right of centre) lands at yaw 30, and the moonlight comes from there.
             night = true, sky = "skybox-moonrise", skyRotation = 6f, skyExposure = 0.9f,
-            sun = new Vector3(26, -150, 0), sunColor = new Color(0.62f, 0.72f, 1f), sunIntensity = 0.7f,
-            ambientSky = new Color(0.22f, 0.26f, 0.36f), ambientEquator = new Color(0.20f, 0.20f, 0.24f), ambientGround = new Color(0.09f, 0.08f, 0.08f),
+            // (a full moon: bright enough that the sand, the palms and the town read between the lamps)
+            sun = new Vector3(26, -150, 0), sunColor = new Color(0.62f, 0.72f, 1f), sunIntensity = 1.0f,
+            ambientSky = new Color(0.28f, 0.33f, 0.46f), ambientEquator = new Color(0.25f, 0.26f, 0.32f), ambientGround = new Color(0.11f, 0.10f, 0.10f),
             // the film's air is thick and a little warm from the lamps: the haze starts close and the far coast sinks into it
             fog = new Color(0.24f, 0.25f, 0.29f), fogStart = 22, fogEnd = 330, farClip = 470,
             water = "Water_night", wet = 1f, lampEvery = 36f, studs = true, lighthouse = true, tunnel = true, groundDetail = "sand_diff",

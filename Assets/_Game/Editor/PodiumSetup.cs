@@ -322,23 +322,27 @@ public static class PodiumSetup
     /// A turned trophy: stem, knop and bowl from one profile (metres, the gold one's size), two handles swept on.
     static Mesh CupMesh()
     {
+        // A cup with some weight to it: a stepped foot, a stout stem with a knop, a deep bowl with a rolled lip, and
+        // ears thick enough to read from across the stage (the first one was a wine glass with wire handles).
         var profile = new[] {
-            new Vector2(0.085f, 0f), new Vector2(0.085f, 0.022f), new Vector2(0.05f, 0.036f), new Vector2(0.028f, 0.06f),
-            new Vector2(0.022f, 0.13f), new Vector2(0.042f, 0.15f), new Vector2(0.022f, 0.17f), new Vector2(0.03f, 0.2f),
-            new Vector2(0.07f, 0.23f), new Vector2(0.115f, 0.28f), new Vector2(0.136f, 0.34f), new Vector2(0.144f, 0.40f),
-            new Vector2(0.15f, 0.44f), new Vector2(0.132f, 0.445f), new Vector2(0.122f, 0.40f), new Vector2(0f, 0.35f),
+            new Vector2(0.125f, 0f), new Vector2(0.125f, 0.028f), new Vector2(0.098f, 0.04f), new Vector2(0.098f, 0.062f),
+            new Vector2(0.062f, 0.078f), new Vector2(0.036f, 0.105f), new Vector2(0.032f, 0.15f), new Vector2(0.058f, 0.168f),
+            new Vector2(0.032f, 0.186f), new Vector2(0.042f, 0.215f), new Vector2(0.095f, 0.245f), new Vector2(0.152f, 0.305f),
+            new Vector2(0.176f, 0.375f), new Vector2(0.184f, 0.455f), new Vector2(0.19f, 0.497f), new Vector2(0.2f, 0.505f),
+            new Vector2(0.198f, 0.518f), new Vector2(0.182f, 0.52f), new Vector2(0.17f, 0.495f), new Vector2(0.162f, 0.45f),
+            new Vector2(0f, 0.39f),
         };
         var b = new Builder();
-        b.Lathe(profile, 40);
+        b.Lathe(profile, 48);
         foreach (float s in new[] { -1f, 1f })
         {
             var path = new List<Vector3>();
-            for (int k = 0; k <= 14; k++)
+            for (int k = 0; k <= 18; k++)
             {
-                float a = Mathf.Lerp(-75f, 80f, k / 14f) * Mathf.Deg2Rad;
-                path.Add(new Vector3(s * (0.13f + Mathf.Cos(a) * 0.11f), 0.335f + Mathf.Sin(a) * 0.075f, 0f));
+                float a = Mathf.Lerp(-108f, 96f, k / 18f) * Mathf.Deg2Rad;
+                path.Add(new Vector3(s * (0.185f + Mathf.Cos(a) * 0.115f), 0.37f + Mathf.Sin(a) * 0.105f, 0f));
             }
-            b.Tube(path, 0.014f, 10);
+            b.Tube(path, 0.024f, 12);
         }
         return b.Mesh("trophy_cup");
     }
@@ -427,7 +431,8 @@ public static class PodiumSetup
         var root = new GameObject(name).transform;
         root.SetParent(parent, false);
         root.localPosition = at;
-        Part(root, "Plinth", cube, plinth, new Vector3(0, 0.05f, 0), new Vector3(0.24f, 0.1f, 0.24f));
+        Part(root, "Plinth", cube, plinth, new Vector3(0, 0.035f, 0), new Vector3(0.36f, 0.07f, 0.36f));
+        Part(root, "Step", cube, plinth, new Vector3(0, 0.085f, 0), new Vector3(0.29f, 0.03f, 0.29f));
         Part(root, "Cup", cup, metal, new Vector3(0, 0.1f, 0), Vector3.one);
         return root;
     }
@@ -626,8 +631,12 @@ public static class PodiumSetup
 
     static Material Metal(string name, Shader lit, Color c)
     {
-        var m = Mat(name, lit);
-        m.SetColor("_BaseColor", c); m.SetFloat("_Metallic", 1f); m.SetFloat("_Smoothness", 0.8f);
+        // (lit is the fallback if the shader is missing)
+        var polished = Shader.Find("KartCup/Polished");
+        var m = Mat(name, polished != null ? polished : lit);
+        if (polished == null) { m.SetColor("_BaseColor", c); m.SetFloat("_Metallic", 1f); m.SetFloat("_Smoothness", 0.8f); return m; }
+        Color.RGBToHSV(c, out float h, out float sat, out float v);
+        m.SetColor("_Color", c); m.SetColor("_Shade", Color.HSVToRGB(h, Mathf.Min(1f, sat * 1.2f + 0.05f), v * 0.45f)); m.SetFloat("_Glint", 1.5f);
         return m;
     }
 

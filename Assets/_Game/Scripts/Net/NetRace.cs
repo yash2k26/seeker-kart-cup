@@ -53,6 +53,8 @@ namespace KartCup
             boundRound = client.Room?.round ?? -1; boundRace = client.Room?.raceIndex ?? -1;
             // What this race is for, while everyone's phone loads the track and until the 3-2-1: the prize pool,
             // whatever it is, and what each place takes home.
+            // the same turbo pads on every phone: the draw is seeded by the room and which of its races this is
+            TurboPad.Spawn(Animator.StringToHash((client.Room?.code ?? "") + ":" + boundRound + ":" + boundRace));
             intro = PodiumShow.Ensure();
             ShowPrizes();
             // A late `countdown` (we loaded after it went out, or it went out while the socket was down) is recovered

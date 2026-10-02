@@ -675,7 +675,32 @@ public static partial class TrackSetup
         go.transform.SetParent(parent, false);
         go.AddComponent<MeshFilter>().sharedMesh = mesh;
         go.AddComponent<MeshRenderer>().sharedMaterials = new[] { body, stripe };
-        go.AddComponent<MeshCollider>().sharedMesh = mesh;
+        // What stops a kart is its own mesh, not the one drawn. A mesh collider only stops what meets its faces from
+        // the front, and the ribbon is wound the same way whichever side of the road it stands on: on half the corners
+        // it faced away from the road and karts drove straight through it. (The same panels wound both ways do not
+        // survive: the collider's cooking drops the second of two triangles on the same three points.) So the wall
+        // is a slab half a metre thick, each face wound to look outward from it, and three metres tall, because a
+        // kart off a kerb clears the 1.15 m that is drawn.
+        var solid = new Mesh { name = name + "_Solid", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+        var slab = new System.Collections.Generic.List<Vector3>();
+        var faces = new System.Collections.Generic.List<int>();
+        for (int k = 0; k <= count; k++)
+        {
+            Vector3 foot = verts[k * 2], top = foot + Vector3.up * 3.3f, back = -norms[k * 2] * 0.5f;   // norms point at the road
+            slab.Add(foot); slab.Add(top); slab.Add(foot + back); slab.Add(top + back);
+            if (k == 0) continue;
+            int v = (k - 1) * 4;
+            void Face(int a, int b, int c, int d, Vector3 looks)      // a quad, wound so its front is toward `looks`
+            {
+                bool flip = Vector3.Dot(Vector3.Cross(slab[b] - slab[a], slab[c] - slab[a]), looks) < 0f;
+                faces.AddRange(flip ? new[] { a, c, b, b, c, d } : new[] { a, b, c, b, d, c });
+            }
+            Face(v, v + 1, v + 4, v + 5, norms[k * 2]);           // the road's side
+            Face(v + 2, v + 3, v + 6, v + 7, -norms[k * 2]);      // the far side
+        }
+        solid.SetVertices(slab); solid.SetTriangles(faces, 0); solid.RecalculateBounds();
+        AssetDatabase.CreateAsset(solid, $"{MeshDir}/{name}_Solid.asset");
+        go.AddComponent<MeshCollider>().sharedMesh = solid;
         GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
     }
 
@@ -692,11 +717,14 @@ public static partial class TrackSetup
         var toycar = AssetDatabase.LoadAssetAtPath<Material>(Art + "Materials/ToyCar.mat");
         if (box == null) return;
         var root = new GameObject("ItemBoxes").transform;
+        root.gameObject.AddComponent<ItemBag>();      // deals each row different items
         for (int lane = 0; lane < 5; lane++)
         {
             for (int i = centre.Length / 12; i < centre.Length; i += centre.Length / 6)   // offset so no cluster sits on the start line
             {
-                var go = (GameObject)PrefabUtility.InstantiatePrefab(box, root);
+                var row = root.Find("Row" + i) ?? new GameObject("Row" + i).transform;
+                row.SetParent(root, false);
+                var go = (GameObject)PrefabUtility.InstantiatePrefab(box, row);
                 go.transform.SetPositionAndRotation(centre[i] + right[i] * (lane - 2) * 3.2f + Vector3.up * 1.4f,
                                                     Quaternion.LookRotation(Forward(i), Vector3.up));
                 Reskin(go, Art + "Models/Props/ToyCar/item-box.fbx", toycar, 1.5f);

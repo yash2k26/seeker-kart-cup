@@ -4,9 +4,11 @@ using UnityEngine;
 
 namespace KartCup
 {
-    /// The ceremony stage, used for two shots. Before a race: the three trophies on the podium, what each place wins,
-    /// and the prize pool (whatever it is), with party poppers going off. After it: the top three standing on their
-    /// blocks holding their trophies (gold, biggest, to the winner, who is too excited to stand still), under confetti.
+    /// The two shots round a race. Before it: a drone's lap of the circuit (the race camera, flown along the
+    /// waypoints, landing behind the grid) with the words over it: what the race is for, the prize pool counting up and
+    /// what each place takes. After it: the ceremony stage, the top three standing on their blocks holding their
+    /// trophies (gold, biggest, to the winner, who is too excited to stand still), under confetti. A scene with no
+    /// waypoints shows the trophies on the stage before the race instead, as it used to.
     ///
     /// One prefab (Resources/PodiumStage, built by PodiumSetup), hung high above the start line with its own camera:
     /// the same stage on every circuit, nothing of the track in shot, nothing of the scenery in the way. While a shot is
@@ -42,14 +44,23 @@ namespace KartCup
         [SerializeField] Rig[] rigs = new Rig[0];
         [SerializeField] float[] trophyScale = { 1f, 0.8f, 0.68f };
         // The racers stand taller on the podium than in their karts, and the trophies are made to be seen from a phone.
-        [SerializeField] float driverScale = 1.7f, trophySize = 1.9f;
-        const float TrophyHeight = 0.545f;                // plinth and cup at scale 1 (PodiumSetup.CupMesh)
+        [SerializeField] float driverScale = 1.7f, trophySize = 2.1f;
+        const float TrophyHeight = 0.62f;                 // plinth and cup at scale 1 (PodiumSetup.CupMesh)
 
         public bool Active { get; private set; }
-        public const float PrizeSeconds = 4.5f;       // the pre-race shot (online it runs until 3-2-1)
+        public const float PrizeSeconds = 4.5f;       // the pre-race shot on the stage (online it runs until 3-2-1)
+        /// How long the pre-race shot wants: the drone's lap and a beat behind the grid, or the stage's reveal.
+        public float IntroSeconds => flying ? flySeconds + 0.7f : PrizeSeconds;
         public const float CeremonySeconds = 5f;      // the podium before the results card comes up
 
         Camera raceCam;
+        // the drone's lap: the race camera taken off its rig, and the stage put away meanwhile
+        bool flying;
+        float flySeconds;
+        Vector3[] path;
+        PowerslideKartPhysics.KartCamera rig;
+        Vector3 rigPos; Quaternion rigRot;
+        readonly List<GameObject> hiddenStage = new();
         readonly List<GameObject> hiddenHud = new();
         readonly List<GameObject> spawned = new();
         Vector3[] trophyHome;
@@ -99,6 +110,7 @@ namespace KartCup
         public void Prizes(string heading, string amount, IList<string> places)
         {
             Init();
+            flying = FlightPath();
             Begin();
             winnersShot = false;
             ClearDrivers();
@@ -111,9 +123,10 @@ namespace KartCup
             {
                 var line = places != null && i < places.Count ? places[i] : "";
                 int cut = line.IndexOf('\n');
-                Card(i, cut < 0 ? metal[Mathf.Min(i, 2)] : line[(cut + 1)..].Trim(), "");
+                Card(i, cut >= 0 ? line[(cut + 1)..].Trim() : flying ? "" : metal[Mathf.Min(i, 2)], "");   // no trophies in shot from the drone: a card only where there is money on the place
             }
             cardsFrom = 1.5f;
+            if (flying) return;
             focus = trophies.Length > 0 && trophies[0] != null ? trophies[0].position + Vector3.up * TrophyHeight * Size(0) * 0.55f : transform.position + Vector3.up * 2f;
             Pop();
         }
@@ -123,6 +136,7 @@ namespace KartCup
         public void Winners(string heading, IList<Winner> top)
         {
             Init();
+            Land();
             Begin();
             winnersShot = true;
             ClearDrivers();
@@ -168,6 +182,7 @@ namespace KartCup
         {
             if (!Active) return;
             Active = false;
+            Land();
             if (cam != null) cam.enabled = false;
             if (overlay != null) overlay.gameObject.SetActive(false);     // (a camera canvas with its camera off draws as an overlay)
             if (raceCam != null) raceCam.enabled = true;
@@ -184,6 +199,7 @@ namespace KartCup
         public void PoseCamera(float t)
         {
             PoseOverlay(t);
+            if (flying) { Fly(t); return; }
             if (cam == null) return;
             var stage = transform;
             // the words own the left of the frame: the camera stands off to that side, so the podium sits right of centre
@@ -213,6 +229,71 @@ namespace KartCup
         }
 
         static float Ease(float x) => 1f - (1f - x) * (1f - x) * (1f - x);
+
+        // ---------- the drone ----------
+
+        /// The lap to fly: the circuit's waypoints (TrackSetup lays ~48 round it, the first on the start line).
+        bool FlightPath()
+        {
+            var root = GameObject.Find("Waypoints");
+            if (root == null || root.transform.childCount < 8 || Camera.main == null || Camera.main == cam) return false;
+            int n = root.transform.childCount;
+            path = new Vector3[n];
+            float lap = 0f;
+            for (int i = 0; i < n; i++) path[i] = root.transform.GetChild(i).position;
+            for (int i = 0; i < n; i++) lap += Vector3.Distance(path[i], path[(i + 1) % n]);
+            flySeconds = Mathf.Clamp(lap / 190f, 5f, 7.5f);        // quick: about 190 m/s on average
+            return true;
+        }
+
+        /// A point `s` waypoints round the lap (Catmull-Rom through them, wrapping).
+        Vector3 Along(float s)
+        {
+            int n = path.Length, i = Mathf.FloorToInt(s); float u = s - i;
+            Vector3 P(int k) => path[((k % n) + n) % n];
+            Vector3 a = P(i - 1), b = P(i), c = P(i + 1), d = P(i + 2);
+            return 0.5f * (2f * b + (c - a) * u + (2f * a - 5f * b + 4f * c - d) * u * u + (3f * b - a - 3f * c + d) * u * u * u);
+        }
+
+        /// The race camera `t` seconds into the lap: seven metres up (under the tunnel's crown and the start gantry),
+        /// looking down the road, leaning into the turns. Away fast, slowing as it comes round to land behind the grid.
+        void Fly(float t)
+        {
+            if (raceCam == null) return;
+            float x = Mathf.Clamp01(t / flySeconds), k = x * (1.5f - 0.5f * x);
+            float s = Mathf.Lerp(1.5f, path.Length - 2.5f, k);
+            var pos = Along(s) + Vector3.up * 7f;
+            var rot = Quaternion.LookRotation(Along(s + 2.4f) + Vector3.up * 2f - pos, Vector3.up);
+            float turn = Vector3.SignedAngle(Along(s + 0.5f) - Along(s), Along(s + 3f) - Along(s + 2.5f), Vector3.up);
+            raceCam.transform.SetPositionAndRotation(pos, rot * Quaternion.Euler(0f, 0f, Mathf.Clamp(-turn * 0.3f, -15f, 15f)));
+        }
+
+        /// Takes the race camera off its rig for the lap, puts the stage away and hangs the words on that camera.
+        void TakeOff()
+        {
+            rig = raceCam.GetComponentInParent<PowerslideKartPhysics.KartCamera>();
+            if (rig != null) rig.enabled = false;
+            rigPos = raceCam.transform.localPosition; rigRot = raceCam.transform.localRotation;
+            foreach (Transform child in transform)
+                if (child.gameObject.activeSelf && (cam == null || child != cam.transform) && (overlay == null || child != overlay.transform))
+                { hiddenStage.Add(child.gameObject); child.gameObject.SetActive(false); }
+            // The words go straight onto the screen for the lap. On the stage's camera they are drawn into the scene
+            // before the grade, which is fine against the stage's black; over a bright circuit the scrim behind them
+            // all but vanished (dark over HDR daylight is still daylight once it is tone-mapped).
+            if (overlay != null && overlay.TryGetComponent<Canvas>(out var canvas)) canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        }
+
+        /// Gives the camera back to its rig and brings the stage back.
+        void Land()
+        {
+            if (!flying) return;
+            flying = false;
+            if (raceCam != null) raceCam.transform.SetLocalPositionAndRotation(rigPos, rigRot);
+            if (rig != null) rig.enabled = true;
+            foreach (var go in hiddenStage) if (go != null) go.SetActive(true);
+            hiddenStage.Clear();
+            if (overlay != null && overlay.TryGetComponent<Canvas>(out var canvas)) { canvas.renderMode = RenderMode.ScreenSpaceCamera; canvas.worldCamera = cam; canvas.planeDistance = 0.6f; }
+        }
 
         // ---------- the overlay ----------
 
@@ -270,8 +351,12 @@ namespace KartCup
             Active = true;
             // Take over from whichever camera is drawing the race; its AudioListener stays where it is.
             raceCam = Camera.main != null && Camera.main != cam ? Camera.main : null;
-            if (raceCam != null) raceCam.enabled = false;
-            if (cam != null) cam.enabled = true;
+            if (flying) TakeOff();
+            else
+            {
+                if (raceCam != null) raceCam.enabled = false;
+                if (cam != null) cam.enabled = true;
+            }
             if (overlay != null) overlay.gameObject.SetActive(true);
             // The race HUD goes; the results card and the pause overlay stay available above the shot.
             var hud = FindAnyObjectByType<RaceHud>();

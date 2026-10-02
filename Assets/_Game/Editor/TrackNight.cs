@@ -579,6 +579,19 @@ public static partial class TrackSetup
             }
         }
 
+        /// A cone of gores about the local Y axis, alternating between two submeshes: a parasol's stripes.
+        public void Gores(int sA, int sB, float r0, float r1, float y0, float y1, int sides)
+        {
+            for (int i = 0; i < sides; i++)
+            {
+                float a = Mathf.PI * 2f * i / sides, b = Mathf.PI * 2f * (i + 1) / sides;
+                Vector3 p0 = new(r0 * Mathf.Cos(a), y0, r0 * Mathf.Sin(a)), p1 = new(r0 * Mathf.Cos(b), y0, r0 * Mathf.Sin(b));
+                Vector3 q0 = new(r1 * Mathf.Cos(a), y1, r1 * Mathf.Sin(a)), q1 = new(r1 * Mathf.Cos(b), y1, r1 * Mathf.Sin(b));
+                Quad(i % 2 == 0 ? sA : sB, p0, q0, q1, p1);
+                Quad(i % 2 == 0 ? sA : sB, p1, q1, q0, p0);      // and its underside: a parasol is seen from below
+            }
+        }
+
         /// A box centred on `c` with unit axes x, y, z and full extents `size`.
         public void Box(int s, Vector3 c, Vector3 x, Vector3 y, Vector3 z, Vector3 size)
         {
