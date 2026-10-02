@@ -36,18 +36,20 @@ public static class LookSetup
         // paying for a cascade split we would never see on a phone.
         Set(so, "m_MainLightShadowsSupported", true);
         Set(so, "m_MainLightRenderingMode", 1);
-        Set(so, "m_MainLightShadowmapResolution", 4096);   // 3 cm a texel over 60 m: at 2048 over 75 every shadow edge was a staircase
-        Set(so, "m_ShadowDistance", 60f);
+        Set(so, "m_MainLightShadowmapResolution", 2048);   // (4096 with a wider filter was tried: with the rest of that pass it halved Palm Bay's frame rate)
+        Set(so, "m_ShadowDistance", 60f);                  // 6 cm a texel: a quarter finer than the 75 m it was
         Set(so, "m_ShadowCascadeCount", 1);
         Set(so, "m_ShadowDepthBias", 1.0f);
         Set(so, "m_ShadowNormalBias", 0.8f);
         Set(so, "m_SoftShadowsSupported", true);
-        Set(so, "m_SoftShadowQuality", 2);          // medium: low's 2-tap filter left the edges blocky
+        Set(so, "m_SoftShadowQuality", 1);          // low: a 2-tap filter, cheap on mobile
         // The phone's panel at its own resolution (QualitySettings lifts the fixed-DPI cap), so the HUD and menus are
-        // drawn sharp; the 3D at 0.85 of that, brought up by FSR instead of the panel's bilinear stretch, which is what
-        // made the whole picture look pixelated at the old 1829 x 823.
-        Set(so, "m_RenderScale", 0.85f);
-        Set(so, "m_UpscalingFilter", 3);            // FSR 1.0
+        // drawn sharp, and the 3D at 0.78 of that, a little more than the 1829 x 823 everything used to be drawn at.
+        // Measured on the Nothing Phone (FpsCounter's sweep, Palm Bay's grid): at 0.85 through FSR with a 4096 shadow
+        // map it ran 33 fps; FSR alone was 6 ms of that, the shadows 5, and 0.7 with a plain stretch ran 52. The phone
+        // is fill-bound: resolution is the first thing to give back if a circuit drops under 50.
+        Set(so, "m_RenderScale", 0.78f);
+        Set(so, "m_UpscalingFilter", 1);            // bilinear
         Set(so, "m_MSAA", 4);
         Set(so, "m_ConservativeEnclosingSphere", true);
         // The night map: HDR so the lamps, studs and moon bloom from real values, and the sodium lamps and headlights

@@ -359,9 +359,10 @@ public static partial class TrackSetup
             lanterns.Add(new Vector3(Mathf.Sin(a) * d, 26f + R() * 60f, Mathf.Cos(a) * d));
         }
 
-        Glows(town, "BeachHalos", halos, new Color(1f, 0.8f, 0.55f), "Beach_Halo", new[] { (3.2f, 2.2f, 0.8f), (0.9f, 1.3f, 2.2f) });
-        Glows(town, "BeachFlames", flames, Flame, "Beach_FlameGlow", new[] { (6.5f, 2.3f, 0.85f), (1.6f, 1.3f, 2.8f) }, 0.45f);
-        Glows(town, "SkyLanterns", lanterns, new Color(1f, 0.6f, 0.25f), "Beach_Lantern", new[] { (3.2f, 2.2f, 0.9f), (0.9f, 1.2f, 2.6f) }, 0.25f);
+        // (small halos: the phone is fill-bound, and a torch's glow three metres from the camera is a lot of screen)
+        Glows(town, "BeachHalos", halos, new Color(1f, 0.8f, 0.55f), "Beach_Halo", new[] { (2.2f, 2.2f, 0.8f), (0.8f, 1.3f, 2.2f) });
+        Glows(town, "BeachFlames", flames, Flame, "Beach_FlameGlow", new[] { (3.4f, 2.3f, 0.9f), (1.2f, 1.3f, 2.8f) }, 0.45f);
+        Glows(town, "SkyLanterns", lanterns, new Color(1f, 0.6f, 0.25f), "Beach_Lantern", new[] { (2.4f, 2.2f, 0.9f), (0.8f, 1.2f, 2.6f) }, 0.25f);
 
         foreach (var p in new[] { bar, cabin, parasol, lounger, board, torch, fire, tower, frame }) Object.DestroyImmediate(p);
         Debug.Log($"[track] beach town: {villages} villages, {fires} bonfires, {torches} torches, {boards} hoardings, {halos.Count + flames.Count} lights of its own, {lanterns.Count} sky lanterns");

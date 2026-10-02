@@ -17,7 +17,7 @@ namespace KartCup
         Item heldItem;
         KartPowers powers;
         ItemMount mount;
-        int knownAmmo, castFrame = -1;
+        int knownAmmo;
 
         public void Bind(Kart k, BlockyDriverPose pose, bool player)
         {
@@ -31,29 +31,40 @@ namespace KartCup
             caster = GetComponent<ItemCaster>();
             powers = GetComponent<KartPowers>();
             if (caster != null && player) caster.castEvent.AddListener(() => AudioDirector.Instance?.UseItem(caster.item != null ? caster.item.itemName : null));
-            if (caster != null) caster.castEvent.AddListener(() => castFrame = Time.frameCount);
-            mount = ItemMount.On(k);   // the pod and the cradle (before the listener above runs they have noted what was fired)
+            mount = ItemMount.On(k);   // the pod and the cradle: their own listener notes what was fired, before ours below runs
+            if (caster != null) caster.castEvent.AddListener(OnCast);
         }
 
         /// The projectile this kart just fired. A projectile does not say who fired it, so the one that appeared beside
         /// the kart on the frame of the cast is taken to be ours. It never touches its own kart (Powerslide ignores one
         /// collider; a kart has two, and a rocket born inside the second spun its own shooter), it starts from where
         /// the kart shows it (the pod's tubes, the cradle), and the ATTACK power makes it fly harder.
-        void LateUpdate()
+        System.Collections.IEnumerator Rearm(Collider[] mine, Collider[] its)
         {
-            if (castFrame != Time.frameCount) return;
+            yield return new WaitForSeconds(1.5f);
+            foreach (var a in mine)
+                foreach (var b in its) if (a != null && b != null) Physics.IgnoreCollision(a, b, false);
+        }
+
+        /// Runs as the cast happens (the shot is already in the scene when Powerslide raises the event), not a frame
+        /// later: a physics step in between is all a trap needs to hit the kart it was dropped under.
+        void OnCast()
+        {
             foreach (var shot in FindObjectsByType<SpawnedProjectileItem>(FindObjectsSortMode.None))
             {
                 if (shot.GetComponent<PoweredShot>() != null || (shot.transform.position - transform.position).sqrMagnitude > 25f) continue;
                 shot.gameObject.AddComponent<PoweredShot>();
                 var srb = shot.GetComponent<Rigidbody>();
                 bool moving = srb != null && rb != null && (srb.linearVelocity - rb.linearVelocity).sqrMagnitude > 4f;   // thrown or fired, not dropped
-                if (moving)
-                {
-                    foreach (var mine in GetComponentsInChildren<Collider>())
-                        foreach (var its in shot.GetComponentsInChildren<Collider>()) Physics.IgnoreCollision(mine, its, true);
-                    if (mount != null && mount.LaunchPoint(out var from)) { shot.transform.position = from; srb.position = from; }
-                }
+                // Nothing a kart lets go of may hit that kart on its way out. Powerslide spares one of the kart's
+                // colliders for half a second; ours have several, so a trap dropped under the kart spun out the one
+                // who dropped it. What is fired never turns on its own kart; what is dropped (a trap, a bomb) is
+                // live for it again a second and a half later, by when the kart is long gone.
+                var mineAll = GetComponentsInChildren<Collider>(); var itsAll = shot.GetComponentsInChildren<Collider>();
+                foreach (var mine in mineAll)
+                    foreach (var its in itsAll) Physics.IgnoreCollision(mine, its, true);
+                if (moving) { if (mount != null && mount.LaunchPoint(out var from)) { shot.transform.position = from; srb.position = from; } }
+                else StartCoroutine(Rearm(mineAll, itsAll));
                 if (powers == null || Mathf.Abs(powers.attack - 1f) < 0.01f) continue;
                 shot.targetSpeed *= powers.attack; shot.accel *= powers.attack;
                 if (srb != null && rb != null) srb.linearVelocity = rb.linearVelocity + (srb.linearVelocity - rb.linearVelocity) * powers.attack;

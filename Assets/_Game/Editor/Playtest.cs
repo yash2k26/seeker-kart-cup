@@ -17,7 +17,7 @@ public static class Playtest
     static string look = "Lighthouse", item;   // -item "Sun Bomb": the player throws it after GO and three frames follow it
     static int itemShot;
     static double[] itemTimes = { 0.5, 2.15, 2.55, 2.9, 3.8 };   // after the throw: in the air, burning, the burst, its wave, the glitter
-    static double thrownAt = -1;
+    static double thrownAt = -1, goAt = -1;
     static bool armed, heldShot;
     static Vector3 itemFrom, itemAt;   // a second camera for the item frames: beside the road, on where it lands
     static int prevQuality;
@@ -45,7 +45,7 @@ public static class Playtest
         mobile = args.Contains("-mobile");   // the phone's quality tier (Forward, eight lights per object), restored on exit
         look = "Lighthouse";
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-look") look = args[i + 1];   // what the vista frames look at
-        item = null; itemShot = 0; thrownAt = -1; armed = false; heldShot = false;
+        item = null; itemShot = 0; thrownAt = -1; goAt = -1; armed = false; heldShot = false;
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-item") item = args[i + 1];
         prevQuality = QualitySettings.GetQualityLevel();
         if (mobile) QualitySettings.SetQualityLevel(0, true);
@@ -100,22 +100,25 @@ public static class Playtest
             captureAt = t + 0.6;                                                              // after the entrance has landed
         }
         // the item is handed over a little before it is used, so the kart is seen carrying it (pod up, bomb in the cradle)
-        if (item != null && !armed && t >= 9.6)
+        // (timed from the green light: the drone's lap before it is as long as the circuit)
+        var raceNow = Object.FindFirstObjectByType<RaceManager>();
+        if (goAt < 0 && raceNow != null && raceNow.state == RaceManager.State.Racing) goAt = t;
+        if (item != null && !armed && goAt >= 0 && t >= goAt + 2.0)
         {
             armed = true;
             var r0 = Object.FindFirstObjectByType<RaceManager>();
             var c0 = r0 != null && r0.Player != null ? r0.Player.GetComponent<ItemCaster>() : null;
             var d0 = Object.FindFirstObjectByType<ItemManager>()?.GetItem(item);
             if (c0 != null && d0 != null) c0.GiveItem(d0);
-            if (item != "Sun Bomb") itemTimes = new[] { 0.05, 0.2, 0.5 };   // a rocket is gone in half a second
+            if (item != "Sun Bomb") itemTimes = new[] { 0.05, 0.2, 0.5, 1.2, 2.5 };   // a rocket is gone in half a second; a trap must still be lying there after two
         }
-        if (item != null && armed && !heldShot && t >= 10.7)
+        if (item != null && armed && !heldShot && t >= goAt + 3.1)
         {
             heldShot = true;
             var k = Object.FindFirstObjectByType<RaceManager>()?.Player?.transform;
             if (k != null) { itemFrom = k.position + k.forward * 4.2f - k.right * 3.4f + Vector3.up * 2.2f; itemAt = k.position + Vector3.up * 1.1f; SideShot($"item{track}-held"); itemFrom = k.position - k.forward * 4.5f + k.right * 3.2f + Vector3.up * 2.4f; SideShot($"item{track}-held-b"); }
         }
-        if (item != null && thrownAt < 0 && t >= 11)
+        if (item != null && armed && thrownAt < 0 && t >= goAt + 3.4)
         {
             var race = Object.FindFirstObjectByType<RaceManager>();
             var caster = race != null && race.Player != null ? race.Player.GetComponent<ItemCaster>() : null;
@@ -125,6 +128,8 @@ public static class Playtest
             else { Debug.LogError($"[playtest] cannot throw {item}: caster {(caster != null)}, item {(def != null)}"); thrownAt = t; }
         }
         if (thrownAt >= 0 && itemShot < itemTimes.Length && t >= thrownAt + itemTimes[itemShot]) { Capture($"item{track}-{itemShot}"); SideShot($"item{track}-{itemShot}-side"); var bombs = Object.FindObjectsByType<SunBomb>(FindObjectsSortMode.None);
+            { var pk = Object.FindFirstObjectByType<RaceManager>()?.Player?.GetComponent<Kart>(); var shots = Object.FindObjectsByType<SpawnedProjectileItem>(FindObjectsSortMode.None);
+              if (pk != null) Debug.Log($"[playtest] item frame {itemShot}: thrower spinning {pk.spinningOut}, speed {pk.velMag:F1}, {shots.Length} shot(s){string.Concat(shots.Select(x => $" {pk.transform.InverseTransformPoint(x.transform.position).z:F1} m ahead"))}"); }
             Debug.Log($"[playtest] item frame {itemShot}: {bombs.Length} sun bomb(s){string.Concat(bombs.Select(b => $" at {b.transform.position}"))}, {Object.FindObjectsByType<Kart>(FindObjectsSortMode.None).Count(k => k.spinningOut)} kart(s) spinning"); itemShot++; }
         if (captureAt >= 0 && t >= captureAt)
         {

@@ -46,6 +46,8 @@ public static class ItemSetup
         go.name = "Items";
         // the homing item Powerslide ships fires its own grey missile: point it at ours
         foreach (var item in go.GetComponentsInChildren<ProjectileItem>()) if (item.itemName == "Homing Item") { item.itemPrefab = homing; item.spawnOffset = new Vector3(0, 1.5f, 1.2f); }
+        // the trap is let go behind the kart, like the bomb (Powerslide drops it at the kart's own centre)
+        foreach (var item in go.GetComponentsInChildren<ProjectileItem>()) if (item.itemName == "Trap") item.spawnOffset = new Vector3(0, 0.5f, -2.6f);
         // (the kart's ItemMount moves a fired shot to the pod's tubes; this offset is only where it starts without one)
         Projectile(go.transform, "RocketItem", "Rocket", rocket, new Vector3(0, 1.5f, 1.2f));
         Projectile(go.transform, "BombItem", "Bomb", bomb, new Vector3(0, 0.5f, -2.5f));

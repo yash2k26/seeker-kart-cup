@@ -380,7 +380,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   itemName: Trap
   itemPrefab: {fileID: 5462182083005470935, guid: e74c090fa86078143a69549426fc9da8, type: 3}
-  spawnOffset: {x: 0, y: 0.5, z: 0}
+  spawnOffset: {x: 0, y: 0.5, z: -2.6}
 --- !u!1 &8484901405143081616
 GameObject:
   m_ObjectHideFlags: 0
