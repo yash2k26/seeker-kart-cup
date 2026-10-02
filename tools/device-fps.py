@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Races each circuit on the connected phone and screenshots it mid-race with the fps overlay in frame.
     ./tools/device-fps.py [beach alpine forest speedway]        -> Builds/device-race-<id>.png
+    ./tools/device-fps.py --sweep [--plan plan.txt] beach       -> FpsCounter's benchmark on that circuit: each
+        setting against the game as shipped on the same stretches of road, uncapped; prints the [perf] lines (about
+        a minute a setting). A plan is one setting a line, e.g. "msaa=2 scale=0.85" (toggles: FpsCounter.Toggle).
 
 The select screen remembers the last card and the Grand Prix card sits among the tracks, so counting taps from
 wherever it opens lands on the wrong map. This reads the card: it taps Next until the title is the widest one (SUNSET
@@ -35,30 +38,49 @@ def title_edge(im):
 
 
 # The cards run Grand Prix, Palm Bay, Frost Peak, Pine Ridge, Sunset Speedway and wrap. SUNSET SPEEDWAY is the one
-# title nothing else is as wide as (Palm Bay and Frost Peak end within a dozen pixels of each other): find it, then
+# title nothing else is as wide as (in Archivo it runs to x=870; the next widest, GRAND PRIX, to 755): find it, then
 # step on from there. (Backdrop colour was tried first: a dusk card and a night card are both dark.)
 STEPS = {"speedway": 0, "beach": 2, "alpine": 3, "forest": 4}
 
-for target in sys.argv[1:] or ["beach", "alpine", "forest", "speedway"]:
-    sh("shell", "am", "force-stop", PKG); time.sleep(1)
+args = sys.argv[1:]
+sweep = "--sweep" in args
+plan = args[args.index("--plan") + 1] if "--plan" in args else None
+REMOTE = f"/sdcard/Android/data/{PKG}/files/sweep.txt"
+if sweep: sh("push", plan, REMOTE) if plan else sh("shell", "rm", "-f", REMOTE)
+for target in [a for a in args if a not in ("--sweep", "--plan", plan)] or ["beach", "alpine", "forest", "speedway"]:
+    sh("shell", "am", "force-stop", PKG); time.sleep(1); sh("logcat", "-c")
     sh("shell", "am", "start", "-n", PKG + "/com.unity3d.player.UnityPlayerGameActivity"); time.sleep(17)
     tap(516, 710, 1.6)            # PLAY
     tap(540, 840, 2.0)            # NEXT (driver select)
     edges = []
     for _ in range(7):
         edges.append(title_edge(shot()))
-        if edges[-1] > 700: break
+        if edges[-1] > 820: break
         tap(2200, 936, 1.5)       # next card (a tap during the card's slide is lost: give it time)
-    if not edges[-1] > 700:
+    if not edges[-1] > 820:
         print(f"{target}: Sunset Speedway's card not found (title edges {edges})"); continue
     for _ in range(STEPS[target]): tap(2200, 936, 1.5)
     for _ in range(3):            # RACE, again if the card is still up (a tap during the card's slide is lost)
         tap(540, 840, 2.5)
         if title_edge(shot()) == 0: break
-    time.sleep(8.5)               # the prize shot is 4.5 s, then the 3-2-1
+    if sweep:
+        time.sleep(2); tap(1200, 540, 0.3)   # skip the drone's lap (a skipped lap leaves RenderBudget's scale alone)
+        time.sleep(6)             # the 3-2-1
+        sh("logcat", "-G", "16M"); sh("logcat", "-c")         # (the default buffer rolls over before the sweep ends)
+        for _ in range(4): sh("shell", "input", "tap", "80", "80")   # FpsCounter: four taps in the top-left corner
+        t0, lines = time.time(), []
+        while time.time() - t0 < 480 and not (lines and lines[-1].startswith("done")):
+            time.sleep(10)
+            log = subprocess.run([ADB, "logcat", "-d", "-s", "Unity:I"], capture_output=True, text=True).stdout
+            lines = [l.split("[perf] ")[1] for l in log.splitlines() if "[perf] " in l]
+        print(f"{target}:\n  " + ("\n  ".join(lines) or "no [perf] lines: is the fps counter switched on in Settings?"))
+        continue
+    time.sleep(8.5)               # the drone's lap is 5 to 7.5 s, then the 3-2-1
     subprocess.Popen([ADB, "shell", "input", "swipe", "2192", "924", "2192", "924", "8000"])   # hold GAS
     time.sleep(5)
     im = shot(); im.save(f"Builds/device-race-{target}.png")
+    budget = [l.split("[budget] ")[1] for l in subprocess.run([ADB, "logcat", "-d", "-s", "Unity:I"], capture_output=True, text=True).stdout.splitlines() if "[budget] " in l]
+    if budget: print(f"{target}: " + budget[-1])
     time.sleep(3.5)
     print(f"{target}: wrote Builds/device-race-{target}.png (title edges on the way: {edges})")
 sh("shell", "am", "force-stop", PKG)

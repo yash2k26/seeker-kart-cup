@@ -60,6 +60,7 @@ namespace KartCup
         Vector3[] path;
         PowerslideKartPhysics.KartCamera rig;
         Vector3 rigPos; Quaternion rigRot;
+        float flightFrom; int flightFrame;      // the lap is also this phone's frame-rate test (RenderBudget)
         readonly List<GameObject> hiddenStage = new();
         readonly List<GameObject> hiddenHud = new();
         readonly List<GameObject> spawned = new();
@@ -281,6 +282,7 @@ namespace KartCup
             // before the grade, which is fine against the stage's black; over a bright circuit the scrim behind them
             // all but vanished (dark over HDR daylight is still daylight once it is tone-mapped).
             if (overlay != null && overlay.TryGetComponent<Canvas>(out var canvas)) canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            flightFrom = Time.realtimeSinceStartup; flightFrame = Time.frameCount;
         }
 
         /// Gives the camera back to its rig and brings the stage back.
@@ -288,6 +290,8 @@ namespace KartCup
         {
             if (!flying) return;
             flying = false;
+            float flown = Time.realtimeSinceStartup - flightFrom;
+            if (flown > 2.5f) RenderBudget.Report((Time.frameCount - flightFrame) / flown);   // (a tap that skips it at once proves nothing)
             if (raceCam != null) raceCam.transform.SetLocalPositionAndRotation(rigPos, rigRot);
             if (rig != null) rig.enabled = true;
             foreach (var go in hiddenStage) if (go != null) go.SetActive(true);
