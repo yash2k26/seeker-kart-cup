@@ -50,6 +50,7 @@ namespace KartCup
                 }
             }
             catch (Exception e) { Debug.LogWarning("[wallet] silent reconnect skipped: " + e.Message); }
+            _ = SettlePurchases();   // a shop payment the Worker had not granted when the app last closed
         }
 
         void SetProfile(KartApi.Profile p)
@@ -89,6 +90,7 @@ namespace KartCup
                 }
                 SetProfile(profile);
                 Status(Profile.skrName ?? Short(Profile.wallet));
+                _ = SettlePurchases();   // payments this wallet made under a session that has since expired
                 KartApi.Event("wallet_login", new { seeker = Profile.isSeeker });
                 if (RaceSession.Instance != null) await RaceSession.Instance.ClaimAfterLogin();
                 return true;
@@ -163,28 +165,52 @@ namespace KartCup
             finally { Busy = false; }
         }
 
-        /// Shop: pay the catalog price, let the Worker verify it landed, refresh what we own.
+        /// Shop: pay the catalog price, then let the Worker verify it landed and grant it. The signature is written down
+        /// before the first ask (PendingPurchases), so a payment the Worker has not seen yet keeps being asked about: for
+        /// a few minutes now, then at every launch and sign-in, until it is granted.
         public async Awaitable<bool> Buy(string sku, string currency)
         {
-            var cfg = await KartApi.Config();
-            var item = cfg?.Item(sku);
+            var cfg = await KartApi.Config(maxAgeSeconds: 300);   // the Worker accepts 90% of today's SKR price, not the session's
+            if (cfg == null) { Status("Couldn't load today's prices. Check your connection."); return false; }
+            var item = cfg.Item(sku);
             if (item == null) { Status("Not for sale right now"); return false; }
             if (!item.price.TryGetValue(currency, out var priceStr) || string.IsNullOrEmpty(priceStr)) { Status("This one is sold for SKR only"); return false; }
             var orderId = Guid.NewGuid().ToString("N").Substring(0, 12);
             var sig = await Pay($"kc:buy:{sku}:{orderId}", ulong.Parse(priceStr), currency, sku);
             if (sig == null) return false;
+            var paid = new PendingPurchases.Entry { sig = sig, sku = sku, orderId = orderId, currency = currency, wallet = KartApi.SessionWallet };
+            PendingPurchases.Add(paid);
             Status("Verifying…");
-            for (int i = 0; i < 10; i++)
+            var outcome = PendingPurchases.Outcome.Pending;
+            for (int i = 0; i < 10 && outcome == PendingPurchases.Outcome.Pending; i++)
             {
-                try { await KartApi.VerifyPurchase(sig, sku, orderId, currency); break; }
-                catch (KartApi.ApiException ex) when (ex.Status == 202) { await Awaitable.WaitForSecondsAsync(2f); }
-                catch (KartApi.ApiException ex) { Debug.LogWarning("[wallet] verify: " + ex.Message); Status("Paid, but we could not verify it yet. It will unlock once the network confirms."); return false; }
-                if (i == 9) { Status("Still confirming — it will unlock shortly."); return false; }
+                if (i > 0) await Awaitable.WaitForSecondsAsync(2f);
+                outcome = await PendingPurchases.Verify(paid);
+            }
+            if (outcome == PendingPurchases.Outcome.Refused) { Status("That payment did not match the price. Contact support with your wallet receipt."); return false; }
+            if (outcome == PendingPurchases.Outcome.Pending)
+            {
+                Status("Paid. Still confirming: it unlocks by itself once the network confirms.");
+                _ = SettlePurchases(rounds: 12);
+                return false;
             }
             try { SetProfile(await KartApi.Me()); } catch { }
             Status("Unlocked ✓");
             KartApi.Event("bought", new { sku, currency, sig });
             return true;
+        }
+
+        /// Payments the Worker has not granted yet: asked about `rounds` times, 15 s apart, while any are waiting.
+        async Awaitable SettlePurchases(int rounds = 1)
+        {
+            for (int i = 0; i < rounds && PendingPurchases.Any; i++)
+            {
+                if (i > 0) await Awaitable.WaitForSecondsAsync(15f);
+                if (this == null) return;   // the menu was left; the next one asks again
+                if (await PendingPurchases.Flush() == 0 || this == null) continue;
+                try { SetProfile(await KartApi.Me()); } catch { }
+                Status("Unlocked ✓");
+            }
         }
 
         /// Lobby: pay the room's entry fee and hand the signature to the room, which verifies it on-chain. The room is
@@ -237,7 +263,8 @@ namespace KartCup
         {
             return new Transaction
             {
-                RecentBlockHash = await Web3.Wallet.GetBlockHash(Commitment.Confirmed, useCache: true, maxSeconds: 30),
+                // Fresh every time: a blockhash lives ~60–90 s and the wallet may sit open for most of that.
+                RecentBlockHash = await Web3.Wallet.GetBlockHash(Commitment.Confirmed, useCache: false),
                 FeePayer = Web3.Wallet.Account.PublicKey,
                 Instructions = new List<TransactionInstruction>(),
                 Signatures = new List<SignaturePubKeyPair>(),

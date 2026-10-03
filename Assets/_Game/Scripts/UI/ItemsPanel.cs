@@ -63,8 +63,7 @@ namespace KartCup
             message = WalletFlow.Instance.LastStatus;
             if (ok)
             {
-                Inventory.Add(pack.id, pack.qty);
-                if (string.IsNullOrEmpty(Inventory.Loadout)) Inventory.Loadout = pack.id;
+                // the pack was credited when the Worker granted it (PendingPurchases.Verify), here or on a later retry
                 Haptics.Play(Haptics.Kind.Win); AudioDirector.Instance?.Confirm();
                 KartApi.Event("pack", new { pack = pack.id, currency });
             }

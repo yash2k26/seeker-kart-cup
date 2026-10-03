@@ -69,14 +69,19 @@ namespace KartCup
             public bool CanPay => !string.IsNullOrEmpty(treasuryOwner);
         }
 
-        /// The Worker's live config (treasury, fee tiers, prices): fetched once per session, never compiled into the APK.
+        /// The Worker's live config (treasury, fee tiers, prices), never compiled into the APK. Fetched once per session;
+        /// a payment asks for one younger than `maxAgeSeconds` (SKR prices follow the market) and gets null when the
+        /// Worker cannot be reached for it.
         public static ConfigDto Cfg { get; private set; }
-        public static async Awaitable<ConfigDto> Config()
+        static DateTime cfgAt;
+        public static async Awaitable<ConfigDto> Config(double maxAgeSeconds = double.PositiveInfinity)
         {
-            if (Cfg != null) return Cfg;
-            try { Cfg = await Get<ConfigDto>("/v1/config"); }
-            catch (Exception e) { Debug.LogWarning("[api] config: " + e.Message); }
-            return Cfg;
+            if (Cfg == null || (DateTime.UtcNow - cfgAt).TotalSeconds >= maxAgeSeconds)
+            {
+                try { Cfg = await Get<ConfigDto>("/v1/config"); cfgAt = DateTime.UtcNow; }
+                catch (Exception e) { Debug.LogWarning("[api] config: " + e.Message); }
+            }
+            return (DateTime.UtcNow - cfgAt).TotalSeconds < maxAgeSeconds ? Cfg : null;
         }
         public static Awaitable<RoomCreated> CreateRoom(List<string> tracks, string fee, string currency, bool isPublic)
             => Post<RoomCreated>("/v1/rooms", new { tracks, fee, currency, device = DeviceId, isPublic });
@@ -112,7 +117,9 @@ namespace KartCup
         public static Awaitable<object> RoomEntry(string code, int round, string signature) => Post<object>($"/v1/rooms/{code}/entry", new { signature, round });
         /// A payment the phone may have made but never got the signature of: the room looks for it on-chain by its memo.
         public static Awaitable<object> RoomEntryScan(string code, int round) => Post<object>($"/v1/rooms/{code}/entry", new { scan = true, round });
-        public static Awaitable<object> VerifyPurchase(string signature, string sku, string orderId, string currency) => Post<object>("/v1/purchase/verify", new { signature, sku, orderId, currency });
+        /// `pending` is the Worker's 202 (not landed at 'confirmed' yet): a 2xx, so it arrives as an answer, not an exception.
+        [Serializable] public class Verified { public bool pending; public List<string> granted; }
+        public static Awaitable<Verified> VerifyPurchase(string signature, string sku, string orderId, string currency) => Post<Verified>("/v1/purchase/verify", new { signature, sku, orderId, currency });
 
         public static void Event(string name, object props = null)
         {
@@ -223,6 +230,73 @@ namespace KartCup
                 if (!Has(sig)) return;
                 await Awaitable.WaitForSecondsAsync(wait);
             }
+        }
+    }
+
+    /// Shop payments the Worker has not granted yet. The wallet answers the moment it has sent the transaction, before
+    /// the Worker can read it at 'confirmed', so the signature is written down first and asked about until the Worker
+    /// grants or refuses it: a slow network, a closed app or a lost answer never turns a payment into nothing. Each is
+    /// kept with the wallet that paid (asked about only under its session). What a payment buys is credited once, by
+    /// whichever ask takes it off the list.
+    public static class PendingPurchases
+    {
+        const string Key = "kc.purchases";
+        public enum Outcome { Granted, Pending, Refused }
+        [Serializable] public class Entry { public string sig, sku, orderId, currency, wallet; }
+        static bool flushing;
+
+        static List<Entry> Load() { try { return JsonConvert.DeserializeObject<List<Entry>>(PlayerPrefs.GetString(Key, "[]")) ?? new List<Entry>(); } catch { return new List<Entry>(); } }
+        static void Store(List<Entry> list) { PlayerPrefs.SetString(Key, JsonConvert.SerializeObject(list)); PlayerPrefs.Save(); }
+        /// True only for the caller that took it off the list.
+        static bool Take(string sig) { var list = Load(); bool had = list.RemoveAll(e => e.sig == sig) > 0; Store(list); return had; }
+        public static bool Any => Load().Count > 0;
+
+        public static void Add(Entry e)
+        {
+            var list = Load();
+            if (!list.Exists(x => x.sig == e.sig)) list.Add(e);
+            Store(list);
+        }
+
+        public static async Awaitable<Outcome> Verify(Entry e)
+        {
+            try
+            {
+                var r = await KartApi.VerifyPurchase(e.sig, e.sku, e.orderId, e.currency);
+                if (r == null || r.pending) return Outcome.Pending;
+            }
+            catch (KartApi.ApiException x) when (x.Status == 400)
+            {
+                // Refused for good (did not match the price, not a payment, already used). The transfer is on-chain
+                // whatever happened, so leave a trail to settle it by hand.
+                Debug.LogWarning($"[purchase] refused {e.sig}: {x.Message}");
+                KartApi.Event("purchase_refused", new { e.sig, e.sku, e.currency, why = x.Message });
+                Take(e.sig);
+                return Outcome.Refused;
+            }
+            catch (Exception x) { Debug.LogWarning("[purchase] will retry: " + x.Message); return Outcome.Pending; }   // offline, 5xx, expired session
+            if (Take(e.sig) && Inventory.BySku(e.sku) is { } pack)   // item packs are counted on the phone
+            {
+                Inventory.Add(pack.id, pack.qty);
+                if (string.IsNullOrEmpty(Inventory.Loadout)) Inventory.Loadout = pack.id;
+            }
+            return Outcome.Granted;
+        }
+
+        /// Ask about every payment of the signed-in wallet; returns how many were granted. Safe to call often.
+        public static async Awaitable<int> Flush()
+        {
+            if (flushing || !KartApi.HasSession) return 0;
+            flushing = true;
+            try
+            {
+                int granted = 0;
+                var me = KartApi.SessionWallet;
+                foreach (var e in Load())
+                    if (e.wallet == me && await Verify(e) == Outcome.Granted) granted++;
+                return granted;
+            }
+            finally { flushing = false; }
         }
     }
 }
