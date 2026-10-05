@@ -4,7 +4,7 @@ using KartCup;
 using UnityEditor;
 using UnityEngine;
 
-// Files the drivers' voice lines (tools/audio/voices.py -> Assets/_Game/Audio/Voice/voices.json + <Driver>/*.ogg) into
+// Files the drivers' voices (tools/audio/vocalize.py -> Assets/_Game/Audio/Voice/voices.json + <Driver>/*.ogg) into
 // Resources/DriverVoices.asset, which Voices.Say reads at run time. Mono, decompressed on load: they are short and
 // must start the instant a kart is tapped.   Run: tools/unity.sh VoiceSetup.Build  (MenuSetup.Build calls it too)
 public static class VoiceSetup
@@ -18,7 +18,7 @@ public static class VoiceSetup
     public static void Build()
     {
         var json = Dir + "voices.json";
-        if (!File.Exists(json)) { Debug.LogWarning("[voices] no " + json + ": run tools/audio/voices.py"); return; }
+        if (!File.Exists(json)) { Debug.LogWarning("[voices] no " + json + ": run tools/audio/vocalize.py"); return; }
         var lines = new List<DriverVoices.Line>();
         foreach (var e in JsonUtility.FromJson<Manifest>(File.ReadAllText(json)).lines)
         {

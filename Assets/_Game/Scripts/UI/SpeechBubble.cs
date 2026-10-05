@@ -4,8 +4,9 @@ using UnityEngine;
 
 namespace KartCup
 {
-    /// What the driver on the turntable just said, in a comic bubble beside their head: pops in with the line,
-    /// follows the head as the turntable turns, and goes once they have finished speaking. Voices.Spoke drives it.
+    /// The sound the driver on the turntable just made (a laugh, a "huh?", a "woo-hoo!": voices without words,
+    /// tools/audio/vocalize.py) as a comic-book word in a bubble beside their head; their eyes react with it. Pops in,
+    /// follows the head as the turntable turns, goes once the sound is over. Voices.Spoke drives it.
     public sealed class SpeechBubble : MonoBehaviour
     {
         [SerializeField] RectTransform bubble;     // pivot on the tail's tip
@@ -38,6 +39,10 @@ namespace KartCup
         void OnSpoke(string driver, string line, float seconds)
         {
             if (bubble == null || words == null) return;
+            Follow();                                           // finds the head
+            // the face reacts with the voice: eyes squeezed shut through a laugh, a blink for anything else
+            bool laughing = line.StartsWith("HA") || line.StartsWith("HEE") || line.StartsWith("HEH");
+            if (head != null && head.GetComponent<EyeLook>() is EyeLook eyes) eyes.React(laughing ? Mathf.Min(seconds, 1.2f) : 0.13f);
             words.text = line;
             var size = words.GetPreferredValues(line, maxWidth, 0f);
             float w = Mathf.Min(size.x, maxWidth) + 56f, h = Mathf.Max(size.y, 44f) + 36f;

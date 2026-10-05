@@ -4,1079 +4,1079 @@
    "driver": "Toly",
    "kind": "hello",
    "file": "Toly/hello_0.ogg",
-   "text": "gm! Let's ship it.",
-   "seconds": 1.732
+   "text": "HEY-YO!",
+   "seconds": 0.8
   },
   {
    "driver": "Toly",
    "kind": "hello",
    "file": "Toly/hello_1.ogg",
-   "text": "Hey! Ready to build?",
-   "seconds": 1.54
+   "text": "HEY!",
+   "seconds": 0.58
   },
   {
    "driver": "Toly",
    "kind": "poke",
    "file": "Toly/poke_0.ogg",
-   "text": "Faster!",
-   "seconds": 0.574
+   "text": "HEE HEE!",
+   "seconds": 0.66
   },
   {
    "driver": "Toly",
    "kind": "poke",
    "file": "Toly/poke_1.ogg",
-   "text": "Ship it!",
-   "seconds": 0.551
+   "text": "HUH?",
+   "seconds": 0.51
   },
   {
    "driver": "Toly",
    "kind": "poke",
    "file": "Toly/poke_2.ogg",
-   "text": "Four hundred milliseconds.",
-   "seconds": 1.547
+   "text": "OH!",
+   "seconds": 0.5
   },
   {
    "driver": "Toly",
    "kind": "poke",
    "file": "Toly/poke_3.ogg",
-   "text": "One more block.",
-   "seconds": 0.942
+   "text": "HEH HEH",
+   "seconds": 0.56
   },
   {
    "driver": "Toly",
    "kind": "annoyed",
    "file": "Toly/annoyed_0.ogg",
-   "text": "Hey, I'm shipping here!",
-   "seconds": 1.365
+   "text": "HMPH!",
+   "seconds": 0.53
   },
   {
    "driver": "Toly",
    "kind": "annoyed",
    "file": "Toly/annoyed_1.ogg",
-   "text": "Okay, okay, I'm shipping!",
-   "seconds": 1.948
+   "text": "UGH!",
+   "seconds": 0.59
   },
   {
    "driver": "Toly",
    "kind": "go",
    "file": "Toly/go_0.ogg",
-   "text": "Let's ship it!",
-   "seconds": 0.783
+   "text": "WOO-HOO!",
+   "seconds": 0.96
   },
   {
    "driver": "Toly",
    "kind": "go",
    "file": "Toly/go_1.ogg",
-   "text": "Full speed ahead!",
-   "seconds": 1.117
+   "text": "WA-HOO!",
+   "seconds": 0.9
   },
   {
    "driver": "Toly",
    "kind": "win",
    "file": "Toly/win_0.ogg",
-   "text": "Shipped it!",
-   "seconds": 0.607
+   "text": "HA HA HA!",
+   "seconds": 1.417
   },
   {
    "driver": "Toly",
    "kind": "win",
    "file": "Toly/win_1.ogg",
-   "text": "Next block, please.",
-   "seconds": 1.281
+   "text": "YEAH!",
+   "seconds": 0.6
   },
   {
    "driver": "Toly",
    "kind": "hurt",
    "file": "Toly/hurt_0.ogg",
-   "text": "Hey!",
-   "seconds": 0.371
+   "text": "OOF!",
+   "seconds": 0.41
   },
   {
    "driver": "Toly",
    "kind": "hurt",
    "file": "Toly/hurt_1.ogg",
-   "text": "Ouch!",
-   "seconds": 0.406
+   "text": "OW!",
+   "seconds": 0.48
   },
   {
    "driver": "Mert",
    "kind": "hello",
    "file": "Mert/hello_0.ogg",
-   "text": "Hey! Let's go!",
-   "seconds": 1.298
+   "text": "HEY-YO!",
+   "seconds": 0.751
   },
   {
    "driver": "Mert",
    "kind": "hello",
    "file": "Mert/hello_1.ogg",
-   "text": "What's up!",
-   "seconds": 0.518
+   "text": "HEY!",
+   "seconds": 0.556
   },
   {
    "driver": "Mert",
    "kind": "poke",
    "file": "Mert/poke_0.ogg",
-   "text": "Indexed.",
-   "seconds": 0.606
+   "text": "HEE HEE!",
+   "seconds": 0.626
   },
   {
    "driver": "Mert",
    "kind": "poke",
    "file": "Mert/poke_1.ogg",
-   "text": "Every corner, indexed.",
-   "seconds": 1.522
+   "text": "HUH?",
+   "seconds": 0.492
   },
   {
    "driver": "Mert",
    "kind": "poke",
    "file": "Mert/poke_2.ogg",
-   "text": "Low latency, baby!",
-   "seconds": 1.429
+   "text": "OH!",
+   "seconds": 0.478
   },
   {
    "driver": "Mert",
    "kind": "poke",
    "file": "Mert/poke_3.ogg",
-   "text": "Let's goooo!",
-   "seconds": 0.693
+   "text": "HEH HEH",
+   "seconds": 0.536
   },
   {
    "driver": "Mert",
    "kind": "annoyed",
    "file": "Mert/annoyed_0.ogg",
-   "text": "Rate limited!",
-   "seconds": 0.718
+   "text": "HMPH!",
+   "seconds": 0.514
   },
   {
    "driver": "Mert",
    "kind": "annoyed",
    "file": "Mert/annoyed_1.ogg",
-   "text": "Too many requests!",
-   "seconds": 1.124
+   "text": "UGH!",
+   "seconds": 0.563
   },
   {
    "driver": "Mert",
    "kind": "go",
    "file": "Mert/go_0.ogg",
-   "text": "Let's go!",
-   "seconds": 0.604
+   "text": "WOO-HOO!",
+   "seconds": 0.902
   },
   {
    "driver": "Mert",
    "kind": "go",
    "file": "Mert/go_1.ogg",
-   "text": "Send it!",
-   "seconds": 0.578
+   "text": "WA-HOO!",
+   "seconds": 0.847
   },
   {
    "driver": "Mert",
    "kind": "win",
    "file": "Mert/win_0.ogg",
-   "text": "Indexed the podium!",
-   "seconds": 1.162
+   "text": "HA HA HA!",
+   "seconds": 1.316
   },
   {
    "driver": "Mert",
    "kind": "win",
    "file": "Mert/win_1.ogg",
-   "text": "Let's gooo!",
-   "seconds": 0.7
+   "text": "YEAH!",
+   "seconds": 0.569
   },
   {
    "driver": "Mert",
    "kind": "hurt",
    "file": "Mert/hurt_0.ogg",
-   "text": "Whoa!",
-   "seconds": 0.325
+   "text": "OOF!",
+   "seconds": 0.399
   },
   {
    "driver": "Mert",
    "kind": "hurt",
    "file": "Mert/hurt_1.ogg",
-   "text": "Ow!",
-   "seconds": 0.311
+   "text": "OW!",
+   "seconds": 0.46
   },
   {
    "driver": "Akshay",
    "kind": "hello",
    "file": "Akshay/hello_0.ogg",
-   "text": "Hello hello!",
-   "seconds": 0.595
+   "text": "HEY-YO!",
+   "seconds": 0.828
   },
   {
    "driver": "Akshay",
    "kind": "hello",
    "file": "Akshay/hello_1.ogg",
-   "text": "Hey! Ready to race?",
-   "seconds": 1.295
+   "text": "HEY!",
+   "seconds": 0.594
   },
   {
    "driver": "Akshay",
    "kind": "poke",
    "file": "Akshay/poke_0.ogg",
-   "text": "Full send!",
-   "seconds": 0.562
+   "text": "HEE HEE!",
+   "seconds": 0.679
   },
   {
    "driver": "Akshay",
    "kind": "poke",
    "file": "Akshay/poke_1.ogg",
-   "text": "Top speed!",
-   "seconds": 0.542
+   "text": "HUH?",
+   "seconds": 0.521
   },
   {
    "driver": "Akshay",
    "kind": "poke",
    "file": "Akshay/poke_2.ogg",
-   "text": "Corners are optional.",
-   "seconds": 0.885
+   "text": "OH!",
+   "seconds": 0.513
   },
   {
    "driver": "Akshay",
    "kind": "poke",
    "file": "Akshay/poke_3.ogg",
-   "text": "Wheee!",
-   "seconds": 0.369
+   "text": "HEH HEH",
+   "seconds": 0.574
   },
   {
    "driver": "Akshay",
    "kind": "annoyed",
    "file": "Akshay/annoyed_0.ogg",
-   "text": "Okay, okay!",
-   "seconds": 0.765
+   "text": "HMPH!",
+   "seconds": 0.539
   },
   {
    "driver": "Akshay",
    "kind": "annoyed",
    "file": "Akshay/annoyed_1.ogg",
-   "text": "I'm going, I'm going!",
-   "seconds": 1.033
+   "text": "UGH!",
+   "seconds": 0.606
   },
   {
    "driver": "Akshay",
    "kind": "go",
    "file": "Akshay/go_0.ogg",
-   "text": "Full send!",
-   "seconds": 0.562
+   "text": "WOO-HOO!",
+   "seconds": 0.994
   },
   {
    "driver": "Akshay",
    "kind": "go",
    "file": "Akshay/go_1.ogg",
-   "text": "Let's fly!",
-   "seconds": 0.595
+   "text": "WA-HOO!",
+   "seconds": 0.931
   },
   {
    "driver": "Akshay",
    "kind": "win",
    "file": "Akshay/win_0.ogg",
-   "text": "Too fast for you!",
-   "seconds": 0.781
+   "text": "HA HA HA!",
+   "seconds": 1.476
   },
   {
    "driver": "Akshay",
    "kind": "win",
    "file": "Akshay/win_1.ogg",
-   "text": "Ferry? What ferry?",
-   "seconds": 1.178
+   "text": "YEAH!",
+   "seconds": 0.618
   },
   {
    "driver": "Akshay",
    "kind": "hurt",
    "file": "Akshay/hurt_0.ogg",
-   "text": "Oof!",
-   "seconds": 0.308
+   "text": "OOF!",
+   "seconds": 0.416
   },
   {
    "driver": "Akshay",
    "kind": "hurt",
    "file": "Akshay/hurt_1.ogg",
-   "text": "Hey!",
-   "seconds": 0.306
+   "text": "OW!",
+   "seconds": 0.492
   },
   {
    "driver": "Emmett",
    "kind": "hello",
    "file": "Emmett/hello_0.ogg",
-   "text": "Hello there.",
-   "seconds": 0.659
+   "text": "HEY-YO!",
+   "seconds": 0.828
   },
   {
    "driver": "Emmett",
    "kind": "hello",
    "file": "Emmett/hello_1.ogg",
-   "text": "Hi. Let's be smooth.",
-   "seconds": 1.423
+   "text": "HEY!",
+   "seconds": 0.594
   },
   {
    "driver": "Emmett",
    "kind": "poke",
    "file": "Emmett/poke_0.ogg",
-   "text": "I see a line.",
-   "seconds": 0.873
+   "text": "HEE HEE!",
+   "seconds": 0.679
   },
   {
    "driver": "Emmett",
    "kind": "poke",
    "file": "Emmett/poke_1.ogg",
-   "text": "Inside line.",
-   "seconds": 0.903
+   "text": "HUH?",
+   "seconds": 0.521
   },
   {
    "driver": "Emmett",
    "kind": "poke",
    "file": "Emmett/poke_2.ogg",
-   "text": "Smooth.",
-   "seconds": 0.392
+   "text": "OH!",
+   "seconds": 0.513
   },
   {
    "driver": "Emmett",
    "kind": "poke",
    "file": "Emmett/poke_3.ogg",
-   "text": "Nobody saw that.",
-   "seconds": 0.996
+   "text": "HEH HEH",
+   "seconds": 0.574
   },
   {
    "driver": "Emmett",
    "kind": "annoyed",
    "file": "Emmett/annoyed_0.ogg",
-   "text": "Hands off the wheel, please.",
-   "seconds": 1.66
+   "text": "HMPH!",
+   "seconds": 0.539
   },
   {
    "driver": "Emmett",
    "kind": "annoyed",
    "file": "Emmett/annoyed_1.ogg",
-   "text": "Rude.",
-   "seconds": 0.364
+   "text": "UGH!",
+   "seconds": 0.606
   },
   {
    "driver": "Emmett",
    "kind": "go",
    "file": "Emmett/go_0.ogg",
-   "text": "Smooth and fast.",
-   "seconds": 1.014
+   "text": "WOO-HOO!",
+   "seconds": 0.994
   },
   {
    "driver": "Emmett",
    "kind": "go",
    "file": "Emmett/go_1.ogg",
-   "text": "Let's thread it.",
-   "seconds": 0.809
+   "text": "WA-HOO!",
+   "seconds": 0.931
   },
   {
    "driver": "Emmett",
    "kind": "win",
    "file": "Emmett/win_0.ogg",
-   "text": "Nobody saw it coming.",
-   "seconds": 1.234
+   "text": "HA HA HA!",
+   "seconds": 1.476
   },
   {
    "driver": "Emmett",
    "kind": "win",
    "file": "Emmett/win_1.ogg",
-   "text": "Smooth as anything.",
-   "seconds": 1.045
+   "text": "YEAH!",
+   "seconds": 0.618
   },
   {
    "driver": "Emmett",
    "kind": "hurt",
    "file": "Emmett/hurt_0.ogg",
-   "text": "Oh!",
-   "seconds": 0.358
+   "text": "OOF!",
+   "seconds": 0.416
   },
   {
    "driver": "Emmett",
    "kind": "hurt",
    "file": "Emmett/hurt_1.ogg",
-   "text": "Rude!",
-   "seconds": 0.364
+   "text": "OW!",
+   "seconds": 0.492
   },
   {
    "driver": "Bitsy",
    "kind": "hello",
    "file": "Bitsy/hello_0.ogg",
-   "text": "Hiii!",
-   "seconds": 0.405
+   "text": "HEY-YO!",
+   "seconds": 0.71
   },
   {
    "driver": "Bitsy",
    "kind": "hello",
    "file": "Bitsy/hello_1.ogg",
-   "text": "Hey there! Let's zoom!",
-   "seconds": 1.16
+   "text": "HEY!",
+   "seconds": 0.537
   },
   {
    "driver": "Bitsy",
    "kind": "poke",
    "file": "Bitsy/poke_0.ogg",
-   "text": "Gas gas gas!",
-   "seconds": 0.838
+   "text": "HEE HEE!",
+   "seconds": 0.598
   },
   {
    "driver": "Bitsy",
    "kind": "poke",
    "file": "Bitsy/poke_1.ogg",
-   "text": "Brakes are for later!",
-   "seconds": 0.807
+   "text": "HUH?",
+   "seconds": 0.477
   },
   {
    "driver": "Bitsy",
    "kind": "poke",
    "file": "Bitsy/poke_2.ogg",
-   "text": "Vroom vroom!",
-   "seconds": 0.645
+   "text": "OH!",
+   "seconds": 0.46
   },
   {
    "driver": "Bitsy",
    "kind": "poke",
    "file": "Bitsy/poke_3.ogg",
-   "text": "Hee hee!",
-   "seconds": 0.421
+   "text": "HEH HEH",
+   "seconds": 0.517
   },
   {
    "driver": "Bitsy",
    "kind": "annoyed",
    "file": "Bitsy/annoyed_0.ogg",
-   "text": "That tickles!",
-   "seconds": 0.624
+   "text": "HMPH!",
+   "seconds": 0.5
   },
   {
    "driver": "Bitsy",
    "kind": "annoyed",
    "file": "Bitsy/annoyed_1.ogg",
-   "text": "Hey, I'm zooming here!",
-   "seconds": 1.259
+   "text": "UGH!",
+   "seconds": 0.54
   },
   {
    "driver": "Bitsy",
    "kind": "go",
    "file": "Bitsy/go_0.ogg",
-   "text": "Gas gas gas!",
-   "seconds": 0.838
+   "text": "WOO-HOO!",
+   "seconds": 0.853
   },
   {
    "driver": "Bitsy",
    "kind": "go",
    "file": "Bitsy/go_1.ogg",
-   "text": "Zoom zoom!",
-   "seconds": 0.621
+   "text": "WA-HOO!",
+   "seconds": 0.803
   },
   {
    "driver": "Bitsy",
    "kind": "win",
    "file": "Bitsy/win_0.ogg",
-   "text": "Woohoo!",
-   "seconds": 0.417
+   "text": "HA HA HA!",
+   "seconds": 1.232
   },
   {
    "driver": "Bitsy",
    "kind": "win",
    "file": "Bitsy/win_1.ogg",
-   "text": "All gas, no regrets!",
-   "seconds": 1.363
+   "text": "YEAH!",
+   "seconds": 0.543
   },
   {
    "driver": "Bitsy",
    "kind": "hurt",
    "file": "Bitsy/hurt_0.ogg",
-   "text": "Eek!",
-   "seconds": 0.304
+   "text": "OOF!",
+   "seconds": 0.39
   },
   {
    "driver": "Bitsy",
    "kind": "hurt",
    "file": "Bitsy/hurt_1.ogg",
-   "text": "Ow!",
-   "seconds": 0.286
+   "text": "OW!",
+   "seconds": 0.443
   },
   {
    "driver": "Pip",
    "kind": "hello",
    "file": "Pip/hello_0.ogg",
-   "text": "Hey.",
-   "seconds": 0.405
+   "text": "HEY-YO!",
+   "seconds": 0.86
   },
   {
    "driver": "Pip",
    "kind": "hello",
    "file": "Pip/hello_1.ogg",
-   "text": "Oh. Hi.",
-   "seconds": 0.989
+   "text": "HEY!",
+   "seconds": 0.609
   },
   {
    "driver": "Pip",
    "kind": "poke",
    "file": "Pip/poke_0.ogg",
-   "text": "Not moving.",
-   "seconds": 0.826
+   "text": "HEE HEE!",
+   "seconds": 0.701
   },
   {
    "driver": "Pip",
    "kind": "poke",
    "file": "Pip/poke_1.ogg",
-   "text": "Try going around.",
-   "seconds": 1.082
+   "text": "HUH?",
+   "seconds": 0.532
   },
   {
    "driver": "Pip",
    "kind": "poke",
    "file": "Pip/poke_2.ogg",
-   "text": "Immovable.",
-   "seconds": 0.724
+   "text": "OH!",
+   "seconds": 0.527
   },
   {
    "driver": "Pip",
    "kind": "poke",
    "file": "Pip/poke_3.ogg",
-   "text": "You shall not pass.",
-   "seconds": 1.286
+   "text": "HEH HEH",
+   "seconds": 0.589
   },
   {
    "driver": "Pip",
    "kind": "annoyed",
    "file": "Pip/annoyed_0.ogg",
-   "text": "I said, I'm not moving.",
-   "seconds": 1.746
+   "text": "HMPH!",
+   "seconds": 0.55
   },
   {
    "driver": "Pip",
    "kind": "annoyed",
    "file": "Pip/annoyed_1.ogg",
-   "text": "Still. Not. Moving.",
-   "seconds": 1.82
+   "text": "UGH!",
+   "seconds": 0.623
   },
   {
    "driver": "Pip",
    "kind": "go",
    "file": "Pip/go_0.ogg",
-   "text": "Try and pass me.",
-   "seconds": 1.123
+   "text": "WOO-HOO!",
+   "seconds": 1.031
   },
   {
    "driver": "Pip",
    "kind": "go",
    "file": "Pip/go_1.ogg",
-   "text": "Good luck getting by.",
-   "seconds": 1.111
+   "text": "WA-HOO!",
+   "seconds": 0.964
   },
   {
    "driver": "Pip",
    "kind": "win",
    "file": "Pip/win_0.ogg",
-   "text": "Told you.",
-   "seconds": 0.779
+   "text": "HA HA HA!",
+   "seconds": 1.541
   },
   {
    "driver": "Pip",
    "kind": "win",
    "file": "Pip/win_1.ogg",
-   "text": "Nobody passed.",
-   "seconds": 1.008
+   "text": "YEAH!",
+   "seconds": 0.638
   },
   {
    "driver": "Pip",
    "kind": "hurt",
    "file": "Pip/hurt_0.ogg",
-   "text": "Hm.",
-   "seconds": 0.336
+   "text": "OOF!",
+   "seconds": 0.423
   },
   {
    "driver": "Pip",
    "kind": "hurt",
    "file": "Pip/hurt_1.ogg",
-   "text": "Ow.",
-   "seconds": 0.381
+   "text": "OW!",
+   "seconds": 0.504
   },
   {
    "driver": "Runa",
    "kind": "hello",
    "file": "Runa/hello_0.ogg",
-   "text": "Hey there!",
-   "seconds": 0.553
+   "text": "HEY-YO!",
+   "seconds": 0.774
   },
   {
    "driver": "Runa",
    "kind": "hello",
    "file": "Runa/hello_1.ogg",
-   "text": "Ready when you are!",
-   "seconds": 0.844
+   "text": "HEY!",
+   "seconds": 0.568
   },
   {
    "driver": "Runa",
    "kind": "poke",
    "file": "Runa/poke_0.ogg",
-   "text": "Never lift!",
-   "seconds": 0.667
+   "text": "HEE HEE!",
+   "seconds": 0.642
   },
   {
    "driver": "Runa",
    "kind": "poke",
    "file": "Runa/poke_1.ogg",
-   "text": "Flat out!",
-   "seconds": 0.591
+   "text": "HUH?",
+   "seconds": 0.5
   },
   {
    "driver": "Runa",
    "kind": "poke",
    "file": "Runa/poke_2.ogg",
-   "text": "Lift? Never.",
-   "seconds": 0.945
+   "text": "OH!",
+   "seconds": 0.489
   },
   {
    "driver": "Runa",
    "kind": "poke",
    "file": "Runa/poke_3.ogg",
-   "text": "Foot down!",
-   "seconds": 0.6
+   "text": "HEH HEH",
+   "seconds": 0.548
   },
   {
    "driver": "Runa",
    "kind": "annoyed",
    "file": "Runa/annoyed_0.ogg",
-   "text": "Still not lifting.",
-   "seconds": 1.034
+   "text": "HMPH!",
+   "seconds": 0.521
   },
   {
    "driver": "Runa",
    "kind": "annoyed",
    "file": "Runa/annoyed_1.ogg",
-   "text": "Hands off!",
-   "seconds": 0.732
+   "text": "UGH!",
+   "seconds": 0.576
   },
   {
    "driver": "Runa",
    "kind": "go",
    "file": "Runa/go_0.ogg",
-   "text": "Flat out!",
-   "seconds": 0.591
+   "text": "WOO-HOO!",
+   "seconds": 0.93
   },
   {
    "driver": "Runa",
    "kind": "go",
    "file": "Runa/go_1.ogg",
-   "text": "Foot down!",
-   "seconds": 0.6
+   "text": "WA-HOO!",
+   "seconds": 0.872
   },
   {
    "driver": "Runa",
    "kind": "win",
    "file": "Runa/win_0.ogg",
-   "text": "Never lifted!",
-   "seconds": 0.766
+   "text": "HA HA HA!",
+   "seconds": 1.364
   },
   {
    "driver": "Runa",
    "kind": "win",
    "file": "Runa/win_1.ogg",
-   "text": "Flat out, all the way!",
-   "seconds": 1.403
+   "text": "YEAH!",
+   "seconds": 0.584
   },
   {
    "driver": "Runa",
    "kind": "hurt",
    "file": "Runa/hurt_0.ogg",
-   "text": "Argh!",
-   "seconds": 0.315
+   "text": "OOF!",
+   "seconds": 0.404
   },
   {
    "driver": "Runa",
    "kind": "hurt",
    "file": "Runa/hurt_1.ogg",
-   "text": "Hey!",
-   "seconds": 0.342
+   "text": "OW!",
+   "seconds": 0.47
   },
   {
    "driver": "Vee",
    "kind": "hello",
    "file": "Vee/hello_0.ogg",
-   "text": "Hiya!",
-   "seconds": 0.481
+   "text": "HEY-YO!",
+   "seconds": 0.751
   },
   {
    "driver": "Vee",
    "kind": "hello",
    "file": "Vee/hello_1.ogg",
-   "text": "G'day! Let's race!",
-   "seconds": 1.37
+   "text": "HEY!",
+   "seconds": 0.556
   },
   {
    "driver": "Vee",
    "kind": "poke",
    "file": "Vee/poke_0.ogg",
-   "text": "Brake late!",
-   "seconds": 0.602
+   "text": "HEE HEE!",
+   "seconds": 0.626
   },
   {
    "driver": "Vee",
    "kind": "poke",
    "file": "Vee/poke_1.ogg",
-   "text": "Apex!",
-   "seconds": 0.571
+   "text": "HUH?",
+   "seconds": 0.492
   },
   {
    "driver": "Vee",
    "kind": "poke",
    "file": "Vee/poke_2.ogg",
-   "text": "Watch this line.",
-   "seconds": 0.855
+   "text": "OH!",
+   "seconds": 0.478
   },
   {
    "driver": "Vee",
    "kind": "poke",
    "file": "Vee/poke_3.ogg",
-   "text": "Late and lovely.",
-   "seconds": 0.763
+   "text": "HEH HEH",
+   "seconds": 0.536
   },
   {
    "driver": "Vee",
    "kind": "annoyed",
    "file": "Vee/annoyed_0.ogg",
-   "text": "Eyes on the road!",
-   "seconds": 0.785
+   "text": "HMPH!",
+   "seconds": 0.514
   },
   {
    "driver": "Vee",
    "kind": "annoyed",
    "file": "Vee/annoyed_1.ogg",
-   "text": "Oi! Hands off!",
-   "seconds": 1.281
+   "text": "UGH!",
+   "seconds": 0.563
   },
   {
    "driver": "Vee",
    "kind": "go",
    "file": "Vee/go_0.ogg",
-   "text": "Brake late!",
-   "seconds": 0.602
+   "text": "WOO-HOO!",
+   "seconds": 0.902
   },
   {
    "driver": "Vee",
    "kind": "go",
    "file": "Vee/go_1.ogg",
-   "text": "Here we go!",
-   "seconds": 0.658
+   "text": "WA-HOO!",
+   "seconds": 0.847
   },
   {
    "driver": "Vee",
    "kind": "win",
    "file": "Vee/win_0.ogg",
-   "text": "Perfect line!",
-   "seconds": 0.795
+   "text": "HA HA HA!",
+   "seconds": 1.316
   },
   {
    "driver": "Vee",
    "kind": "win",
    "file": "Vee/win_1.ogg",
-   "text": "Late brake, big win!",
-   "seconds": 1.3
+   "text": "YEAH!",
+   "seconds": 0.569
   },
   {
    "driver": "Vee",
    "kind": "hurt",
    "file": "Vee/hurt_0.ogg",
-   "text": "Oi!",
-   "seconds": 0.3
+   "text": "OOF!",
+   "seconds": 0.399
   },
   {
    "driver": "Vee",
    "kind": "hurt",
    "file": "Vee/hurt_1.ogg",
-   "text": "Ouch!",
-   "seconds": 0.375
+   "text": "OW!",
+   "seconds": 0.46
   },
   {
    "driver": "Chase",
    "kind": "hello",
    "file": "Chase/hello_0.ogg",
-   "text": "Hey! Hi! Hello!",
-   "seconds": 1.741
+   "text": "HEY-YO!",
+   "seconds": 0.73
   },
   {
    "driver": "Chase",
    "kind": "hello",
    "file": "Chase/hello_1.ogg",
-   "text": "Oh hey, it's you!",
-   "seconds": 0.995
+   "text": "HEY!",
+   "seconds": 0.546
   },
   {
    "driver": "Chase",
    "kind": "poke",
    "file": "Chase/poke_0.ogg",
-   "text": "Hi again!",
-   "seconds": 0.666
+   "text": "HEE HEE!",
+   "seconds": 0.612
   },
   {
    "driver": "Chase",
    "kind": "poke",
    "file": "Chase/poke_1.ogg",
-   "text": "Wave back!",
-   "seconds": 0.675
+   "text": "HUH?",
+   "seconds": 0.484
   },
   {
    "driver": "Chase",
    "kind": "poke",
    "file": "Chase/poke_2.ogg",
-   "text": "I know that guy!",
-   "seconds": 0.852
+   "text": "OH!",
+   "seconds": 0.469
   },
   {
    "driver": "Chase",
    "kind": "poke",
    "file": "Chase/poke_3.ogg",
-   "text": "Hey, hey, hey!",
-   "seconds": 1.184
+   "text": "HEH HEH",
+   "seconds": 0.526
   },
   {
    "driver": "Chase",
    "kind": "annoyed",
    "file": "Chase/annoyed_0.ogg",
-   "text": "Okay, bye! No, wait. Hi!",
-   "seconds": 2.651
+   "text": "HMPH!",
+   "seconds": 0.507
   },
   {
    "driver": "Chase",
    "kind": "annoyed",
    "file": "Chase/annoyed_1.ogg",
-   "text": "Hi! Still hi!",
-   "seconds": 1.257
+   "text": "UGH!",
+   "seconds": 0.551
   },
   {
    "driver": "Chase",
    "kind": "go",
    "file": "Chase/go_0.ogg",
-   "text": "Hi everyone! Bye everyone!",
-   "seconds": 2.025
+   "text": "WOO-HOO!",
+   "seconds": 0.877
   },
   {
    "driver": "Chase",
    "kind": "go",
    "file": "Chase/go_1.ogg",
-   "text": "See you at the finish!",
-   "seconds": 1.019
+   "text": "WA-HOO!",
+   "seconds": 0.824
   },
   {
    "driver": "Chase",
    "kind": "win",
    "file": "Chase/win_0.ogg",
-   "text": "Thanks, everyone!",
-   "seconds": 1.23
+   "text": "HA HA HA!",
+   "seconds": 1.272
   },
   {
    "driver": "Chase",
    "kind": "win",
    "file": "Chase/win_1.ogg",
-   "text": "Hi from first place!",
-   "seconds": 1.183
+   "text": "YEAH!",
+   "seconds": 0.556
   },
   {
    "driver": "Chase",
    "kind": "hurt",
    "file": "Chase/hurt_0.ogg",
-   "text": "Hey! Rude!",
-   "seconds": 1.054
+   "text": "OOF!",
+   "seconds": 0.394
   },
   {
    "driver": "Chase",
    "kind": "hurt",
    "file": "Chase/hurt_1.ogg",
-   "text": "Ow! Hi!",
-   "seconds": 0.94
+   "text": "OW!",
+   "seconds": 0.451
   },
   {
    "driver": "Beeman",
    "kind": "hello",
    "file": "Beeman/hello_0.ogg",
-   "text": "Hello, world.",
-   "seconds": 1.089
+   "text": "HEY-YO!",
+   "seconds": 0.895
   },
   {
    "driver": "Beeman",
    "kind": "hello",
    "file": "Beeman/hello_1.ogg",
-   "text": "Ah. A new build.",
-   "seconds": 1.503
+   "text": "HEY!",
+   "seconds": 0.626
   },
   {
    "driver": "Beeman",
    "kind": "poke",
    "file": "Beeman/poke_0.ogg",
-   "text": "Sixty frames a second.",
-   "seconds": 1.681
+   "text": "HEE HEE!",
+   "seconds": 0.725
   },
   {
    "driver": "Beeman",
    "kind": "poke",
    "file": "Beeman/poke_1.ogg",
-   "text": "Found the bug.",
-   "seconds": 1.0
+   "text": "HUH?",
+   "seconds": 0.545
   },
   {
    "driver": "Beeman",
    "kind": "poke",
    "file": "Beeman/poke_2.ogg",
-   "text": "Works on my machine.",
-   "seconds": 1.312
+   "text": "OH!",
+   "seconds": 0.542
   },
   {
    "driver": "Beeman",
    "kind": "poke",
    "file": "Beeman/poke_3.ogg",
-   "text": "Shiny, and fast.",
-   "seconds": 1.424
+   "text": "HEH HEH",
+   "seconds": 0.606
   },
   {
    "driver": "Beeman",
    "kind": "annoyed",
    "file": "Beeman/annoyed_0.ogg",
-   "text": "Stack overflow!",
-   "seconds": 1.187
+   "text": "HMPH!",
+   "seconds": 0.562
   },
   {
    "driver": "Beeman",
    "kind": "annoyed",
    "file": "Beeman/annoyed_1.ogg",
-   "text": "Infinite loop detected!",
-   "seconds": 1.52
+   "text": "UGH!",
+   "seconds": 0.643
   },
   {
    "driver": "Beeman",
    "kind": "go",
    "file": "Beeman/go_0.ogg",
-   "text": "Compiling. Go!",
-   "seconds": 1.525
+   "text": "WOO-HOO!",
+   "seconds": 1.073
   },
   {
    "driver": "Beeman",
    "kind": "go",
    "file": "Beeman/go_1.ogg",
-   "text": "Shipping to production!",
-   "seconds": 1.525
+   "text": "WA-HOO!",
+   "seconds": 1.002
   },
   {
    "driver": "Beeman",
    "kind": "win",
    "file": "Beeman/win_0.ogg",
-   "text": "Zero bugs!",
-   "seconds": 1.01
+   "text": "HA HA HA!",
+   "seconds": 1.613
   },
   {
    "driver": "Beeman",
    "kind": "win",
    "file": "Beeman/win_1.ogg",
-   "text": "Ship it. Done.",
-   "seconds": 1.433
+   "text": "YEAH!",
+   "seconds": 0.66
   },
   {
    "driver": "Beeman",
    "kind": "hurt",
    "file": "Beeman/hurt_0.ogg",
-   "text": "Segfault!",
-   "seconds": 0.773
+   "text": "OOF!",
+   "seconds": 0.431
   },
   {
    "driver": "Beeman",
    "kind": "hurt",
    "file": "Beeman/hurt_1.ogg",
-   "text": "Ow!",
-   "seconds": 0.345
+   "text": "OW!",
+   "seconds": 0.519
   },
   {
    "driver": "Maroo",
    "kind": "hello",
    "file": "Maroo/hello_0.ogg",
-   "text": "Heyy! Maroo's here!",
-   "seconds": 1.412
+   "text": "HEY-YO!",
+   "seconds": 0.774
   },
   {
    "driver": "Maroo",
    "kind": "hello",
    "file": "Maroo/hello_1.ogg",
-   "text": "Hey hey! Let's drift!",
-   "seconds": 1.675
+   "text": "HEY!",
+   "seconds": 0.568
   },
   {
    "driver": "Maroo",
    "kind": "poke",
    "file": "Maroo/poke_0.ogg",
-   "text": "Mind the curls!",
-   "seconds": 1.022
+   "text": "HEE HEE!",
+   "seconds": 0.642
   },
   {
    "driver": "Maroo",
    "kind": "poke",
    "file": "Maroo/poke_1.ogg",
-   "text": "Drift time!",
-   "seconds": 0.731
+   "text": "HUH?",
+   "seconds": 0.5
   },
   {
    "driver": "Maroo",
    "kind": "poke",
    "file": "Maroo/poke_2.ogg",
-   "text": "Big drift energy!",
-   "seconds": 1.073
+   "text": "OH!",
+   "seconds": 0.489
   },
   {
    "driver": "Maroo",
    "kind": "poke",
    "file": "Maroo/poke_3.ogg",
-   "text": "Ha ha!",
-   "seconds": 0.589
+   "text": "HEH HEH",
+   "seconds": 0.548
   },
   {
    "driver": "Maroo",
    "kind": "annoyed",
    "file": "Maroo/annoyed_0.ogg",
-   "text": "Not the hair!",
-   "seconds": 0.653
+   "text": "HMPH!",
+   "seconds": 0.521
   },
   {
    "driver": "Maroo",
    "kind": "annoyed",
    "file": "Maroo/annoyed_1.ogg",
-   "text": "Watch the curls, man!",
-   "seconds": 1.563
+   "text": "UGH!",
+   "seconds": 0.576
   },
   {
    "driver": "Maroo",
    "kind": "go",
    "file": "Maroo/go_0.ogg",
-   "text": "Drift time!",
-   "seconds": 0.731
+   "text": "WOO-HOO!",
+   "seconds": 0.93
   },
   {
    "driver": "Maroo",
    "kind": "go",
    "file": "Maroo/go_1.ogg",
-   "text": "Let's slide!",
-   "seconds": 0.869
+   "text": "WA-HOO!",
+   "seconds": 0.872
   },
   {
    "driver": "Maroo",
    "kind": "win",
    "file": "Maroo/win_0.ogg",
-   "text": "Curls on top!",
-   "seconds": 0.873
+   "text": "HA HA HA!",
+   "seconds": 1.364
   },
   {
    "driver": "Maroo",
    "kind": "win",
    "file": "Maroo/win_1.ogg",
-   "text": "Biggest drift wins!",
-   "seconds": 1.18
+   "text": "YEAH!",
+   "seconds": 0.584
   },
   {
    "driver": "Maroo",
    "kind": "hurt",
    "file": "Maroo/hurt_0.ogg",
-   "text": "Not the hair!",
-   "seconds": 0.653
+   "text": "OOF!",
+   "seconds": 0.404
   },
   {
    "driver": "Maroo",
    "kind": "hurt",
    "file": "Maroo/hurt_1.ogg",
-   "text": "Whoa!",
-   "seconds": 0.347
+   "text": "OW!",
+   "seconds": 0.47
   }
  ]
 }

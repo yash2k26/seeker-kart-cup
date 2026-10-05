@@ -60,6 +60,16 @@ namespace KartCup
             nextBlink = Time.time + Random.Range(0.5f, 4f);
         }
 
+        /// The driver just made a sound (Voices): the eyes shut for `seconds` (a laugh squeezes them shut, anything
+        /// else is a blink) and come back looking straight out.
+        public void React(float seconds)
+        {
+            if (!enabled) return;
+            blinkUntil = Time.time + seconds;
+            nextBlink = Time.time + seconds + Random.Range(1.5f, 3.5f);
+            target = Vector2.zero; next = Time.time + seconds + 0.6f;
+        }
+
         void Blink(float now)
         {
             blinkUntil = now + blinkTime;
