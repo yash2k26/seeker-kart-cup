@@ -826,9 +826,12 @@ def flat(d, P, N, lab, part, src):
     jaw_under = np.isin(lab, ["skull:" + k for k in ("bottom", "jawR", "jawL")])
     lev = np.where(jaw_under, 0.75, np.maximum(beard, burn))
     r = cells(P, N, lab, STUB_CELL, 5); r2 = cells(P, N, lab, STUB_CELL, 9)
-    dark, mid = stubble_tones(src)
-    st = sk & ~under & (r < 0.75 * lev)
-    col[st] = np.where((r2[st] < 0.55)[:, None], dark, mid) * (0.9 + 0.2 * r2[st])[:, None]
+    dark, _ = stubble_tones(src)
+    # each block some way from the skin to the dark stubble (in sRGB, as the art is drawn): the art's blocks are soft,
+    # 0.35-0.65 of the way where it is thick. Blocks either dark or bare skin read as noise on the phone.
+    st = sk & ~under & (r < 0.35 + 0.65 * lev)
+    a = (lev * (0.35 + 0.5 * r2))[st, None]
+    col[st] = srgb_to_lin(lin_to_srgb(skin_c) * (1 - a) + lin_to_srgb(dark) * a)
     col[sk & under] = hair_colour(P[sk & under], N[sk & under], lab[sk & under])
     band = sk & (z > HAIRLINE_Z)
     col[band] = hair_colour(P[band], N[band], lab[band])
