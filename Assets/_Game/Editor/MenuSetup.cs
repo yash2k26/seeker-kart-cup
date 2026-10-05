@@ -421,6 +421,18 @@ public static class MenuSetup
         var cog = IconButton("Settings", corner, "icon_cog", new Vector2(1, 1), new Vector2(-64, -32), new Vector2(104, 104));
         Wire(cog, nameof(ScreenFlow.ShowSettings));
 
+        // NEW VERSION, bottom right over the street: hidden until the download host has a newer build (AppUpdate)
+        var update = Button("Update", screen.transform, "NEW VERSION", Slate, Paper, 32,
+                            new Vector2(1, 0), new Vector2(-64, 56), new Vector2(600, 104), icon: "download");
+        var appUpdate = screen.AddComponent<AppUpdate>();
+        new SerializedObject(appUpdate).Do(s =>
+        {
+            s.FindProperty("banner").objectReferenceValue = update.gameObject;
+            s.FindProperty("label").objectReferenceValue = update.GetComponentInChildren<TMP_Text>();
+        });
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(update.onClick, appUpdate.Open);
+        update.gameObject.SetActive(false);
+
         // The wordmark is the film's own lockup (tools/brand/make_lockup.py lifts it from the teaser's title frames):
         // the gold letters on their violet shell, the tagline in its badge. It stands in for the typeset title and the
         // eyebrow over it, and the on-chain line moves up under it.

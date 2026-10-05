@@ -73,6 +73,13 @@ public static class Playtest
                 SideShot($"pad{track}");
                 Debug.Log($"[playtest] {pads.transform.childCount} turbo pad(s), first at {pad.position}");
             }
+            var slicks = GameObject.Find("OilSlicks");
+            if (introShot == 0 && slicks != null && slicks.transform.childCount > 0)
+            {
+                var slick = slicks.transform.GetChild(0);
+                itemFrom = slick.position - slick.forward * 9f + Vector3.up * 4.5f + slick.right * 3f; itemAt = slick.position;
+                SideShot($"oil{track}");
+            }
             if (introShot == 0)
             {
                 // every corner wall must stop what comes at it from the road (a mesh collider only stops its faces' front)

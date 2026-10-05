@@ -18,10 +18,12 @@ namespace KartCup
         BasicWaypoint nextPoint;
 
         [Header("Personality (seeded from the character)")]
-        [Range(0.75f, 1.05f)] public float skill = 0.95f;     // share of its own top speed it will commit to
+        [Range(0.75f, 1.08f)] public float skill = 0.98f;     // share of its own top speed it will commit to
         [Range(0f, 1f)] public float aggression = 0.5f;       // brakes later, fights harder for a line
         [Range(-1f, 1f)] public float lineBias;               // preferred side of the road
-        public float catchUpPerMetre = 0.004f, maxCatchUp = 0.12f;
+        // Behind the player it digs in: +0.6% top speed per metre down, up to +16% (6 Oct: the field was too easy to
+        // leave behind). Ahead of the player it never eases off: a lead has to be earned.
+        public float catchUpPerMetre = 0.006f, maxCatchUp = 0.16f;
 
         [Header("Feel")]
         public float steerAmount = 9f;
@@ -55,12 +57,13 @@ namespace KartCup
             var rnd = new System.Random(seed * 7919 + 13);
             float r(float a, float b) => a + (float)rnd.NextDouble() * (b - a);
 
-            // Stats shape the driver: grip buys corner speed, weight buys the confidence to lean on people.
-            skill = Mathf.Clamp(r(0.88f, 1.0f) + (def != null ? def.speed * 0.012f : 0f), 0.8f, 1.03f);
-            aggression = Mathf.Clamp01(r(0.25f, 0.85f) + (def != null ? def.weight * 0.05f : 0f));
+            // Stats shape the driver: grip buys corner speed, weight buys the confidence to lean on people. The field
+            // commits to (nearly) all of its pace: 0.95-1.03 before stats (was 0.88-1.0, an easy field to drop).
+            skill = Mathf.Clamp(r(0.95f, 1.03f) + (def != null ? def.speed * 0.012f : 0f), 0.9f, 1.06f);
+            aggression = Mathf.Clamp01(r(0.4f, 0.95f) + (def != null ? def.weight * 0.05f : 0f));
             lineBias = Mathf.Clamp(r(-0.75f, 0.75f) + (def != null ? def.handling * 0.05f : 0f), -0.85f, 0.85f);
-            nextItem = r(2f, 6f);
-            nextMistake = r(6f, 16f);
+            nextItem = r(1.5f, 4f);
+            nextMistake = r(14f, 30f);
             Awake();
         }
 
@@ -100,6 +103,7 @@ namespace KartCup
             Vector3 aim = Vector3.Lerp(here, ahead, 1f - Mathf.Clamp01(Vector3.Distance(tr.position, here) * lookAhead))
                           + roadRight * (smoothedLateral * lateralRange);
 
+            aim = Detour(aim);                                                   // oil in the path: aim beside it until past
             Vector3 toAim = aim - tr.position;
             float forwardDot = Vector3.Dot(toAim.normalized, kart.rotator.forward);
             float rightDot = Vector3.Dot(toAim.normalized, kart.rotator.right);
@@ -127,12 +131,13 @@ namespace KartCup
                 band = Mathf.Min(Mathf.Max(0f, race.Player.score - progress.score) * catchUpPerMetre, maxCatchUp);
             kart.maxSpeed = baseSpeed * (skill + band);
 
-            // A corner is a speed limit. Aggression buys a later lift, never a free pass.
-            float corner = Mathf.Lerp(1f, 0.52f, severity) + aggression * 0.12f;
+            // A corner is a speed limit. Aggression buys a later lift, never a free pass. (The floor was 0.52 of top
+            // speed in the tightest corner: the field crawled through them; they drift these, so 0.6 holds the road.)
+            float corner = Mathf.Lerp(1f, 0.6f, severity) + aggression * 0.15f;
             float wantSpeed = kart.maxSpeed * Mathf.Clamp01(corner);
             float over = kart.velMag - wantSpeed;
             targetAccel = (over > 0f ? Mathf.Clamp01(1f - over / 6f) : 1f) * trafficLift;
-            targetBrake = Mathf.Clamp01(over / 9f) * 0.55f;
+            targetBrake = Mathf.Clamp01(over / 9f) * 0.45f;
             targetSteer = Mathf.Clamp(rightDot * steerAmount, -1f, 1f);
             if (forwardDot <= 0f) targetSteer = Mathf.Sign(rightDot);            // pointing away: turn around
 
@@ -142,11 +147,12 @@ namespace KartCup
                 nextMistake -= dt;
                 if (nextMistake <= 0f)
                 {
-                    nextMistake = Mathf.Lerp(16f, 40f, skill) * Random.Range(0.6f, 1.5f);
-                    mistakeUntil = Time.time + Random.Range(0.25f, 0.6f);
-                    mistakeSteer = Random.Range(-0.35f, 0.35f);
+                    // rarer and smaller than they were (every 16-40 s for up to 0.6 s): still beatable, not a gift
+                    nextMistake = Mathf.Lerp(30f, 70f, Mathf.InverseLerp(0.9f, 1.06f, skill)) * Random.Range(0.7f, 1.4f);
+                    mistakeUntil = Time.time + Random.Range(0.2f, 0.45f);
+                    mistakeSteer = Random.Range(-0.25f, 0.25f);
                 }
-                if (Time.time < mistakeUntil) { targetAccel *= 0.45f; targetSteer = Mathf.Clamp(targetSteer + mistakeSteer, -1f, 1f); }
+                if (Time.time < mistakeUntil) { targetAccel *= 0.6f; targetSteer = Mathf.Clamp(targetSteer + mistakeSteer, -1f, 1f); }
             }
 
             // ---- drift the corner rather than scrub it ----
@@ -174,31 +180,71 @@ namespace KartCup
                 if (Vector3.Dot(delta / dist, fwd) < 0.55f) continue;            // only what is genuinely in front
 
                 float side = Vector3.Dot(delta / dist, kart.rotator.right);
-                nudge += -Mathf.Sign(side == 0f ? Random.value - 0.5f : side) * (1f - dist / 14f) * (0.5f + aggression * 0.5f);
-                if (dist < 6f) trafficLift = Mathf.Min(trafficLift, 0.65f);      // back off instead of ramming
+                nudge += -Mathf.Sign(side == 0f ? Random.value - 0.5f : side) * (1f - dist / 14f) * (0.7f + aggression * 0.6f);
+                if (dist < 4.5f) trafficLift = Mathf.Min(trafficLift, 0.85f);     // only off the throttle when about to touch: go round, not behind
             }
-            return Mathf.Clamp(nudge, -0.8f, 0.8f);
+            return Mathf.Clamp(nudge, -0.9f, 0.9f);
         }
 
-        /// Fire when it will land on someone, not on a metronome.
+        /// Oil in the kart's own path (along where it is travelling, measured from the kart, not the road): aim at a point
+        /// beside the nearest slick, on the side the kart already leans to, until it is past; then the line again. Steering
+        /// nudges lost the tug of war with the pull to an aim point beyond the slick; a detour point at the slick's own
+        /// distance cannot. Seen from 25-40 m: the better the driver, the sooner.
+        Vector3 Detour(Vector3 aim)
+        {
+            float see = 25f + 15f * Mathf.InverseLerp(0.9f, 1.06f, skill);
+            const float Clear = 4.2f;                                           // slick radius 1.8 + half a kart + room
+            var heading = rb != null && rb.linearVelocity.sqrMagnitude > 25f ? rb.linearVelocity : kart.rotator.forward;
+            var fwd = Vector3.ProjectOnPlane(heading, Vector3.up).normalized;
+            var right = Vector3.Cross(Vector3.up, fwd);
+            OilSlick nearest = null; float best = see, nearestLat = 0f;
+            foreach (var slick in OilSlick.All)
+            {
+                if (slick == null) continue;
+                Vector3 d = slick.transform.position - tr.position; d.y = 0f;
+                float ahead = Vector3.Dot(d, fwd), lateral = Vector3.Dot(d, right);
+                if (ahead < 2f || ahead > best || Mathf.Abs(lateral) > Clear) continue;
+                nearest = slick; best = ahead; nearestLat = lateral;
+            }
+            if (nearest == null) return aim;
+            float side = nearestLat > 0f ? -1f : 1f;                            // slick to the right: pass it on the left
+            return nearest.transform.position + right * side * Clear + fwd * 2f;
+        }
+
+        /// Use each item the way it works, when it will land: a rocket at someone ahead, a homing one at anyone up the
+        /// road, a bomb or a trap dropped on whoever is on its tail, nitro on a straight. Held too long, it goes anyway.
         void Items(RaceManager race, float dt)
         {
-            if (race == null || race.state != RaceManager.State.Racing || caster == null || caster.item == null) return;
+            if (race == null || race.state != RaceManager.State.Racing || caster == null || caster.item == null || caster.ammo <= 0) return;
             nextItem -= dt;
             if (nextItem > 0f) return;
 
-            bool someoneAhead = false;
+            string held = caster.item.itemName;
             var fwd = kart.rotator.forward;
+            bool ahead = false, behind = false;
+            float reach = held == "Homing Item" ? 85f : 60f;
             foreach (var other in race.racers)
             {
                 if (other == null || other.transform == tr) continue;
                 Vector3 delta = other.transform.position - tr.position;
-                float dist = delta.magnitude;
-                if (dist < 45f && Vector3.Dot(delta.normalized, fwd) > 0.75f) { someoneAhead = true; break; }
+                float dist = delta.magnitude, dot = Vector3.Dot(delta.normalized, fwd);
+                if (dist < reach && dot > 0.6f) ahead = true;
+                if (dist < 25f && dot < -0.5f) behind = true;
             }
-            if (!someoneAhead) return;
-            nextItem = Random.Range(3.5f, 7f);
+            heldFor += 1f;                                                       // seconds held, near enough (checked about once a second)
+            bool use = held switch
+            {
+                "Nitro" => Mathf.Abs(Vector3.SignedAngle(Vector3.ProjectOnPlane(fwd, Vector3.up), Vector3.ProjectOnPlane(nextPoint.transform.position - tr.position, Vector3.up), Vector3.up)) < 12f
+                           && kart.velMag > kart.maxSpeed * 0.55f,
+                "Bomb" or "Trap" => behind,
+                _ => ahead,
+            };
+            if (!use && heldFor < 12f) { nextItem = 1f; return; }
+            heldFor = 0f;
+            nextItem = Random.Range(2.5f, 5f);
             PressItem();
         }
+
+        float heldFor;
     }
 }

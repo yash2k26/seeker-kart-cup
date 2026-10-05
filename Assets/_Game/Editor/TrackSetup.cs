@@ -592,8 +592,7 @@ public static partial class TrackSetup
             mat.shader = lit; mat.SetColor("_BaseColor", V.ground);
         }
         EditorUtility.SetDirty(mat);
-        var dirt = AssetDatabase.LoadAssetAtPath<GroundSurfacePreset>(PKP + "Prefabs/GroundSurfacePresets/Dirt.asset");   // slower and slidey: cutting corners costs you
-        TerrainGen.Build(centre, V.shape, HalfWidth + Kerb + 1.5f, V.palette, mat, dirt, MeshDir, out terrainTris);
+        TerrainGen.Build(centre, V.shape, HalfWidth + Kerb + 1.5f, V.palette, mat, Offroad(), MeshDir, out terrainTris);
 
         // Water: the sea round the island, or a lake in a basin. One shared material; its surf ring is radial from
         // the origin at the island's shoreline, so the lake (well inside it) gets the caustics without the surf.
@@ -781,6 +780,26 @@ public static partial class TrackSetup
     }
 
     // ---------- UI ----------
+    /// Everything off the road (sand, snow, grass, verge): the kit's Dirt, harsher. Dirt kept 90% of top speed, so
+    /// cutting across the infield cost almost nothing; at 68% and with less grip, running wide or cutting a corner
+    /// costs real time (6 Oct: "make the maps more difficult"). The racing line, the road and the referee's geometry
+    /// (worker/src/tracks.json) are untouched.
+    static GroundSurfacePreset Offroad()
+    {
+        const string path = "Assets/_Game/Data/Offroad.asset";
+        var dirt = AssetDatabase.LoadAssetAtPath<GroundSurfacePreset>(PKP + "Prefabs/GroundSurfacePresets/Dirt.asset");
+        var off = AssetDatabase.LoadAssetAtPath<GroundSurfacePreset>(path);
+        if (off == null)
+        {
+            off = Object.Instantiate(dirt);
+            AssetDatabase.CreateAsset(off, path);
+        }
+        off.friction = 0.5f; off.speed = 0.68f; off.alwaysSlide = true;
+        off.tireMarkMaterial = dirt.tireMarkMaterial; off.tireSnd = dirt.tireSnd;
+        EditorUtility.SetDirty(off);
+        return off;
+    }
+
     static GameObject Hud(InputManager input, CameraAngles angles, out RaceHud hud)
     {
         MenuSetup.Fonts();

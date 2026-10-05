@@ -38,6 +38,7 @@ public static class ItemSetup
         var sun = SunBomb();
         Mount();
         TurboPad();
+        OilSlick();
 
         var src = AssetDatabase.LoadAssetAtPath<GameObject>(PKP + "Items.prefab");
         if (src == null) { Debug.LogError("[items] Powerslide Items.prefab missing"); if (Application.isBatchMode) EditorApplication.Exit(1); return; }
@@ -286,6 +287,73 @@ public static class ItemSetup
         m.renderQueue = 3000; m.SetOverrideTag("RenderType", "Transparent"); m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); m.DisableKeyword("_SOFTPARTICLES_ON");
         EditorUtility.SetDirty(m);
         return m;
+    }
+
+    /// Resources/OilSlick: a dark puddle with a rainbow sheen at its edge (alpha-blended over the road; unlit, so it
+    /// reads under the lamps and in the dark), a faint violet glow round it, and a low trigger a little smaller than
+    /// the puddle, so a kart that clips the very edge gets away with it. OilSlick.cs lays them in solo races.
+    static void OilSlick()
+    {
+        const float D = 3.6f;
+        var quad = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
+        var root = new GameObject("OilSlick");
+        root.AddComponent<KartCup.OilSlick>();
+        var trigger = root.AddComponent<BoxCollider>();
+        trigger.isTrigger = true; trigger.center = new Vector3(0, 0.7f, 0); trigger.size = new Vector3(D * 0.72f, 1.4f, D * 0.72f);
+        void Flat(string name, Material m, float y, float size)
+        {
+            var go = new GameObject(name); go.transform.SetParent(root.transform, false);
+            go.transform.localPosition = new Vector3(0, y, 0); go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            go.transform.localScale = new Vector3(size, size, 1f);
+            go.AddComponent<MeshFilter>().sharedMesh = quad;
+            var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = m; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false;
+        }
+        Flat("Sheen", Additive("FX_OilSheen", Tex("dot"), new Color(0.45f, 0.25f, 0.9f) * 0.55f), 0f, D * 1.6f);
+        string path = Out + "FX_Oil.mat";
+        var oil = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (oil == null) { oil = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit")) { name = "FX_Oil" }; AssetDatabase.CreateAsset(oil, path); }
+        oil.SetTexture("_BaseMap", OilTex()); oil.SetColor("_BaseColor", Color.white);
+        oil.SetFloat("_Surface", 1); oil.SetFloat("_Blend", 0); oil.SetFloat("_ZWrite", 0); oil.SetFloat("_Cull", 0);
+        oil.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha); oil.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        oil.SetFloat("_SoftParticlesEnabled", 0); oil.SetFloat("_ColorMode", 0);
+        oil.renderQueue = 3001; oil.SetOverrideTag("RenderType", "Transparent"); oil.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); oil.DisableKeyword("_SOFTPARTICLES_ON");
+        EditorUtility.SetDirty(oil);
+        Flat("Oil", oil, 0.02f, D);
+        Directory.CreateDirectory("Assets/_Game/Resources");
+        PrefabUtility.SaveAsPrefabAsset(root, "Assets/_Game/Resources/OilSlick.prefab");
+        Object.DestroyImmediate(root);
+    }
+
+    /// The puddle: an irregular blob (its edge wanders with the angle), near black inside, a band of oily rainbow
+    /// round the rim, soft at the very edge.
+    static Texture2D OilTex()
+    {
+        string path = FxTex + "fx_oil.png";
+        var have = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+        if (have != null) return have;
+        const int S = 256;
+        var tex = new Texture2D(S, S, TextureFormat.RGBA32, false);
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++)
+            {
+                float u = (x + 0.5f) / S * 2f - 1f, v = (y + 0.5f) / S * 2f - 1f;
+                float a = Mathf.Atan2(v, u), r = Mathf.Sqrt(u * u + v * v);
+                float edge = 0.78f + 0.09f * Mathf.Sin(3f * a + 0.7f) + 0.06f * Mathf.Sin(5f * a + 2.1f) + 0.04f * Mathf.Sin(9f * a);
+                float t = r / edge;                                               // 0 at the middle, 1 at the edge
+                float alpha = Mathf.Clamp01((1f - t) / 0.06f) * 0.92f;
+                float rim = Mathf.Clamp01(1f - Mathf.Abs(t - 0.8f) / 0.17f);      // the rainbow band just inside the edge
+                var hue = Color.HSVToRGB(Mathf.Repeat(a / (2f * Mathf.PI) + t * 0.6f, 1f), 0.75f, 0.85f);
+                var c = Color.Lerp(new Color(0.03f, 0.02f, 0.05f), hue, rim * 0.75f);
+                tex.SetPixel(x, y, new Color(c.r, c.g, c.b, alpha));
+            }
+        tex.Apply();
+        Directory.CreateDirectory(FxTex);
+        File.WriteAllBytes(path, tex.EncodeToPNG());
+        Object.DestroyImmediate(tex);
+        AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+        var importer = (TextureImporter)AssetImporter.GetAtPath(path);
+        importer.alphaIsTransparency = true; importer.wrapMode = TextureWrapMode.Clamp; importer.SaveAndReimport();
+        return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
     }
 
     /// Resources/TurboPad: a strip of chevrons running up the road over a soft glow, a trigger a kart's height tall,

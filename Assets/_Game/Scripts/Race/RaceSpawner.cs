@@ -60,6 +60,7 @@ namespace KartCup
             if (show == null) { race.BeginCountdown(); yield break; }
             race.Hold();
             TurboPad.Spawn(System.Environment.TickCount);
+            OilSlick.Spawn(System.Environment.TickCount + 1, Tracks.At(Cup.TrackIndex).difficulty);   // solo only: rooms never get them
             show.Prizes(Tracks.At(Cup.TrackIndex).kicker, Tracks.At(Cup.TrackIndex).name.ToUpperInvariant(), new[] { "1ST", "2ND", "3RD" });
             float until = Time.time + show.IntroSeconds, skippable = Time.time + 0.6f;
             while (Time.time < until && !(Time.time > skippable && PodiumShow.Tapped())) yield return null;

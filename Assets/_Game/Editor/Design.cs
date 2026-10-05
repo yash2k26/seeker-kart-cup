@@ -224,7 +224,7 @@ public static class Design
     /// White glyph on clear, 128 px, made once into Gen/Icons. play, back, next, globe, trophy, kart, user, flag; the
     /// race items (rocket, homing, bomb, nitro, bouncer, sunbomb, trap); arc (the loading spinner).
     public static readonly string[] Drawn = { "play", "back", "next", "globe", "trophy", "kart", "user", "flag",
-                                              "rocket", "homing", "bomb", "nitro", "bouncer", "sunbomb", "trap", "arc" };
+                                              "rocket", "homing", "bomb", "nitro", "bouncer", "sunbomb", "trap", "arc", "download" };
     /// The race items' glyphs by ItemManager name.
     public static string ItemGlyph(string item) => item switch
     {
@@ -264,6 +264,8 @@ public static class Design
             "trap" => (x, y) => Mathf.Min(Circle(x, y, 64, 64, 14),
                                      Mathf.Min(Seg(x, y, 20, 64, 108, 64, 13), Mathf.Min(Seg(x, y, 42, 26, 86, 102, 13), Seg(x, y, 42, 102, 86, 26, 13)))),
             "arc" => (x, y) => Arc(x, y),
+            "download" => (x, y) => Mathf.Min(Mathf.Min(Seg(x, y, 64, 108, 64, 46, 13), Mathf.Min(Seg(x, y, 38, 70, 64, 44, 13), Seg(x, y, 90, 70, 64, 44, 13))),
+                                         Box(x, y, 64, 20, 46, 7, 4)),
             _ => null,
         };
         if (sdf == null) { Debug.LogError("[design] no icon " + name); return null; }
