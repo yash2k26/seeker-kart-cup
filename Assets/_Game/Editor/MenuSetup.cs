@@ -34,6 +34,7 @@ public static class MenuSetup
     public static void Build()
     {
         Fonts();
+        VoiceSetup.Build();                                   // the drivers' voices (Resources/DriverVoices), for the select screen and the race
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
         var podium = Vista();
 
@@ -506,6 +507,33 @@ public static class MenuSetup
             Fill(s.FindProperty("rings"), rings.Cast<Object>().ToArray());
             s.FindProperty("idle").colorValue = Slate;
             s.FindProperty("picked").colorValue = Design.Ink600;
+        });
+
+        // What the driver says (their own voice, Voices.Say) in a comic bubble beside their head: the tail's tip is the
+        // bubble's pivot, which SpeechBubble keeps by the head as the turntable turns.
+        var bubble = Rect("Bubble", screen.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+        bubble.pivot = Vector2.zero;
+        var bubbleGroup = bubble.gameObject.AddComponent<CanvasGroup>();
+        bubbleGroup.alpha = 0f; bubbleGroup.blocksRaycasts = false; bubbleGroup.interactable = false;
+        var tail = Rect("Tail", bubble, Vector2.zero, Vector2.zero, new Vector2(30, 34), new Vector2(62, 62));
+        tail.localRotation = Quaternion.Euler(0, 0, -135f);        // the play glyph turned to point back down at the head
+        var tailImg = tail.gameObject.AddComponent<Image>();
+        tailImg.sprite = Design.Icon("play"); tailImg.color = Paper; tailImg.raycastTarget = false;
+        var speech = Rect("Speech", bubble, Vector2.zero, Vector2.zero, new Vector2(16, 26), new Vector2(320, 96));
+        speech.pivot = Vector2.zero;
+        Design.AsCard(speech, Paper).raycastTarget = false;
+        var words = Label("Words", speech, display, "", 42, Deep, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+        words.rectTransform.anchorMin = Vector2.zero; words.rectTransform.anchorMax = Vector2.one;
+        words.rectTransform.offsetMin = new Vector2(28, 14); words.rectTransform.offsetMax = new Vector2(-28, -14);
+        words.textWrappingMode = TextWrappingModes.Normal;
+        var speechBubble = bubble.gameObject.AddComponent<SpeechBubble>();
+        new SerializedObject(speechBubble).Do(s =>
+        {
+            s.FindProperty("bubble").objectReferenceValue = bubble;
+            s.FindProperty("body").objectReferenceValue = speech;
+            s.FindProperty("words").objectReferenceValue = words;
+            s.FindProperty("group").objectReferenceValue = bubbleGroup;
+            s.FindProperty("podium").objectReferenceValue = podium;
         });
 
         var so = new SerializedObject(carousel);

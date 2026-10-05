@@ -9,6 +9,8 @@ namespace KartCup
     {
         public abstract void Next();
         public abstract void Previous();
+        /// A tap on the vista (no drag): the character select's driver answers it; others ignore it.
+        public virtual void Poke() { }
 
         /// Set by SwipeSelect: the thumb turns the podium 1:1, and it eases home when the finger lifts.
         public float DragYaw { get; set; }
@@ -17,8 +19,11 @@ namespace KartCup
 
     /// Finger on the vista: drag turns the kart with the thumb, a flick changes character. The arrows stay for
     /// anyone who prefers them; this is the gesture every phone select screen already teaches.
-    public sealed class SwipeSelect : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+    public sealed class SwipeSelect : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
     {
+        /// A tap that never became a drag (uGUI cancels the click once the drag threshold is crossed): poke the kart.
+        public void OnPointerClick(PointerEventData e) { if (!e.dragging && carousel != null) carousel.Poke(); }
+
         [SerializeField] Carousel carousel;
         [SerializeField] float flickPixels = 90f;      // at 420 dpi; scaled below
         [SerializeField] float degreesPerPixel = 0.25f;

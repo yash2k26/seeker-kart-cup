@@ -74,7 +74,7 @@ namespace KartCup
                 if (lastPosition > 0 && race.state == RaceManager.State.Racing)
                 {
                     UiMotion.Punch(positionLabel.transform);
-                    if (position < lastPosition) Haptics.Play(Haptics.Kind.Tick);
+                    if (position < lastPosition) { Haptics.Play(Haptics.Kind.Tick); AudioDirector.Instance?.PositionUp(); }
                 }
                 lastPosition = position;
             }
@@ -106,7 +106,7 @@ namespace KartCup
                 boostFill.fillAmount = Mathf.Clamp01(charge);
                 if (boostTiers.Length > 0) boostFill.color = boostTiers[Mathf.Clamp(playerKart.boostCount, 0, boostTiers.Length - 1)];
                 // Compare the UNCLAMPED count: maxBoosts is 3 and there are 3 colours, so clamping hid the top tier-up.
-                if (playerKart.drifting && playerKart.boostCount > lastTier) Haptics.Play(Haptics.Kind.TierUp);
+                if (playerKart.drifting && playerKart.boostCount > lastTier) { Haptics.Play(Haptics.Kind.TierUp); AudioDirector.Instance?.TierUp(playerKart.boostCount); }
                 lastTier = playerKart.drifting ? playerKart.boostCount : 0;
             }
 
@@ -136,7 +136,7 @@ namespace KartCup
                          && Vector3.Dot(vel.normalized, heading.normalized) < -0.45f;
             if (!wrong) { wrongSince = -1f; return; }
             if (wrongSince < 0f) wrongSince = Time.time;
-            if (Time.time - wrongSince > 1.2f) Big("WRONG WAY", 0.2f);
+            if (Time.time - wrongSince > 1.2f) { Big("WRONG WAY", 0.2f); AudioDirector.Instance?.Warn(); }
         }
 
         Sprite Glyph(string item)

@@ -36,13 +36,44 @@ namespace KartCup
         /// Editor-side preview so the menu scene is not empty when it is opened or screenshotted.
         public void ShowInEditor(int i) { index = i; Show(); if (podium != null) podium.localRotation = Quaternion.Euler(0, baseYaw, 0); }
 
-        /// A face tapped in the roster strip: straight to that driver.
+        /// A face tapped in the roster strip: straight to that driver. Tapping the one already on the turntable is a poke.
         public void Pick(int i)
         {
-            if (roster == null || i < 0 || i >= roster.characters.Length || i == index) return;
+            if (roster == null || i < 0 || i >= roster.characters.Length) return;
+            if (i == index) { Poke(); return; }
             index = i;
             CharacterDatabase.SelectedIndex = index;
             Show();
+            Greet(0.22f);
+        }
+
+        // ---- voices: each driver says hello on arrival and answers a tap in their own voice (Voices, DriverVoices) ----
+        float lastPoke; int pokes; Tween hop;
+        string DriverId => roster != null ? roster.At(index)?.driverId : null;
+
+        /// The driver on the turntable says hello (just arrived, or the screen opened on them); a negative delay
+        /// takes back one that has not been said yet.
+        public void Greet(float delay)
+        {
+            if (!Application.isPlaying) return;
+            CancelInvoke(nameof(SayHello));
+            if (delay >= 0f) Invoke(nameof(SayHello), delay);
+        }
+
+        void SayHello() => Voices.Say(DriverId, "hello");
+
+        /// A tap on the kart: a line, and the kart hops. Keep poking and they get annoyed, then start over.
+        public override void Poke()
+        {
+            CancelInvoke(nameof(SayHello));
+            pokes = Time.unscaledTime - lastPoke < 2.5f ? pokes + 1 : 1;
+            lastPoke = Time.unscaledTime;
+            Voices.Say(DriverId, pokes >= 4 ? "annoyed" : "poke");
+            if (pokes >= 4) pokes = 0;
+            Haptics.Play(Haptics.Kind.Tick);
+            if (current == null) return;
+            if (hop.isAlive) hop.Complete();
+            hop = Tween.PunchLocalPosition(current.transform, new Vector3(0f, 0.5f, 0f), 0.42f, frequency: 2, useUnscaledTime: true);
         }
 
         void Update()
@@ -62,6 +93,7 @@ namespace KartCup
             Haptics.Play(Haptics.Kind.Tick);
             AudioDirector.Instance?.Click();
             Show();
+            Greet(0.22f);
         }
 
         /// The garage borrows the podium: hide our kart (and stop turning it) while it is open, bring it back after.

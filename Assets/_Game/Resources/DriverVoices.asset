@@ -1,0 +1,631 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cc971cccbf5e042abb06acecc65814bb, type: 3}
+  m_Name: DriverVoices
+  m_EditorClassIdentifier: Assembly-CSharp::KartCup.DriverVoices
+  lines:
+  - driver: Toly
+    kind: hello
+    text: gm! Let's ship it.
+    clip: {fileID: 8300000, guid: edd93562a65c84c4da575fc18252de4f, type: 3}
+  - driver: Toly
+    kind: hello
+    text: Hey! Ready to build?
+    clip: {fileID: 8300000, guid: e9f342003c7374acfa6504c49bdd40dc, type: 3}
+  - driver: Toly
+    kind: poke
+    text: Faster!
+    clip: {fileID: 8300000, guid: 0d3992337d387421d839c2da33c5a8b0, type: 3}
+  - driver: Toly
+    kind: poke
+    text: Ship it!
+    clip: {fileID: 8300000, guid: 243fef770a455496f9f7c6685cbf928c, type: 3}
+  - driver: Toly
+    kind: poke
+    text: Four hundred milliseconds.
+    clip: {fileID: 8300000, guid: 48626b11ea20349ea9242f4beef6d872, type: 3}
+  - driver: Toly
+    kind: poke
+    text: One more block.
+    clip: {fileID: 8300000, guid: 5878b066ab8d6415692e382de13cd1e0, type: 3}
+  - driver: Toly
+    kind: annoyed
+    text: Hey, I'm shipping here!
+    clip: {fileID: 8300000, guid: 0bd1c1f0a9d2e421a885a5d76c86a656, type: 3}
+  - driver: Toly
+    kind: annoyed
+    text: Okay, okay, I'm shipping!
+    clip: {fileID: 8300000, guid: 1af1eb7fc09f74e3f851671f88f6d352, type: 3}
+  - driver: Toly
+    kind: go
+    text: Let's ship it!
+    clip: {fileID: 8300000, guid: 54f3bf63f8d0b41d0bdbdfee66601cbb, type: 3}
+  - driver: Toly
+    kind: go
+    text: Full speed ahead!
+    clip: {fileID: 8300000, guid: acd30ff7d89c242ab9b588fbaceaf3c6, type: 3}
+  - driver: Toly
+    kind: win
+    text: Shipped it!
+    clip: {fileID: 8300000, guid: cde2b3bf001ae4043a3986a020d533ad, type: 3}
+  - driver: Toly
+    kind: win
+    text: Next block, please.
+    clip: {fileID: 8300000, guid: 925400fea220f4f9293a1145c30c22bd, type: 3}
+  - driver: Toly
+    kind: hurt
+    text: Hey!
+    clip: {fileID: 8300000, guid: 5ce191ba283254321b6247703f0826fe, type: 3}
+  - driver: Toly
+    kind: hurt
+    text: Ouch!
+    clip: {fileID: 8300000, guid: f50c288a873a3474bb358ddcd172dda3, type: 3}
+  - driver: Mert
+    kind: hello
+    text: Hey! Let's go!
+    clip: {fileID: 8300000, guid: 8529bc8794f5e435c93a3383c90aa222, type: 3}
+  - driver: Mert
+    kind: hello
+    text: What's up!
+    clip: {fileID: 8300000, guid: a33b9bad435cd4eafbba8aaa05f4ced6, type: 3}
+  - driver: Mert
+    kind: poke
+    text: Indexed.
+    clip: {fileID: 8300000, guid: 431702c34319046ee80b9d35f1d5a360, type: 3}
+  - driver: Mert
+    kind: poke
+    text: Every corner, indexed.
+    clip: {fileID: 8300000, guid: ab7af7e4be2eb45a191800b1057710c1, type: 3}
+  - driver: Mert
+    kind: poke
+    text: Low latency, baby!
+    clip: {fileID: 8300000, guid: 8f8e5dcedebdc402c90e4a757e3f0ef4, type: 3}
+  - driver: Mert
+    kind: poke
+    text: Let's goooo!
+    clip: {fileID: 8300000, guid: 63867a7060bcf4577bf6a22e36f99e36, type: 3}
+  - driver: Mert
+    kind: annoyed
+    text: Rate limited!
+    clip: {fileID: 8300000, guid: b4ea05606020a41db8c25f41a4cf0393, type: 3}
+  - driver: Mert
+    kind: annoyed
+    text: Too many requests!
+    clip: {fileID: 8300000, guid: 2b7db1a5da4484155a8b1ac9b8918006, type: 3}
+  - driver: Mert
+    kind: go
+    text: Let's go!
+    clip: {fileID: 8300000, guid: 03b51395f6a7c41f6b25b9cc3a2d8b92, type: 3}
+  - driver: Mert
+    kind: go
+    text: Send it!
+    clip: {fileID: 8300000, guid: 6dce1e7c713324f6d9969dfb9adebca2, type: 3}
+  - driver: Mert
+    kind: win
+    text: Indexed the podium!
+    clip: {fileID: 8300000, guid: 987c2e4de6c094ccbafa2389131c5a96, type: 3}
+  - driver: Mert
+    kind: win
+    text: Let's gooo!
+    clip: {fileID: 8300000, guid: 3493c71046dc043fca9b8761c68b8273, type: 3}
+  - driver: Mert
+    kind: hurt
+    text: Whoa!
+    clip: {fileID: 8300000, guid: b906016b267274362b92a2a6233c98b8, type: 3}
+  - driver: Mert
+    kind: hurt
+    text: Ow!
+    clip: {fileID: 8300000, guid: 3036c4101b1cd4a1693776d8c3576e89, type: 3}
+  - driver: Akshay
+    kind: hello
+    text: Hello hello!
+    clip: {fileID: 8300000, guid: 42dafa3fc0c24417785847243b4d8958, type: 3}
+  - driver: Akshay
+    kind: hello
+    text: Hey! Ready to race?
+    clip: {fileID: 8300000, guid: cc171b386de004255aff6ee10a0f46b3, type: 3}
+  - driver: Akshay
+    kind: poke
+    text: Full send!
+    clip: {fileID: 8300000, guid: 7d877b834d7444dbaa6e8b4cf5cfee89, type: 3}
+  - driver: Akshay
+    kind: poke
+    text: Top speed!
+    clip: {fileID: 8300000, guid: c9a476ef205404913a29d12996db5093, type: 3}
+  - driver: Akshay
+    kind: poke
+    text: Corners are optional.
+    clip: {fileID: 8300000, guid: 69be7d6f34b834ce9908718646c9c155, type: 3}
+  - driver: Akshay
+    kind: poke
+    text: Wheee!
+    clip: {fileID: 8300000, guid: fefe21682b38b4316bd1d6c20da474ee, type: 3}
+  - driver: Akshay
+    kind: annoyed
+    text: Okay, okay!
+    clip: {fileID: 8300000, guid: 74a706fcc02be4ae09c172ee48053c70, type: 3}
+  - driver: Akshay
+    kind: annoyed
+    text: I'm going, I'm going!
+    clip: {fileID: 8300000, guid: 2c173e86bf2a14c098e10ccf725eb806, type: 3}
+  - driver: Akshay
+    kind: go
+    text: Full send!
+    clip: {fileID: 8300000, guid: fa4c53ad68e5040ffbf2fbf20d26f425, type: 3}
+  - driver: Akshay
+    kind: go
+    text: Let's fly!
+    clip: {fileID: 8300000, guid: 04acbff4390064d45a5cb67e6eb132ac, type: 3}
+  - driver: Akshay
+    kind: win
+    text: Too fast for you!
+    clip: {fileID: 8300000, guid: 6983d2082c3664fba8300157b52ace6b, type: 3}
+  - driver: Akshay
+    kind: win
+    text: Ferry? What ferry?
+    clip: {fileID: 8300000, guid: 8197700076b154b21a803973bb85c7d9, type: 3}
+  - driver: Akshay
+    kind: hurt
+    text: Oof!
+    clip: {fileID: 8300000, guid: e886aa5955d79433989e2264cd6b6fa6, type: 3}
+  - driver: Akshay
+    kind: hurt
+    text: Hey!
+    clip: {fileID: 8300000, guid: 0445d0a575eea49968afab576af7f31f, type: 3}
+  - driver: Emmett
+    kind: hello
+    text: Hello there.
+    clip: {fileID: 8300000, guid: b83187ba50f36432f9597e15ef500145, type: 3}
+  - driver: Emmett
+    kind: hello
+    text: Hi. Let's be smooth.
+    clip: {fileID: 8300000, guid: 5fe5b96e8418148af9baee3fb003084a, type: 3}
+  - driver: Emmett
+    kind: poke
+    text: I see a line.
+    clip: {fileID: 8300000, guid: a7421d60c726a46d48653c5ba1d231d2, type: 3}
+  - driver: Emmett
+    kind: poke
+    text: Inside line.
+    clip: {fileID: 8300000, guid: a5254626aff8e432f9c9b66fbc4e12dd, type: 3}
+  - driver: Emmett
+    kind: poke
+    text: Smooth.
+    clip: {fileID: 8300000, guid: 7e5fe602d509b4765a34ece71faae2a6, type: 3}
+  - driver: Emmett
+    kind: poke
+    text: Nobody saw that.
+    clip: {fileID: 8300000, guid: 174b2ca72e917446c98724ba6ef2cee7, type: 3}
+  - driver: Emmett
+    kind: annoyed
+    text: Hands off the wheel, please.
+    clip: {fileID: 8300000, guid: b53ca05f9fb854b059b7518c241bb7f9, type: 3}
+  - driver: Emmett
+    kind: annoyed
+    text: Rude.
+    clip: {fileID: 8300000, guid: fc5c22f0d262d400abbbf7ddcddd285c, type: 3}
+  - driver: Emmett
+    kind: go
+    text: Smooth and fast.
+    clip: {fileID: 8300000, guid: e66635b44ffae426cac307876343341f, type: 3}
+  - driver: Emmett
+    kind: go
+    text: Let's thread it.
+    clip: {fileID: 8300000, guid: 77144af07cd524666902d4d597fbbbbb, type: 3}
+  - driver: Emmett
+    kind: win
+    text: Nobody saw it coming.
+    clip: {fileID: 8300000, guid: 0bbd952328c464f9fa6dd9116980bc1b, type: 3}
+  - driver: Emmett
+    kind: win
+    text: Smooth as anything.
+    clip: {fileID: 8300000, guid: 34064353eca8e4301949bbd8e69205fb, type: 3}
+  - driver: Emmett
+    kind: hurt
+    text: Oh!
+    clip: {fileID: 8300000, guid: c05a6e71a8ce64dc2a3b2df4edde97a9, type: 3}
+  - driver: Emmett
+    kind: hurt
+    text: Rude!
+    clip: {fileID: 8300000, guid: 1e555fa01f9954fc1b58eb91f1f65e89, type: 3}
+  - driver: Bitsy
+    kind: hello
+    text: Hiii!
+    clip: {fileID: 8300000, guid: 88cf85e84524e448186244d38e1a3778, type: 3}
+  - driver: Bitsy
+    kind: hello
+    text: Hey there! Let's zoom!
+    clip: {fileID: 8300000, guid: 95fa1812130f944e5a1c74995e0f029b, type: 3}
+  - driver: Bitsy
+    kind: poke
+    text: Gas gas gas!
+    clip: {fileID: 8300000, guid: b24380b4125a1467d8a535e28b7ce7dc, type: 3}
+  - driver: Bitsy
+    kind: poke
+    text: Brakes are for later!
+    clip: {fileID: 8300000, guid: 6860c142854c74259b694d38ce5557a0, type: 3}
+  - driver: Bitsy
+    kind: poke
+    text: Vroom vroom!
+    clip: {fileID: 8300000, guid: 8872c83f46e874b14a68ac768fbb2ca4, type: 3}
+  - driver: Bitsy
+    kind: poke
+    text: Hee hee!
+    clip: {fileID: 8300000, guid: d3119d78f235049c08c63d31770999b9, type: 3}
+  - driver: Bitsy
+    kind: annoyed
+    text: That tickles!
+    clip: {fileID: 8300000, guid: ebe077df2aa0f4dc9b060782c1e4c7fa, type: 3}
+  - driver: Bitsy
+    kind: annoyed
+    text: Hey, I'm zooming here!
+    clip: {fileID: 8300000, guid: 13285f8fad3ab4b29b724685254736a6, type: 3}
+  - driver: Bitsy
+    kind: go
+    text: Gas gas gas!
+    clip: {fileID: 8300000, guid: ce717134b71ba40b29588a3cfe54f884, type: 3}
+  - driver: Bitsy
+    kind: go
+    text: Zoom zoom!
+    clip: {fileID: 8300000, guid: c9ac8b98205014e17874131842e496b6, type: 3}
+  - driver: Bitsy
+    kind: win
+    text: Woohoo!
+    clip: {fileID: 8300000, guid: bbbf3da0f7b8c455da095b3bba3f7ea3, type: 3}
+  - driver: Bitsy
+    kind: win
+    text: All gas, no regrets!
+    clip: {fileID: 8300000, guid: 06092ca523b46427a9d6f1833f507005, type: 3}
+  - driver: Bitsy
+    kind: hurt
+    text: Eek!
+    clip: {fileID: 8300000, guid: 0333af01bc9d241fca5b76ca1af66519, type: 3}
+  - driver: Bitsy
+    kind: hurt
+    text: Ow!
+    clip: {fileID: 8300000, guid: 0ac707740d89a4b379d49c91bd8c2153, type: 3}
+  - driver: Pip
+    kind: hello
+    text: Hey.
+    clip: {fileID: 8300000, guid: 2c7dc05e070f044779a6b748bdd21a9d, type: 3}
+  - driver: Pip
+    kind: hello
+    text: Oh. Hi.
+    clip: {fileID: 8300000, guid: 7d7b226fcdc5f4008b89c1172aed7bdb, type: 3}
+  - driver: Pip
+    kind: poke
+    text: Not moving.
+    clip: {fileID: 8300000, guid: 0512710ccc85e4484b0f12e27ce02e7e, type: 3}
+  - driver: Pip
+    kind: poke
+    text: Try going around.
+    clip: {fileID: 8300000, guid: b56b656fa7c22418f8ef1386c3c48acd, type: 3}
+  - driver: Pip
+    kind: poke
+    text: Immovable.
+    clip: {fileID: 8300000, guid: 5a554fd737c7f466a941e74fc1a0cdbd, type: 3}
+  - driver: Pip
+    kind: poke
+    text: You shall not pass.
+    clip: {fileID: 8300000, guid: 0bec66b8ba6c345b4a8302a0c02fbcf4, type: 3}
+  - driver: Pip
+    kind: annoyed
+    text: I said, I'm not moving.
+    clip: {fileID: 8300000, guid: 25552806bf4c142e6a388d3aa505673d, type: 3}
+  - driver: Pip
+    kind: annoyed
+    text: Still. Not. Moving.
+    clip: {fileID: 8300000, guid: 2a13bce477b4948d79ca99139f97ba74, type: 3}
+  - driver: Pip
+    kind: go
+    text: Try and pass me.
+    clip: {fileID: 8300000, guid: c721d3ab12f9c401d8e2f6c8aaf827ee, type: 3}
+  - driver: Pip
+    kind: go
+    text: Good luck getting by.
+    clip: {fileID: 8300000, guid: f6d3cd8e7e67c425b93bccdd04207ccd, type: 3}
+  - driver: Pip
+    kind: win
+    text: Told you.
+    clip: {fileID: 8300000, guid: 52bc77a47c922435a86ebd1b124c16da, type: 3}
+  - driver: Pip
+    kind: win
+    text: Nobody passed.
+    clip: {fileID: 8300000, guid: 8b214f1cf8b37405b8cd53170a07f0b3, type: 3}
+  - driver: Pip
+    kind: hurt
+    text: Hm.
+    clip: {fileID: 8300000, guid: cc136922eb0ab4e648732e5ed63ccb35, type: 3}
+  - driver: Pip
+    kind: hurt
+    text: Ow.
+    clip: {fileID: 8300000, guid: 2202c655d69ca4d9ab579dc5e4f56e9e, type: 3}
+  - driver: Runa
+    kind: hello
+    text: Hey there!
+    clip: {fileID: 8300000, guid: 89cfaacc5c2ef4ba0815837da72f4d7d, type: 3}
+  - driver: Runa
+    kind: hello
+    text: Ready when you are!
+    clip: {fileID: 8300000, guid: 2bf21975fd23442f6acd6b12225e3278, type: 3}
+  - driver: Runa
+    kind: poke
+    text: Never lift!
+    clip: {fileID: 8300000, guid: 95fb4afa63098495788a0d5859ca7307, type: 3}
+  - driver: Runa
+    kind: poke
+    text: Flat out!
+    clip: {fileID: 8300000, guid: 823a9ebed0aa640c49859ae3bfbc8cd2, type: 3}
+  - driver: Runa
+    kind: poke
+    text: Lift? Never.
+    clip: {fileID: 8300000, guid: 583bcd8751908419b8979d12b3458ca7, type: 3}
+  - driver: Runa
+    kind: poke
+    text: Foot down!
+    clip: {fileID: 8300000, guid: 282aa40ffb89741c1b1b3cbbda89a16e, type: 3}
+  - driver: Runa
+    kind: annoyed
+    text: Still not lifting.
+    clip: {fileID: 8300000, guid: 91c79e9d839e145979d2fef3035ad77a, type: 3}
+  - driver: Runa
+    kind: annoyed
+    text: Hands off!
+    clip: {fileID: 8300000, guid: da48bee3bb03e49fd95220df196cc4d4, type: 3}
+  - driver: Runa
+    kind: go
+    text: Flat out!
+    clip: {fileID: 8300000, guid: b6659f82340da4ae9980776c10c8868f, type: 3}
+  - driver: Runa
+    kind: go
+    text: Foot down!
+    clip: {fileID: 8300000, guid: 83da52bc5fcec4b2bb03c3830148d961, type: 3}
+  - driver: Runa
+    kind: win
+    text: Never lifted!
+    clip: {fileID: 8300000, guid: 6652b53f6a37a4f3fb6350f519314cf1, type: 3}
+  - driver: Runa
+    kind: win
+    text: Flat out, all the way!
+    clip: {fileID: 8300000, guid: d7b6a343148b8484dadc8f987d664870, type: 3}
+  - driver: Runa
+    kind: hurt
+    text: Argh!
+    clip: {fileID: 8300000, guid: ff553acf12d364154a25dcd7ba55bff6, type: 3}
+  - driver: Runa
+    kind: hurt
+    text: Hey!
+    clip: {fileID: 8300000, guid: 82bcdbdbf9f52488286c540a749280a9, type: 3}
+  - driver: Vee
+    kind: hello
+    text: Hiya!
+    clip: {fileID: 8300000, guid: f5be50f86967444e49a67847a040a4cb, type: 3}
+  - driver: Vee
+    kind: hello
+    text: G'day! Let's race!
+    clip: {fileID: 8300000, guid: 1ef189629480a44aab03ea92a415aa60, type: 3}
+  - driver: Vee
+    kind: poke
+    text: Brake late!
+    clip: {fileID: 8300000, guid: 4fbcfe3cfd096471dae7a1502d03014d, type: 3}
+  - driver: Vee
+    kind: poke
+    text: Apex!
+    clip: {fileID: 8300000, guid: 6626c566577624eda9bbbd2b558d256f, type: 3}
+  - driver: Vee
+    kind: poke
+    text: Watch this line.
+    clip: {fileID: 8300000, guid: 5d2d7b2e02dc842d18f0d68c846c25f2, type: 3}
+  - driver: Vee
+    kind: poke
+    text: Late and lovely.
+    clip: {fileID: 8300000, guid: 8da6e34c7c45c4f68aaaee826b0e2b11, type: 3}
+  - driver: Vee
+    kind: annoyed
+    text: Eyes on the road!
+    clip: {fileID: 8300000, guid: 0c9090f011d2c48a699c8c9b6d3d58f6, type: 3}
+  - driver: Vee
+    kind: annoyed
+    text: Oi! Hands off!
+    clip: {fileID: 8300000, guid: 8a301bc32dfce4af8b2187016d637e9c, type: 3}
+  - driver: Vee
+    kind: go
+    text: Brake late!
+    clip: {fileID: 8300000, guid: ea2194508170d494784205bb72e8cb28, type: 3}
+  - driver: Vee
+    kind: go
+    text: Here we go!
+    clip: {fileID: 8300000, guid: b2d7ee843f207487e8ba7db4b26cf818, type: 3}
+  - driver: Vee
+    kind: win
+    text: Perfect line!
+    clip: {fileID: 8300000, guid: 03ae1b0e2fe474415a77d86d2f53a4cb, type: 3}
+  - driver: Vee
+    kind: win
+    text: Late brake, big win!
+    clip: {fileID: 8300000, guid: 63c94bd832b4d4996b443303bd0ec7da, type: 3}
+  - driver: Vee
+    kind: hurt
+    text: Oi!
+    clip: {fileID: 8300000, guid: d36cb7485ffcf4d9db6d60ecd1b7c67f, type: 3}
+  - driver: Vee
+    kind: hurt
+    text: Ouch!
+    clip: {fileID: 8300000, guid: 4d761abcb53d74e619c135c98115aab7, type: 3}
+  - driver: Chase
+    kind: hello
+    text: Hey! Hi! Hello!
+    clip: {fileID: 8300000, guid: dd144940dc72646f0b0ac92cb9b6b6d1, type: 3}
+  - driver: Chase
+    kind: hello
+    text: Oh hey, it's you!
+    clip: {fileID: 8300000, guid: df71eb4d698ed413886ed6ccc5263fe2, type: 3}
+  - driver: Chase
+    kind: poke
+    text: Hi again!
+    clip: {fileID: 8300000, guid: 9e4ad063afc444ed3ab3b5d4f0389090, type: 3}
+  - driver: Chase
+    kind: poke
+    text: Wave back!
+    clip: {fileID: 8300000, guid: 06375f070b2444241ab5499247940db8, type: 3}
+  - driver: Chase
+    kind: poke
+    text: I know that guy!
+    clip: {fileID: 8300000, guid: 9155a61c92f0e4f8a8ec956aaa33f931, type: 3}
+  - driver: Chase
+    kind: poke
+    text: Hey, hey, hey!
+    clip: {fileID: 8300000, guid: 64551ffa6f64b462e9f949a24981cc3b, type: 3}
+  - driver: Chase
+    kind: annoyed
+    text: Okay, bye! No, wait. Hi!
+    clip: {fileID: 8300000, guid: a6e6647094ade4453ab620d307bf2a33, type: 3}
+  - driver: Chase
+    kind: annoyed
+    text: Hi! Still hi!
+    clip: {fileID: 8300000, guid: 44ce065b224fa46e3b124f9e1486456e, type: 3}
+  - driver: Chase
+    kind: go
+    text: Hi everyone! Bye everyone!
+    clip: {fileID: 8300000, guid: fc9935099770c47c9bcc329e66490780, type: 3}
+  - driver: Chase
+    kind: go
+    text: See you at the finish!
+    clip: {fileID: 8300000, guid: 1af7fff3ed50e452fa0cd8e728ee8177, type: 3}
+  - driver: Chase
+    kind: win
+    text: Thanks, everyone!
+    clip: {fileID: 8300000, guid: 56e0eda2b1d6348768823471d89074c1, type: 3}
+  - driver: Chase
+    kind: win
+    text: Hi from first place!
+    clip: {fileID: 8300000, guid: ee8aec7db42b944379b6ab923580e720, type: 3}
+  - driver: Chase
+    kind: hurt
+    text: Hey! Rude!
+    clip: {fileID: 8300000, guid: cbbef09d54b264493be2e23c37c86ba7, type: 3}
+  - driver: Chase
+    kind: hurt
+    text: Ow! Hi!
+    clip: {fileID: 8300000, guid: ae20221696f2f4fc18776506b8cd65be, type: 3}
+  - driver: Beeman
+    kind: hello
+    text: Hello, world.
+    clip: {fileID: 8300000, guid: 0b4ddde3d3e71404996553ae990ef06c, type: 3}
+  - driver: Beeman
+    kind: hello
+    text: Ah. A new build.
+    clip: {fileID: 8300000, guid: dd44ae5b00d7b461398a553dc92a9778, type: 3}
+  - driver: Beeman
+    kind: poke
+    text: Sixty frames a second.
+    clip: {fileID: 8300000, guid: 6d8ffca5429e249fa8b18f41cfa39254, type: 3}
+  - driver: Beeman
+    kind: poke
+    text: Found the bug.
+    clip: {fileID: 8300000, guid: 8c3d749859a164b06a4b75d772844205, type: 3}
+  - driver: Beeman
+    kind: poke
+    text: Works on my machine.
+    clip: {fileID: 8300000, guid: cfb695d5d93364455bdbd5020007c471, type: 3}
+  - driver: Beeman
+    kind: poke
+    text: Shiny, and fast.
+    clip: {fileID: 8300000, guid: bbc5f841122184fce9ab7fece573968a, type: 3}
+  - driver: Beeman
+    kind: annoyed
+    text: Stack overflow!
+    clip: {fileID: 8300000, guid: eac735bb088f5483fba474c169cf4622, type: 3}
+  - driver: Beeman
+    kind: annoyed
+    text: Infinite loop detected!
+    clip: {fileID: 8300000, guid: 375be6471dd5443ecb5b14c20cb3a065, type: 3}
+  - driver: Beeman
+    kind: go
+    text: Compiling. Go!
+    clip: {fileID: 8300000, guid: f9e363ea0ebc74893996ac64325c670e, type: 3}
+  - driver: Beeman
+    kind: go
+    text: Shipping to production!
+    clip: {fileID: 8300000, guid: 7b648e5f0e2a6480797fb2255d7c253a, type: 3}
+  - driver: Beeman
+    kind: win
+    text: Zero bugs!
+    clip: {fileID: 8300000, guid: ea0da9b79526f4b7b98fd55db320b41c, type: 3}
+  - driver: Beeman
+    kind: win
+    text: Ship it. Done.
+    clip: {fileID: 8300000, guid: 47f66b98a157c4d31a86dbaaad3d0430, type: 3}
+  - driver: Beeman
+    kind: hurt
+    text: Segfault!
+    clip: {fileID: 8300000, guid: 16a04708a45c24153bc53da13b1c93e6, type: 3}
+  - driver: Beeman
+    kind: hurt
+    text: Ow!
+    clip: {fileID: 8300000, guid: 72845bc73ef8a4b0a94a272a3c92aaab, type: 3}
+  - driver: Maroo
+    kind: hello
+    text: Heyy! Maroo's here!
+    clip: {fileID: 8300000, guid: a5b31c1bba6fa40c1a63f3b26063bd98, type: 3}
+  - driver: Maroo
+    kind: hello
+    text: Hey hey! Let's drift!
+    clip: {fileID: 8300000, guid: 12567460883cb444ca34d0cf550de29a, type: 3}
+  - driver: Maroo
+    kind: poke
+    text: Mind the curls!
+    clip: {fileID: 8300000, guid: af8ddaf8f198448b6af04bcdec3a8a05, type: 3}
+  - driver: Maroo
+    kind: poke
+    text: Drift time!
+    clip: {fileID: 8300000, guid: 782099c7963804c329ec9ac65d1fd0a4, type: 3}
+  - driver: Maroo
+    kind: poke
+    text: Big drift energy!
+    clip: {fileID: 8300000, guid: 3d5e60a358c5d45be954502c992ef82a, type: 3}
+  - driver: Maroo
+    kind: poke
+    text: Ha ha!
+    clip: {fileID: 8300000, guid: 01b144ac54e8945f78cf4fc4c1ec2650, type: 3}
+  - driver: Maroo
+    kind: annoyed
+    text: Not the hair!
+    clip: {fileID: 8300000, guid: aca1e494c65594a06aaa3610c28a6523, type: 3}
+  - driver: Maroo
+    kind: annoyed
+    text: Watch the curls, man!
+    clip: {fileID: 8300000, guid: ea31e8d0fcff7498dbe05d106f237556, type: 3}
+  - driver: Maroo
+    kind: go
+    text: Drift time!
+    clip: {fileID: 8300000, guid: 9007af9568d734747a326aa3da93577e, type: 3}
+  - driver: Maroo
+    kind: go
+    text: Let's slide!
+    clip: {fileID: 8300000, guid: 4de5f1901701a4291aedd3aeae7a4d93, type: 3}
+  - driver: Maroo
+    kind: win
+    text: Curls on top!
+    clip: {fileID: 8300000, guid: 0f17e25dcc2544046b0dae3badde4bdb, type: 3}
+  - driver: Maroo
+    kind: win
+    text: Biggest drift wins!
+    clip: {fileID: 8300000, guid: eb9b45f03b7df46218084d70ee2c5cb9, type: 3}
+  - driver: Maroo
+    kind: hurt
+    text: Not the hair!
+    clip: {fileID: 8300000, guid: 2de234fa437914421beab3a4bc6478c7, type: 3}
+  - driver: Maroo
+    kind: hurt
+    text: Whoa!
+    clip: {fileID: 8300000, guid: 3f38cc8d6cbe44dea917e7dbad6d1d5f, type: 3}

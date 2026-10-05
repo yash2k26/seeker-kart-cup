@@ -22,9 +22,16 @@ namespace KartCup
         {
             CharacterCarousel.Changed += Mark;
             Mark(carousel != null && Application.isPlaying ? carousel.Index : CharacterDatabase.SelectedIndex, false);
+            // the screen opens on a driver who says hello once it has slid in (not at scene load: every panel is
+            // enabled for a frame before ScreenFlow hides all but the title)
+            if (carousel != null && Time.timeSinceLevelLoad > 0.3f) carousel.Greet(0.45f);
         }
 
-        void OnDisable() => CharacterCarousel.Changed -= Mark;
+        void OnDisable()
+        {
+            CharacterCarousel.Changed -= Mark;
+            if (carousel != null) carousel.Greet(-1f);         // left before they spoke: they don't
+        }
 
         public void Pick(int i) => carousel?.Pick(i);
 

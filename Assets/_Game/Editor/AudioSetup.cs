@@ -29,6 +29,22 @@ public static class AudioSetup
         for (int i = 0; i < list.Length; i++) tracks.GetArrayElementAtIndex(i).objectReferenceValue = list[i];
         so.FindProperty("musicVolume").floatValue = menu ? 0.5f : 0.42f;   // the loops are mastered at -15 LUFS: under the engines at this
 
+        // The place itself, under everything (tools/audio/ambience.py): waves and crickets at Palm Bay and on the
+        // title's beach, wind on Frost Peak, wind and birds in Pine Ridge, the crowd at the Speedway. The beds are
+        // -20 LUFS; at 0.3 they sit ~8 dB under the music. Per scene (not kept across loads like the director), streamed.
+        var bedPath = "Assets/_Game/Audio/Ambience/" + (menu ? "menu" : map ?? "beach") + ".ogg";
+        if (AssetImporter.GetAtPath(bedPath) is AudioImporter bedImporter && bedImporter.defaultSampleSettings.loadType != AudioClipLoadType.Streaming)
+        {
+            var s = bedImporter.defaultSampleSettings; s.loadType = AudioClipLoadType.Streaming; s.quality = 0.6f;
+            bedImporter.defaultSampleSettings = s; bedImporter.SaveAndReimport();
+        }
+        var bed = Clip(bedPath);
+        if (bed != null)
+        {
+            var amb = new GameObject("Ambience").AddComponent<AudioSource>();
+            amb.clip = bed; amb.loop = true; amb.playOnAwake = true; amb.spatialBlend = 0f; amb.volume = 0.3f; amb.priority = 64;
+        }
+
         var clicks = so.FindProperty("clicks");
         var clickClips = new[] { "ui/click_001.ogg", "ui/click_003.ogg", "ui/select_001.ogg" }.Select(c => Clip(Sfx + c)).Where(c => c != null).ToArray();
         clicks.arraySize = clickClips.Length;
@@ -51,6 +67,12 @@ public static class AudioSetup
         Set(so, "podUp", Clip(Sfx + "items/launcher_clack.ogg"));
         Set(so, "bombUp", Clip(Sfx + "items/bomb_appear.ogg"));
         Set(so, "hit", Clip(Sfx + "items/kart_hit.ogg"));
+        // The cues the HUD used to show silently: a drift tier (pitched up a step per tier), a place gained, the
+        // two-tone WRONG WAY, a button that cannot be pressed.
+        Set(so, "tierUp", Clip(Sfx + "digital/pepSound1.ogg"));
+        Set(so, "positionUp", Clip(Sfx + "digital/highUp.ogg"));
+        Set(so, "warn", Clip(Sfx + "digital/twoTone1.ogg"));
+        Set(so, "error", Clip(Sfx + "ui/error_001.ogg"));
         // Using an item, by its ItemManager name. The rockets and the sun bomb sound from the thing itself (ItemSetup
         // puts the source on their prefabs), so here they map to nothing rather than to the fallback.
         (string item, string clip)[] items = { ("Nitro", "nitro_boost"), ("Turbo", "turbo_boost"), ("Bouncer", "bouncer_launch"), ("Bomb", "bomb_drop"),

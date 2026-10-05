@@ -111,6 +111,10 @@ namespace KartCup
             if (isPlayer) { Haptics.Play(Haptics.Kind.Hit); CameraFeel.Instance?.Kick(-transform.forward, 0.4f); }
         }
 
+        static float lastHurt = -10f;
+        // the driver riding this kart (Driver_<Name>, spawned as a clone): whose voice the barks are in
+        string DriverId => driver != null ? driver.gameObject.name.Replace("(Clone)", "").Replace("Driver_", "").Trim() : Voices.Player;
+
         public void OnSpinOut()
         {
             driver?.OnHit();
@@ -118,13 +122,18 @@ namespace KartCup
             if (!isPlayer) return;
             HitStop.Do();
             AudioDirector.Instance?.Hit();
+            if (Time.unscaledTime - lastHurt > 4f) { lastHurt = Time.unscaledTime; Voices.Say(DriverId, "hurt"); }   // a bark, not a commentary
             Haptics.Play(Haptics.Kind.Hit);
             CameraFeel.Instance?.Kick(-transform.forward, 1f);
         }
 
+        void SayWin() => Voices.Say(DriverId, "win");
+
         public void OnFinish()
         {
             driver?.OnFinish();
+            if (isPlayer && RaceManager.Instance != null && RaceManager.Instance.PositionOf(GetComponent<KartProgress>()) == 1)
+                Invoke(nameof(SayWin), 1.6f);                // after the announcer's YOU WIN
             if (isPlayer) Haptics.Play(Haptics.Kind.Win);
         }
     }

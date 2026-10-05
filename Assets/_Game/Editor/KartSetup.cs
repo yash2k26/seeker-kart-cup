@@ -180,11 +180,36 @@ public static class KartSetup
         var presets = go.GetComponent<KartPresetControl>();
         if (presets != null) presets.loadOnAwake = false;    // otherwise a preset reload would stamp over the per-character stats
 
+        // ---- sound: each class of kart its own engine and rev range, so a grid of six is six engines and not one
+        // drone; heard from further off (min distance 2.5 m, was 1: with the chase camera ~5.5 m back your own engine
+        // sits ~5 dB over the music at full speed, a rival alongside about as loud, one 15 m off a sixth of it)
+        var audio = go.GetComponentInChildren<KartAudio>();
+        if (audio != null)
+        {
+            var (clip, lo, hi) = Engine(name);
+            if (audio.engineSnd != null)
+                audio.engineSnd.clip = AssetDatabase.LoadAssetAtPath<AudioClip>($"Assets/ThirdParty/PowerslideKartPhysics/Audio/Engines/{clip}.wav");
+            audio.engineMinPitch = lo; audio.engineMaxPitch = hi;
+            foreach (var source in audio.GetComponentsInChildren<AudioSource>(true)) { source.minDistance = 2.5f; source.maxDistance = 140f; }
+        }
+
         Object.DestroyImmediate(art);
         PrefabUtility.SaveAsPrefabAsset(go, Prefabs + go.name + ".prefab");
         Object.DestroyImmediate(go);
         Debug.Log($"[karts] {name}: fit x{fit:F2}, rig {rigLength:F2} m, wheel r={wheelRadius * fit:F2}");
     }
+
+    /// The engine a kart sounds like and its pitch at idle and flat out. Engine0 is the buzzy small one, Engine1 the
+    /// warmer kit default, Engine2/3 carry a deep low end (50-60 Hz) for the big machines; the trucks and the tractor
+    /// rev low, the light and sporty ones high.
+    static (string clip, float lo, float hi) Engine(string kart) => kart switch
+    {
+        "oodi" => ("Engine0", 0.60f, 1.60f), "oozi" => ("Engine0", 0.70f, 1.75f), "hatchback-sports" => ("Engine0", 0.65f, 1.70f),
+        "race-future" => ("Engine0", 0.75f, 1.85f), "ooli" => ("Engine1", 0.60f, 1.55f), "taxi" => ("Engine1", 0.50f, 1.35f),
+        "oopi" => ("Engine2", 0.50f, 1.30f), "police" => ("Engine2", 0.55f, 1.45f), "tractor" => ("Engine2", 0.35f, 0.95f),
+        "van" => ("Engine3", 0.45f, 1.20f), "firetruck" => ("Engine3", 0.40f, 1.10f), "garbage-truck" => ("Engine3", 0.38f, 1.00f),
+        _ => ("Engine1", 0.55f, 1.45f),
+    };
 
     /// Karts.asset: what the garage shows and the spawner reads. Rebuilt every run so a renamed kart never goes stale.
     static void Database()

@@ -26,6 +26,7 @@ public static class MenuPlay
         }
         EditorSceneManager.OpenScene("Assets/_Game/Scenes/Menu.unity", OpenSceneMode.Single);
         start = EditorApplication.timeSinceStartup; stage = 0;
+        Voices.Spoke -= Said; Voices.Spoke += Said;
         EditorApplication.update += Tick;
         EditorApplication.EnterPlaymode();
     }
@@ -41,8 +42,10 @@ public static class MenuPlay
         (double at, System.Action act)[] steps =
         {
             (5, () => Report("title-a")), (9, () => Report("title-b")), (14, () => Report("title-c")),
-            (14.2, () => flow.Play()), (14.55, () => Shot("fly")), (16.5, () => Shot("select", ui: true)),
-            (16.7, () => flow.ShowTitle()), (18.5, () => Shot("back", ui: true)),
+            (14.2, () => flow.Play()), (14.55, () => Shot("fly")), (15.3, () => Shot("hello", ui: true)), (16.5, () => Shot("select", ui: true)),
+            (16.55, () => Object.FindFirstObjectByType<CharacterCarousel>().Poke()), (16.75, () => Shot("poke", ui: true)),
+            (16.9, () => Object.FindFirstObjectByType<CharacterCarousel>().Pick(10)), (17.6, () => Shot("pick", ui: true)),
+            (17.7, () => flow.ShowTitle()), (18.5, () => Shot("back", ui: true)),
             (18.7, () => flow.Play()), (19.8, () => flow.ShowTrack()), (21.0, () => Shot("track", ui: true)),
             (21.2, () => flow.StartRace()), (21.32, () => Shot("curtain", ui: true)),
             (29.0, () => { Debug.Log($"[menuplay] race scene: {UnityEngine.SceneManagement.SceneManager.GetActiveScene().name}, curtain alpha {LoadingCurtain.Instance?.GetComponent<CanvasGroup>()?.alpha}"); Shot("race", ui: true); }),
@@ -52,6 +55,8 @@ public static class MenuPlay
         Debug.Log("[menuplay] done");
         EditorApplication.Exit(0);
     }
+
+    static void Said(string driver, string line, float seconds) => Debug.Log($"[menuplay] {driver} says \"{line}\" ({seconds:0.00} s)");
 
     static void Report(string name)
     {

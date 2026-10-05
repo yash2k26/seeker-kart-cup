@@ -112,7 +112,12 @@ namespace KartCup
         public void ShowSelect() => Show(Select);
         public void ShowLeaderboard() => Show(2);
         public void ShowSettings() => Show(3);
-        public void ShowTrack() { if (Time.unscaledTime - lastShow >= 0.3f) Show(Track); }   // NEXT overlaps PLAY: a double tap must not skip character select
+        public void ShowTrack()
+        {
+            if (Time.unscaledTime - lastShow < 0.3f) return;   // NEXT overlaps PLAY: a double tap must not skip character select
+            if (current == Select && roster != null) Voices.Say(roster.At(CharacterDatabase.SelectedIndex)?.driverId, "go");   // the chosen driver is in
+            Show(Track);
+        }
         public void ShowRooms() => Show(Rooms);
         public void ShowLobby() => Show(Lobby);
         public void ShowGarage() => Show(Garage);

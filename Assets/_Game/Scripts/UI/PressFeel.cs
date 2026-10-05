@@ -27,6 +27,7 @@ namespace KartCup
             if (selectable != null && !selectable.IsInteractable())
             {
                 if (!shake.isAlive) shake = Tween.PunchLocalPosition(transform, new Vector3(14f, 0f, 0f), 0.3f, frequency: 8, useUnscaledTime: true);
+                AudioDirector.Instance?.Error();
                 return;
             }
             Go(pressed, 0.10f, Ease.OutQuad);
