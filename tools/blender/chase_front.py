@@ -10,7 +10,7 @@ planes) for the character art/chase.py. akshay_front.py and from_art.py are not 
 - --clay: the fitted, unioned shape in clay (parts coloured) from every side: clay-<view>.png and clay.png;
 - the locks' faces toward the art's camera get C.LOCK_FRONT_UV more texels; slivers of no area left by the union and
   the hair's decimation are dissolved (meshcheck's zero_area).
-Env: CHASE_NO_BUDGET=1 skips the 3900-triangle decimation (a look only, not for the game); CHASE_DEBUG=1 marks the
+Env: HEAD_NAME=<name> builds art/<name>.py instead (Maroo is built this way); CHASE_NO_BUDGET=1 skips the 3900-triangle decimation (a look only, not for the game); CHASE_DEBUG=1 marks the
 streak-filled hair half-green in <name>-texsource.png.
 
 Usage (from tools/blender):
@@ -23,14 +23,14 @@ Then: Blender -b -P meshcheck.py -- <out> chase; Blender -b -P verify.py -- <out
 import sys, os, math, hashlib, pickle
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE); sys.path.append(os.path.join(HERE, "pylib"))
-NAME = "chase"
+NAME = os.environ.get("HEAD_NAME", "chase")      # another character built the same way: HEAD_NAME=maroo
 _argv = sys.argv[sys.argv.index("--") + 1:]
 OUT = os.path.abspath(_argv[0])
 sys.argv = [sys.argv[0], "--", OUT, NAME]      # akshay_front takes the character's name from here
 import akshay_front as af
 import numpy as np
 fa = af.fa
-CACHE = os.path.join(HERE, "..", "..", "Builds", "chase-front", ".fitcache")
+CACHE = os.path.join(HERE, "..", "..", "Builds", f"{NAME}-front", ".fitcache")
 
 _fit = fa.fit
 def fit(C, size, verbose=True):

@@ -743,7 +743,7 @@ public static partial class TrackSetup
 
         // name, kart, driver, speed, accel, handling, weight, turbo, attack  (six pips that sum to 0 so nobody is
         // strictly better: a shape, not an edge). This table is the roster's stats; the tint stays LookSetup's. New
-        // names are appended, so a roster that grows (Chase and Beeman arrived on 28 Sep 2026) never resets the
+        // names are appended, so a roster that grows (Chase and Beeman arrived on 28 Sep 2026, Maroo on 5 Oct) never resets the
         // select-screen order or the saved character index.
         var rows = new (string name, string kart, string driver, int sp, int ac, int hd, int wt, int tb, int at, string blurb)[]
         {
@@ -757,6 +757,7 @@ public static partial class TrackSetup
             ("Vee",      "oopi", "Vee",    1, -1,  1, -1,  0,  0, "Late braker, early apex."),
             ("Chase",    "oozi", "Chase",  0,  1,  1, -2, -1,  1, "Knows every dev on the grid. Waves at all of them."),
             ("Beeman",   "oobi", "Beeman", 2,  0, -1, -1, -1,  1, "Bald, fast, and debugging at sixty frames a second."),
+            ("Maroo",    "oopi", "Maroo",  0,  0,  1, -1,  1, -1, "Big curls, bigger drifts."),
         };
         var defs = (db.characters ?? System.Array.Empty<CharacterDef>()).Where(d => d != null).ToList();
         foreach (var r in rows)

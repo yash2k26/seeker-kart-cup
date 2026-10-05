@@ -178,7 +178,10 @@ public static class MenuPreview
         canvas.planeDistance = 1f;
 
         var carousel = Object.FindFirstObjectByType<CharacterCarousel>();
-        if (carousel != null) carousel.ShowInEditor(0);      // Start() never runs in edit mode
+        int character = 0;                                   // -char N: the select screen on that character
+        var cargs = System.Environment.GetCommandLineArgs();
+        for (int k = 0; k < cargs.Length - 1; k++) if (cargs[k] == "-char") int.TryParse(cargs[k + 1], out character);
+        if (carousel != null) carousel.ShowInEditor(character);      // Start() never runs in edit mode
         // nor does the drivers' seated clip: pose them as the phone will, and keep the posed skin from being culled
         foreach (var anim in Object.FindObjectsByType<Animation>(FindObjectsSortMode.None).Where(a => a.clip != null))
         {
