@@ -115,6 +115,7 @@ public static class Playtest
         if (item != null && armed && !heldShot && t >= goAt + 3.1)
         {
             heldShot = true;
+            Capture($"item{track}-hud");                       // the race view with the item in the HUD's slot
             var k = Object.FindFirstObjectByType<RaceManager>()?.Player?.transform;
             if (k != null) { itemFrom = k.position + k.forward * 4.2f - k.right * 3.4f + Vector3.up * 2.2f; itemAt = k.position + Vector3.up * 1.1f; SideShot($"item{track}-held"); itemFrom = k.position - k.forward * 4.5f + k.right * 3.2f + Vector3.up * 2.4f; SideShot($"item{track}-held-b"); }
         }

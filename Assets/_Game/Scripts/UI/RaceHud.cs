@@ -17,7 +17,12 @@ namespace KartCup
         // Design.Accent, OnAccent and Ink700: the armed button turns gold, and its word violet with it.
         [SerializeField] Color accent = new(1f, 0.694f, 0.149f), onAccent = new(0.09f, 0.02f, 0.251f);
         [SerializeField] Color idle = new(0.18f, 0.043f, 0.439f);
+        // What the slot shows while an item is held: its glyph (Design's), by ItemManager name.
+        [SerializeField] Image itemIcon;
+        [SerializeField] string[] glyphNames = System.Array.Empty<string>();
+        [SerializeField] Sprite[] glyphs = System.Array.Empty<Sprite>();
         TMP_Text itemWord; Color itemWordIdle;
+        string heldName;
 
         RaceManager race;
         Kart playerKart;
@@ -76,15 +81,18 @@ namespace KartCup
 
             if (timeLabel != null) timeLabel.text = Clock(race.raceTime);
             bool armed = playerItems != null && playerItems.item != null && playerItems.ammo > 0;   // a fired item is no longer held
-            if (itemLabel != null) itemLabel.text = armed ? playerItems.item.itemName.ToUpperInvariant() : "";
-            if (itemButton != null && armed != itemArmed)
+            string held = armed ? playerItems.item.itemName : null;
+            if (itemLabel != null) itemLabel.text = armed ? (held == "Homing Item" ? "HOMING" : held.ToUpperInvariant()) : "";
+            if (itemButton != null && (armed != itemArmed || held != heldName))
             {
                 var c = armed ? accent : idle;
                 itemButton.color = new Color(c.r, c.g, c.b, itemButton.color.a);
                 if (itemWord == null) { itemWord = itemButton.GetComponentInChildren<TMP_Text>(); if (itemWord != null) itemWordIdle = itemWord.color; }
-                if (itemWord != null) itemWord.color = armed ? onAccent : itemWordIdle;
+                var glyph = armed ? Glyph(held) : null;
+                if (itemIcon != null) { itemIcon.sprite = glyph; itemIcon.enabled = glyph != null; }
+                if (itemWord != null) { itemWord.color = armed ? onAccent : itemWordIdle; itemWord.enabled = glyph == null; }   // the glyph replaces the word
                 if (armed) UiMotion.Punch(itemButton.transform, 1.12f, 0.24f);
-                itemArmed = armed;
+                itemArmed = armed; heldName = held;
             }
 
             if (boostFill != null && playerKart != null)
@@ -129,6 +137,12 @@ namespace KartCup
             if (!wrong) { wrongSince = -1f; return; }
             if (wrongSince < 0f) wrongSince = Time.time;
             if (Time.time - wrongSince > 1.2f) Big("WRONG WAY", 0.2f);
+        }
+
+        Sprite Glyph(string item)
+        {
+            int i = System.Array.IndexOf(glyphNames, item);
+            return i >= 0 && i < glyphs.Length ? glyphs[i] : null;
         }
 
         /// Tabular figures. Kenney Future is proportional, so a running clock jitters sideways as the digits change

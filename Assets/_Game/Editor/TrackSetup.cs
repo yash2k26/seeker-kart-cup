@@ -857,6 +857,15 @@ public static partial class TrackSetup
         hudSo.FindProperty("bigLabel").objectReferenceValue = big;
         hudSo.FindProperty("boostFill").objectReferenceValue = fill;
         hudSo.FindProperty("itemButton").objectReferenceValue = itemBtn.GetComponent<Image>();
+        // the held item's glyph on the slot's face, in the violet that reads on the lit (gold) slot
+        var itemIconRt = Rect("ItemIcon", itemBtn.transform.Find("ItemFace"), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(92, 92));
+        var itemIcon = itemIconRt.gameObject.AddComponent<Image>();
+        itemIcon.color = Design.OnAccent; itemIcon.preserveAspect = true; itemIcon.raycastTarget = false; itemIcon.enabled = false;
+        hudSo.FindProperty("itemIcon").objectReferenceValue = itemIcon;
+        var held = new[] { "Rocket", "Homing Item", "Bomb", "Nitro", "Bouncer", "Sun Bomb", "Trap" };
+        var glyphNames = hudSo.FindProperty("glyphNames"); glyphNames.arraySize = held.Length;
+        for (int i = 0; i < held.Length; i++) glyphNames.GetArrayElementAtIndex(i).stringValue = held[i];
+        Fill(hudSo.FindProperty("glyphs"), held.Select(h => (Object)Design.Icon(Design.ItemGlyph(h))).ToArray());
         hudSo.ApplyModifiedPropertiesWithoutUndo();
 
         // Camera angle: the pill names the current view; tapping it drops a picker with all four, current one lit.
@@ -954,10 +963,13 @@ public static partial class TrackSetup
     {
         var rt = Rect(name, parent, anchor, anchor, offset, dims);
         rt.pivot = anchor;
-        Design.AsPill(rt, new Color(Design.Ink700.r, Design.Ink700.g, Design.Ink700.b, 0.85f));
+        Design.AsButton(rt, new Color(Design.Ink700.r, Design.Ink700.g, Design.Ink700.b, 0.9f), out float lip);
         var button = rt.gameObject.AddComponent<UnityEngine.UI.Button>();
-        rt.gameObject.AddComponent<PressFeel>();
-        var glyph = Rect(name + "Icon", rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, dims * 0.42f);
+        var feel = rt.gameObject.AddComponent<PressFeel>();
+        var face = Rect(name + "Face", rt, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        face.offsetMin = new Vector2(0, lip); face.offsetMax = Vector2.zero;
+        feel.Configure(Design.PillDown, face, lip * (Design.Lip - 4f) / Design.Lip);
+        var glyph = Rect(name + "Icon", face, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, dims * 0.42f);
         var g = glyph.gameObject.AddComponent<Image>();
         g.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(Art + $"Textures/UI/Icons/{icon}.png");
         g.color = Design.Paper; g.raycastTarget = false;
@@ -1003,13 +1015,15 @@ public static partial class TrackSetup
         dim.gameObject.SetActive(false);
     }
 
+    /// A race control: the menus' pressable pill (face over lip, the face dropping as a thumb holds it), with a word
+    /// or a glyph. `icon` is a Design glyph name (Design.Drawn) or a Kit sprite.
     static UnityEngine.UI.Image Button(string name, Transform parent, InputManager input, HoldButton.Control control, Color tint, Vector2 anchor, Vector2 offset, Vector2 dims, string caption, TMP_FontAsset font, SteerButtons steering = null, string icon = null)
     {
         var rt = Rect(name, parent, anchor, anchor, offset, dims);
         rt.pivot = anchor;
-        var img = Design.AsPill(rt, new Color(tint.r, tint.g, tint.b, 0.88f));
+        var img = Design.AsButton(rt, new Color(tint.r, tint.g, tint.b, 0.9f), out float lip);
         var group = rt.gameObject.AddComponent<CanvasGroup>();
-        rt.gameObject.AddComponent<PressFeel>();
+        var feel = rt.gameObject.AddComponent<PressFeel>();
         var hold = rt.gameObject.AddComponent<HoldButton>();
         var so = new SerializedObject(hold);
         so.FindProperty("control").enumValueIndex = (int)control;
@@ -1017,20 +1031,23 @@ public static partial class TrackSetup
         so.FindProperty("fade").objectReferenceValue = group;
         so.FindProperty("steering").objectReferenceValue = steering;
         so.ApplyModifiedPropertiesWithoutUndo();
+        var face = Rect(name + "Face", rt, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        face.offsetMin = new Vector2(0, lip); face.offsetMax = Vector2.zero;
+        feel.Configure(Design.PillDown, face, lip * (Design.Lip - 4f) / Design.Lip);
 
         if (icon != null)
         {
-            var glyph = Rect(name + "Icon", rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(110, 110));
+            var glyph = Rect(name + "Icon", face, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(104, 104));
             var img2 = glyph.gameObject.AddComponent<Image>();
-            img2.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(Art + $"Textures/UI/Kit/{icon}.png");
-            img2.color = Design.Paper;
+            img2.sprite = System.Array.IndexOf(Design.Drawn, icon) >= 0 ? Design.Icon(icon) : AssetDatabase.LoadAssetAtPath<Sprite>(Art + $"Textures/UI/Kit/{icon}.png");
+            img2.color = Design.Paper; img2.preserveAspect = true;
             img2.raycastTarget = false;
             return img;
         }
 
-        var label = Text(name + "Text", rt, font, caption, 44, tint == Design.Accent ? Design.OnAccent : Design.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, dims);
+        var label = Text(name + "Text", face, font, caption, 44, tint == Design.Accent ? Design.OnAccent : Design.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, dims);
         label.rectTransform.anchorMin = Vector2.zero; label.rectTransform.anchorMax = Vector2.one;
-        label.rectTransform.offsetMin = Vector2.zero; label.rectTransform.offsetMax = new Vector2(0, -4);
+        label.rectTransform.offsetMin = Vector2.zero; label.rectTransform.offsetMax = new Vector2(0, -2);
         return img;
     }
 
@@ -1038,12 +1055,16 @@ public static partial class TrackSetup
     {
         var rt = Rect(name, parent, anchor, anchor, offset, dims);
         rt.pivot = anchor;
-        Design.AsPill(rt, tint);
+        Design.AsButton(rt, tint, out float lip);
         var button = rt.gameObject.AddComponent<UnityEngine.UI.Button>();
-        rt.gameObject.AddComponent<PressFeel>();
-        var label = Text(name + "Label", rt, font, caption, size, tint == Design.Accent ? Design.OnAccent : textColour, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, dims);
+        var feel = rt.gameObject.AddComponent<PressFeel>();
+        var face = Rect(name + "Face", rt, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        face.offsetMin = new Vector2(0, lip); face.offsetMax = Vector2.zero;
+        var label = Text(name + "Label", face, font, caption, size, tint == Design.Accent ? Design.OnAccent : textColour, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, dims);
         label.rectTransform.anchorMin = Vector2.zero; label.rectTransform.anchorMax = Vector2.one;
-        label.rectTransform.offsetMin = Vector2.zero; label.rectTransform.offsetMax = new Vector2(0, -4);
+        label.rectTransform.offsetMin = new Vector2(16, 0); label.rectTransform.offsetMax = new Vector2(-16, -2);
+        label.enableAutoSizing = true; label.fontSizeMin = size * 0.6f; label.fontSizeMax = size;
+        feel.Configure(Design.PillDown, face, lip * (Design.Lip - 4f) / Design.Lip);
         return button;
     }
 

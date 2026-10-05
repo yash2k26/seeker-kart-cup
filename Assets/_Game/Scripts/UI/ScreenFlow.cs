@@ -18,6 +18,8 @@ namespace KartCup
         [SerializeField] TMP_Text playLabel;      // says CONTINUE CUP when one is half-run
 
         const int Select = 1, Track = 4, Rooms = 5, Lobby = 6, Garage = 7, Items = 8;
+        // How deep each panel sits under the title: going deeper slides in from the right, coming back from the left.
+        static readonly int[] Depth = { 0, 1, 1, 1, 2, 1, 2, 1, 1 };
 
         /// Set before loading the menu: open straight into the lobby (rematch) or join a code (invite link).
         public static bool PendingLobby;
@@ -54,7 +56,6 @@ namespace KartCup
             // one would just throw the standings away.
             if (playLabel != null) playLabel.text = Resuming ? "CONTINUE CUP" : "PLAY";
             if (!IsMenu) return;
-            _ = PendingEntries.Flush();   // an entry payment a room never heard of (the app was closed mid-payment)
             if (PendingLobby && RoomClient.Member) { PendingLobby = false; Show(Lobby, silent: true); return; }
             PendingLobby = false;
             if (!string.IsNullOrEmpty(Application.absoluteURL)) OnDeepLink(Application.absoluteURL);   // cold start from an invite link
@@ -76,27 +77,35 @@ namespace KartCup
             // The race scene carries a ScreenFlow too (for the results buttons) with no panels — it must ignore Back
             // and leave it to PauseMenu, so the panel check comes first.
             if (!IsMenu || Keyboard.current == null || !Keyboard.current.escapeKey.wasPressedThisFrame) return;
-            if (current == Lobby) { AudioDirector.Instance?.Back(); LeaveRoom(); Show(Rooms, silent: true); }        // back out of a lobby = leave it
-            else if (current > 0) { AudioDirector.Instance?.Back(); Show(current == Track ? Select : 0, silent: true); }   // track select was reached from select, so back retraces one step
+            if (current == Lobby) { AudioDirector.Instance?.Back(); LeaveRoom(); Show(Rooms, silent: false); }        // back out of a lobby = leave it
+            else if (current > 0) { AudioDirector.Instance?.Back(); Show(current == Track ? Select : current == Items ? Garage : 0, silent: false); }   // back retraces one step: track to select, items to karts
             else Application.Quit();
         }
 
         public void Show(int panel) => Show(panel, silent: false);
 
+        /// `silent`: a jump the player did not ask for (start-up, an invite link, a rematch) fades in place; a step
+        /// they took slides the way they went. The tap itself already ticked and clicked (PressFeel).
         void Show(int panel, bool silent)
         {
-            for (int i = 0; i < panels.Length; i++) if (panels[i] != null && i != panel) UiMotion.Hide(panels[i]);
+            int dir = silent ? 0 : Direction(current, panel);
+            for (int i = 0; i < panels.Length; i++) if (panels[i] != null && i != panel) UiMotion.Hide(panels[i], dir);
             if (panel >= 0 && panel < panels.Length)
             {
                 var t = panels[panel].transform;
-                UiMotion.Show(panels[panel], t.Find("Card"));   // cards scale; the title plate is edge-anchored, so it only fades
+                UiMotion.Show(panels[panel], t.Find("Card"), dir);   // cards scale; the title plate is edge-anchored, so it only fades
             }
             current = panel;
             lastShow = Time.unscaledTime;
             if (backdrop != null) backdrop.Focused = panel == Select || panel == Garage || panel == Items;   // hold a composed angle while a kart is on show; the track panel covers the vista
-            if (silent) return;
-            Haptics.Play(Haptics.Kind.Tick);
-            AudioDirector.Instance?.Click();
+        }
+
+        int Direction(int from, int to)
+        {
+            if (from < 0 || to < 0 || from == to) return 0;
+            if ((from == Garage && to == Items) || (from == Items && to == Garage)) return to == Items ? 1 : -1;   // the shop's tabs, left to right
+            int a = from < Depth.Length ? Depth[from] : 1, b = to < Depth.Length ? Depth[to] : 1;
+            return b > a ? 1 : b < a ? -1 : 0;
         }
 
         public void ShowTitle() => Show(0);
@@ -191,7 +200,13 @@ namespace KartCup
             if (loading) return;
             loading = true;
             Time.timeScale = 1f;   // pause and hit-stop must never leak into the next scene
-            SceneManager.LoadScene(scene);
+            // Under the curtain: the tap is answered with where you are going while the scene loads behind it.
+            int number = 0;
+            bool race = scene.StartsWith("Race") && int.TryParse(scene.Substring(4), out number);
+            var track = race ? Tracks.At(number - 1) : null;
+            string heading = race ? track.name.ToUpperInvariant() : "KARTEL";
+            string sub = race ? (Cup.Active && Cup.Races > 1 ? $"RACE {Cup.RaceNumber} OF {Cup.Races}  ·  {track.kicker}" : track.kicker) : "BACK TO THE COAST";
+            if (!LoadingCurtain.Load(scene, heading, sub)) SceneManager.LoadScene(scene);
         }
     }
 }

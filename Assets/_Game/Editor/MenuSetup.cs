@@ -62,7 +62,7 @@ public static class MenuSetup
 
         var so = new SerializedObject(flow);
         so.FindProperty("roster").objectReferenceValue = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
-        so.FindProperty("playLabel").objectReferenceValue = title.transform.Find("Plate/Play/PlayLabel")?.GetComponent<TMP_Text>();
+        so.FindProperty("playLabel").objectReferenceValue = title.transform.Find("Plate/Actions/Play/PlayFace/PlayLabel")?.GetComponent<TMP_Text>();
         var panels = so.FindProperty("panels");
         panels.arraySize = 9;
         panels.GetArrayElementAtIndex(0).objectReferenceValue = title;
@@ -76,6 +76,7 @@ public static class MenuSetup
         panels.GetArrayElementAtIndex(8).objectReferenceValue = items;
         so.ApplyModifiedPropertiesWithoutUndo();
 
+        Curtain();
         new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
         var boot = new GameObject("Boot");
         boot.AddComponent<GameBoot>();
@@ -89,6 +90,45 @@ public static class MenuSetup
         AssetDatabase.SaveAssets();
         Debug.Log("[menu] built " + ScenePath);
         if (Application.isBatchMode) EditorApplication.Exit(0);
+    }
+
+    /// The loading curtain (LoadingCurtain): its own canvas over everything, kept across scenes once the menu has run.
+    static void Curtain()
+    {
+        var go = new GameObject("LoadingCurtain", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster), typeof(CanvasGroup));
+        var canvas = go.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 5000;
+        var scaler = go.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(2400, 1080);
+        scaler.matchWidthOrHeight = 1f;
+        var group = go.GetComponent<CanvasGroup>();
+        group.alpha = 0f; group.blocksRaycasts = false;
+
+        var back = Rect("Back", go.transform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(600, 600));
+        back.gameObject.AddComponent<Image>().color = Deep;
+        var glow = Rect("Glow", go.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 40), new Vector2(2200, 1300));
+        var glowImg = glow.gameObject.AddComponent<Image>();
+        glowImg.sprite = Design.Glow; glowImg.color = new Color(Design.Ink600.r, Design.Ink600.g, Design.Ink600.b, 0.55f); glowImg.raycastTarget = false;
+        var kicker = Label("Kicker", go.transform, strong, "", 32, Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 150), new Vector2(1800, 48));
+        kicker.characterSpacing = 12f;
+        var title = Label("Title", go.transform, display, "", 150, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 40), new Vector2(2000, 170));
+        title.enableAutoSizing = true; title.fontSizeMin = 90; title.fontSizeMax = 150;
+        var spin = Rect("Spinner", go.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -150), new Vector2(104, 104));
+        var spinImg = spin.gameObject.AddComponent<Image>();
+        spinImg.sprite = Design.Icon("arc"); spinImg.color = Paper; spinImg.raycastTarget = false;
+        var tip = Label("Tip", go.transform, body, "", 32, Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 90), new Vector2(1900, 50));
+
+        var curtain = go.AddComponent<LoadingCurtain>();
+        new SerializedObject(curtain).Do(s =>
+        {
+            s.FindProperty("group").objectReferenceValue = group;
+            s.FindProperty("kicker").objectReferenceValue = kicker;
+            s.FindProperty("title").objectReferenceValue = title;
+            s.FindProperty("tip").objectReferenceValue = tip;
+            s.FindProperty("spinner").objectReferenceValue = spin;
+        });
     }
 
     // ---------- fonts ----------
@@ -342,28 +382,42 @@ public static class MenuSetup
         Label("Sub", plate, body, "Race the island. Put your lap on-chain.", 38, Muted,
               TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(120, -576), new Vector2(1000, 60));
 
-        var play = Button("Play", plate, "PLAY", Accent, Paper, 62,
-                          new Vector2(0, 0), new Vector2(120, 300), new Vector2(520, 140));
+        // The actions assemble themselves when the title opens (PopIn): PLAY first, then the three doors under it.
+        var actions = Rect("Actions", plate, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        actions.gameObject.AddComponent<PopIn>();
+        var play = Button("Play", actions, "PLAY", Accent, Paper, 76,
+                          new Vector2(0, 0), new Vector2(120, 272), new Vector2(640, 164), icon: "play");
         Wire(play, nameof(ScreenFlow.Play));
+        Shine(play);
 
-        // Second row: the two doors that make it a game between people — race friends, and the garage they see you in.
-        var online = Button("Online", plate, "RACE ONLINE", Slate, Paper, 34,
-                            new Vector2(0, 0), new Vector2(120, 176), new Vector2(330, 96));
+        // Under it, the three doors that make it a game between people: race friends, the garage they see you in, and
+        // the times to beat. Tiles with a glyph each, so they read at a glance and never compete with PLAY.
+        var online = Tile("Online", actions, "globe", "ONLINE", new Vector2(0, 0), new Vector2(120, 64), new Vector2(200, 176));
         Wire(online, nameof(ScreenFlow.ShowRooms));
-        var garageBtn = Button("Garage", plate, "GARAGE", Slate, Paper, 34,
-                               new Vector2(0, 0), new Vector2(470, 176), new Vector2(260, 96));
+        var garageBtn = Tile("Garage", actions, "kart", "GARAGE", new Vector2(0, 0), new Vector2(340, 64), new Vector2(200, 176));
         Wire(garageBtn, nameof(ScreenFlow.ShowGarage));
-
-        var boardBtn = Button("Board", plate, "LEADERBOARD", Slate, Paper, 34,
-                              new Vector2(0, 0), new Vector2(120, 64), new Vector2(390, 96));
+        var boardBtn = Tile("Board", actions, "trophy", "RANKING", new Vector2(0, 0), new Vector2(560, 64), new Vector2(200, 176));
         Wire(boardBtn, nameof(ScreenFlow.ShowLeaderboard));
 
-        var walletBtn = Button("Wallet", plate, "SIGN IN", Slate, Paper, 34,
-                               new Vector2(0, 0), new Vector2(530, 64), new Vector2(260, 96));
+        // Top right, out of the film's way: who you are (sign in) and the settings.
+        var corner = Rect("Corner", screen.transform, new Vector2(1, 1), new Vector2(1, 1), Vector2.zero, Vector2.zero);
         var wallet = new GameObject("WalletFlow").AddComponent<WalletFlow>();
-        UnityEditor.Events.UnityEventTools.AddPersistentListener(walletBtn.onClick, wallet.Login);
+        var chipBtn = Button("Profile", corner, "SIGN IN", new Color(Slate.r, Slate.g, Slate.b, 0.92f), Paper, 34,
+                             new Vector2(1, 1), new Vector2(-196, -32), new Vector2(380, 104), icon: "user");
+        var chip = chipBtn.gameObject.AddComponent<ProfileChip>();
+        var toast = Label("Toast", corner, body, "", 28, Paper, TextAlignmentOptions.Right,
+                          new Vector2(1, 1), new Vector2(-64, -150), new Vector2(900, 44));
+        var toastGroup = toast.gameObject.AddComponent<CanvasGroup>();
+        toastGroup.alpha = 0f; toastGroup.blocksRaycasts = false;
+        new SerializedObject(chip).Do(s =>
+        {
+            s.FindProperty("nameLabel").objectReferenceValue = chipBtn.GetComponentInChildren<TMP_Text>();
+            s.FindProperty("toast").objectReferenceValue = toast;
+            s.FindProperty("toastGroup").objectReferenceValue = toastGroup;
+        });
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(chipBtn.onClick, chip.Tap);
 
-        var cog = IconButton("Settings", plate, "icon_cog", new Vector2(0, 0), new Vector2(810, 64), new Vector2(96, 96));
+        var cog = IconButton("Settings", corner, "icon_cog", new Vector2(1, 1), new Vector2(-64, -32), new Vector2(104, 104));
         Wire(cog, nameof(ScreenFlow.ShowSettings));
 
         // The wordmark is the film's own lockup (tools/brand/make_lockup.py lifts it from the teaser's title frames):
@@ -392,34 +446,67 @@ public static class MenuSetup
         var swipe = catcher.gameObject.AddComponent<SwipeSelect>();
         new SerializedObject(swipe).Do(s => s.FindProperty("carousel").objectReferenceValue = carousel);
 
-        var card = Rect("Card", screen.transform, new Vector2(0, 0), new Vector2(0, 1), new Vector2(60, 0), new Vector2(760, -160));
+        Header(screen.transform, "CHOOSE YOUR DRIVER", nameof(ScreenFlow.ShowTitle), "STEP 1 OF 2");
+
+        var card = Rect("Card", screen.transform, Vector2.zero, new Vector2(0, 1), Vector2.zero, Vector2.zero);
         card.pivot = new Vector2(0, 0.5f);
-        card.anchorMin = new Vector2(0, 0); card.anchorMax = new Vector2(0, 1);
-        card.offsetMin = new Vector2(64, 112); card.offsetMax = new Vector2(744, -152);
+        card.offsetMin = new Vector2(64, 64); card.offsetMax = new Vector2(744, -172);
         Design.AsCard(card, Panel);
 
         var nameLabel = Label("Name", card, display, "NODEY", 112, Paper, TextAlignmentOptions.Left,
-                              new Vector2(0, 1), new Vector2(48, -56), new Vector2(624, 120));
-        var blurb = Label("Blurb", card, body, "", 36, Muted, TextAlignmentOptions.TopLeft,
-                          new Vector2(0, 1), new Vector2(48, -180), new Vector2(608, 120));
+                              new Vector2(0, 1), new Vector2(48, -40), new Vector2(624, 120));
+        var blurb = Label("Blurb", card, body, "", 34, Muted, TextAlignmentOptions.TopLeft,
+                          new Vector2(0, 1), new Vector2(48, -164), new Vector2(608, 96));
         blurb.textWrappingMode = TextWrappingModes.Normal;
 
         var bars = new StatBar[6];
         var labels = new[] { "SPEED", "ACCEL", "GRIP", "WEIGHT", "TURBO", "ATTACK" };
-        for (int i = 0; i < 6; i++) bars[i] = StatRow(card, labels[i], -268 - i * 56);
+        for (int i = 0; i < 6; i++) bars[i] = StatRow(card, labels[i], -276 - i * 56);
 
-        var next = Button("Next", card, "NEXT", Accent, Paper, 52,
-                          new Vector2(0.5f, 0), new Vector2(0, 64), new Vector2(560, 128));
+        var next = Button("Next", card, "CHOOSE TRACK", Accent, Paper, 52,
+                          new Vector2(0.5f, 0), new Vector2(0, 48), new Vector2(584, 136), icon: "next", iconAfter: true);
         Wire(next, nameof(ScreenFlow.ShowTrack));
+        Shine(next);
 
-        var back = Button("Back", screen.transform, "BACK", Slate, Paper, 32,
-                          new Vector2(0, 1), new Vector2(64, -36), new Vector2(200, 88));
-        back.GetComponent<RectTransform>().pivot = new Vector2(0, 1);
-        Wire(back, nameof(ScreenFlow.ShowTitle));
-
-        // both arrows hug the bottom right, clear of the kart and of the card
-        var prevArrow = IconButton("Prev", screen.transform, "arrow_basic_w", new Vector2(1, 0), new Vector2(-336, 72), new Vector2(144, 144));
-        var nextArrow = IconButton("Next", screen.transform, "arrow_basic_e", new Vector2(1, 0), new Vector2(-128, 72), new Vector2(144, 144));
+        // Every driver's face in a row along the bottom right, clear of the card: tap one to put them on the turntable.
+        var roster = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
+        var strip = Rect("Roster", screen.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-64, 48), Vector2.zero);
+        var rosterStrip = strip.gameObject.AddComponent<RosterStrip>();
+        int count = roster != null ? roster.characters.Length : 0;
+        const float tileSize = 116f, tileGap = 12f;
+        var tiles = new RectTransform[count]; var tileBacks = new Image[count]; var rings = new Image[count];
+        for (int i = 0; i < count; i++)
+        {
+            var def = roster.characters[i];
+            var rt = Rect("Face" + i, strip, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-(count - 1 - i) * (tileSize + tileGap), 0), new Vector2(tileSize, tileSize));
+            rt.pivot = new Vector2(1, 0);
+            tileBacks[i] = Design.AsTile(rt, Slate, 24f, out float lip);
+            var button = rt.gameObject.AddComponent<Button>();
+            var feel = rt.gameObject.AddComponent<PressFeel>();
+            var face = Face("Face" + i, rt, lip);
+            var portrait = Rect("Portrait", face, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            portrait.offsetMin = new Vector2(6, 4); portrait.offsetMax = new Vector2(-6, -4);
+            var pic = portrait.gameObject.AddComponent<Image>();
+            pic.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(PortraitSetup.Dir + def.driverId + ".png");
+            pic.preserveAspect = true; pic.raycastTarget = false;
+            var ring = Rect("Ring", rt, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            ring.offsetMin = new Vector2(-6, -6); ring.offsetMax = new Vector2(6, 6);
+            rings[i] = ring.gameObject.AddComponent<Image>();
+            rings[i].sprite = Design.TileEdge; rings[i].type = Image.Type.Sliced; rings[i].pixelsPerUnitMultiplier = Design.TileRadius / 30f;
+            rings[i].color = Paper; rings[i].raycastTarget = false; rings[i].enabled = false;
+            feel.Configure(Design.TileDown, face, lip * (Design.TileLip - 3f) / Design.TileLip);
+            tiles[i] = rt;
+            UnityEditor.Events.UnityEventTools.AddIntPersistentListener(button.onClick, rosterStrip.Pick, i);
+        }
+        new SerializedObject(rosterStrip).Do(s =>
+        {
+            s.FindProperty("carousel").objectReferenceValue = carousel;
+            Fill(s.FindProperty("tiles"), tiles.Cast<Object>().ToArray());
+            Fill(s.FindProperty("backs"), tileBacks.Cast<Object>().ToArray());
+            Fill(s.FindProperty("rings"), rings.Cast<Object>().ToArray());
+            s.FindProperty("idle").colorValue = Slate;
+            s.FindProperty("picked").colorValue = Design.Ink600;
+        });
 
         var so = new SerializedObject(carousel);
         so.FindProperty("roster").objectReferenceValue = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
@@ -435,9 +522,6 @@ public static class MenuSetup
         so.FindProperty("turboBar").objectReferenceValue = bars[4];
         so.FindProperty("attackBar").objectReferenceValue = bars[5];
         so.ApplyModifiedPropertiesWithoutUndo();
-
-        UnityEditor.Events.UnityEventTools.AddPersistentListener(prevArrow.onClick, carousel.Previous);
-        UnityEditor.Events.UnityEventTools.AddPersistentListener(nextArrow.onClick, carousel.Next);
         return screen;
     }
 
@@ -474,53 +558,129 @@ public static class MenuSetup
         var ramp = scrim.gameObject.AddComponent<Image>();
         ramp.sprite = FadeSprite(); ramp.color = Deep; ramp.raycastTarget = false;
 
+        // and a bottom-up ramp under the row of track cards, so their names read over any picture
+        var floor = Rect("Floor", screen.transform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, -320), new Vector2(1200, 1000));
+        floor.pivot = new Vector2(0.5f, 0);
+        var floorRamp = floor.gameObject.AddComponent<Image>();
+        floorRamp.sprite = FadeSprite(vertical: true); floorRamp.color = Deep; floorRamp.raycastTarget = false;
+
         var catcher = Rect("SwipeCatcher", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         catcher.gameObject.AddComponent<Image>().color = Color.clear;
         var swipe = catcher.gameObject.AddComponent<SwipeSelect>();
         new SerializedObject(swipe).Do(s => s.FindProperty("carousel").objectReferenceValue = carousel);
 
-        // same card as select, so the eye lands in the same place on consecutive screens
+        Header(screen.transform, "CHOOSE A TRACK", nameof(ScreenFlow.ShowSelect), "STEP 2 OF 2");
+
+        // The same card as select, so the eye lands in the same place on consecutive screens: how to race at the top
+        // (the two tabs), then what the chosen race is, then RACE.
         var card = Rect("Card", screen.transform, Vector2.zero, new Vector2(0, 1), Vector2.zero, Vector2.zero);
         card.pivot = new Vector2(0, 0.5f);
-        card.offsetMin = new Vector2(64, 112); card.offsetMax = new Vector2(744, -152);
+        card.offsetMin = new Vector2(64, 64); card.offsetMax = new Vector2(744, -172);
         Design.AsCard(card, Panel);
 
-        var kicker = Label("Kicker", card, body, "", 32, Muted, TextAlignmentOptions.Left,
-                           new Vector2(0, 1), new Vector2(48, -48), new Vector2(608, 44));
+        var (tabBacks, tabLabels, tabButtons) = Segmented("Mode", card, new[] { "GRAND PRIX", "SINGLE RACE" },
+                                                           new Vector2(0.5f, 1), new Vector2(0, -32), new Vector2(600, 88), 34);
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(tabButtons[0].onClick, carousel.GrandPrix);
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(tabButtons[1].onClick, carousel.SingleRace);
+
+        var kicker = Label("Kicker", card, strong, "", 28, Muted, TextAlignmentOptions.Left,
+                           new Vector2(0, 1), new Vector2(48, -148), new Vector2(608, 40));
         kicker.characterSpacing = 8f;
-        var nameLabel = Label("Name", card, display, "", 112, Paper, TextAlignmentOptions.Left,
-                              new Vector2(0, 1), new Vector2(48, -92), new Vector2(624, 120));
-        nameLabel.enableAutoSizing = true; nameLabel.fontSizeMin = 72; nameLabel.fontSizeMax = 112;   // SUNSET SPEEDWAY is wider than the card
-        var blurb = Label("Blurb", card, body, "", 36, Muted, TextAlignmentOptions.TopLeft,
-                          new Vector2(0, 1), new Vector2(48, -224), new Vector2(608, 160));
-        blurb.textWrappingMode = TextWrappingModes.Normal;
+        var nameLabel = Label("Name", card, display, "", 104, Paper, TextAlignmentOptions.Left,
+                              new Vector2(0, 1), new Vector2(46, -184), new Vector2(624, 112));
+        nameLabel.enableAutoSizing = true; nameLabel.fontSizeMin = 64; nameLabel.fontSizeMax = 104;   // SUNSET SPEEDWAY is wider than the card
+        // left column: the facts; right: the map
+        var facts = Label("Facts", card, display, "", 44, Paper, TextAlignmentOptions.Left,
+                          new Vector2(0, 1), new Vector2(48, -312), new Vector2(400, 56));
         // Label and pips in one container so the Grand Prix card can drop the whole row with one SetActive.
-        var difficulty = Rect("Difficulty", card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, -400), new Vector2(680, 48));
+        var difficulty = Rect("Difficulty", card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, -386), new Vector2(440, 48));
         difficulty.pivot = new Vector2(0, 1);
-        var bar = StatRow(difficulty, "DIFFICULTY", 0, pips: 3);
-        var bestCaption = Label("BestLabel", card, body, "BEST", 32, Muted, TextAlignmentOptions.Left,
-                                new Vector2(0, 1), new Vector2(48, -472), new Vector2(240, 48));
+        var bar = StatRow(difficulty, "DIFFICULTY", 0, pips: 3, size: 28, barX: 236);
+        var bestCaption = Label("BestLabel", card, strong, "YOUR BEST", 28, Muted, TextAlignmentOptions.Left,
+                                new Vector2(0, 1), new Vector2(48, -446), new Vector2(240, 40));
         bestCaption.characterSpacing = 6f;
-        var best = Label("Best", card, body, "—", 40, Paper, TextAlignmentOptions.Left,
-                         new Vector2(0, 1), new Vector2(300, -478), new Vector2(380, 48));
+        var best = Label("Best", card, strong, "—", 36, Paper, TextAlignmentOptions.Left,
+                         new Vector2(0, 1), new Vector2(232, -442), new Vector2(220, 44));
+        best.enableAutoSizing = true; best.fontSizeMin = 26; best.fontSizeMax = 36;
+        var mapBox = Rect("Map", card, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-44, -300), new Vector2(196, 196));
+        mapBox.pivot = new Vector2(1, 1);
+        var mapImage = mapBox.gameObject.AddComponent<Image>();
+        mapImage.preserveAspect = true; mapImage.raycastTarget = false;
+        // the Grand Prix shows its running order where a single track shows its map
+        var order = Rect("Order", card, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-44, -300), new Vector2(196, 196));
+        order.pivot = new Vector2(1, 1);
+        for (int i = 0; i < Tracks.Count && i < 4; i++)
+        {
+            var cell = Rect("Map" + i, order, new Vector2(0, 1), new Vector2(0, 1), new Vector2(i % 2 * 100 + 48, -(i / 2) * 100 - 48), new Vector2(92, 92));
+            var img = cell.gameObject.AddComponent<Image>();
+            img.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(Art + $"Textures/UI/Tracks/{Tracks.At(i).id}_map.png");
+            img.preserveAspect = true; img.raycastTarget = false; img.color = new Color(1, 1, 1, 0.9f);
+            var n = Label("N", cell, display, (i + 1).ToString(), 30, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(60, 40));
+            n.raycastTarget = false;
+        }
+        var blurb = Label("Blurb", card, body, "", 30, Muted, TextAlignmentOptions.TopLeft,
+                          new Vector2(0, 1), new Vector2(48, -516), new Vector2(600, 132));
+        blurb.textWrappingMode = TextWrappingModes.Normal;
 
-        var race = Button("Race", card, "RACE", Accent, Paper, 52,
-                          new Vector2(0.5f, 0), new Vector2(0, 64), new Vector2(560, 128));
+        var race = Button("Race", card, "RACE", Accent, Paper, 60,
+                          new Vector2(0.5f, 0), new Vector2(0, 48), new Vector2(584, 136), icon: "flag");
         Wire(race, nameof(ScreenFlow.StartRace));
+        Shine(race);
 
-        var back = Button("Back", screen.transform, "BACK", Slate, Paper, 32,
-                          new Vector2(0, 1), new Vector2(64, -36), new Vector2(200, 88));
-        back.GetComponent<RectTransform>().pivot = new Vector2(0, 1);
-        Wire(back, nameof(ScreenFlow.ShowSelect));
-
-        var prevArrow = IconButton("Prev", screen.transform, "arrow_basic_w", new Vector2(1, 0), new Vector2(-336, 72), new Vector2(144, 144));
-        var nextArrow = IconButton("Next", screen.transform, "arrow_basic_e", new Vector2(1, 0), new Vector2(-128, 72), new Vector2(144, 144));
-        UnityEditor.Events.UnityEventTools.AddPersistentListener(prevArrow.onClick, carousel.Previous);
-        UnityEditor.Events.UnityEventTools.AddPersistentListener(nextArrow.onClick, carousel.Next);
+        // Every track as a card along the bottom right: its picture, its name, its map in the corner. Tap one to race
+        // it alone; in a Grand Prix they are all lit and numbered in running order.
+        var row = Rect("Tracks", screen.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-64, 48), Vector2.zero);
+        int nTracks = Tracks.Count;
+        const float cw = 326f, ch = 232f, gap = 18f;
+        var cards = new RectTransform[nTracks]; var cardArt = new Image[nTracks]; var cardRings = new Image[nTracks]; var badges = new GameObject[nTracks];
+        for (int i = 0; i < nTracks; i++)
+        {
+            var def = Tracks.At(i);
+            var rt = Rect("Track" + i, row, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-(nTracks - 1 - i) * (cw + gap), 0), new Vector2(cw, ch));
+            rt.pivot = new Vector2(1, 0);
+            var back = Design.AsCard(rt, Deep);
+            rt.gameObject.AddComponent<Mask>().showMaskGraphic = true;
+            var button = rt.gameObject.AddComponent<Button>();
+            button.targetGraphic = back;
+            rt.gameObject.AddComponent<PressFeel>();
+            UnityEditor.Events.UnityEventTools.AddIntPersistentListener(button.onClick, carousel.Pick, i);
+            // the key art is 2:1; the card is wider than tall but not that wide, so the picture covers it and is cropped
+            var pic = Rect("Art", rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 10), new Vector2(ch * 2.1f, ch * 1.05f));
+            cardArt[i] = pic.gameObject.AddComponent<Image>();
+            cardArt[i].sprite = AssetDatabase.LoadAssetAtPath<Sprite>(Art + $"Textures/UI/Tracks/{def.id}.png");
+            cardArt[i].raycastTarget = false;
+            var shade = Rect("Shade", rt, new Vector2(0, 0), new Vector2(1, 0), Vector2.zero, new Vector2(0, 150));
+            shade.pivot = new Vector2(0.5f, 0);
+            var shadeImg = shade.gameObject.AddComponent<Image>();
+            shadeImg.sprite = FadeSprite(vertical: true); shadeImg.color = Deep; shadeImg.raycastTarget = false;
+            var nm = Label("Name", rt, display, def.name.ToUpperInvariant(), 40, Paper, TextAlignmentOptions.BottomLeft,
+                           new Vector2(0, 0), new Vector2(20, 14), new Vector2(cw - 110, 48));
+            nm.enableAutoSizing = true; nm.fontSizeMin = 26; nm.fontSizeMax = 40;
+            var map = Rect("Map", rt, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-12, 10), new Vector2(76, 76));
+            map.pivot = new Vector2(1, 0);
+            var mapImg = map.gameObject.AddComponent<Image>();
+            mapImg.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(Art + $"Textures/UI/Tracks/{def.id}_map.png");
+            mapImg.preserveAspect = true; mapImg.raycastTarget = false;
+            var badge = Rect("Badge", rt, new Vector2(0, 1), new Vector2(0, 1), new Vector2(14, -14), new Vector2(56, 56));
+            badge.pivot = new Vector2(0, 1);
+            Design.AsPill(badge, Paper).raycastTarget = false;                 // cream, not gold: gold is RACE's alone
+            Label("N", badge, display, (i + 1).ToString(), 36, Deep, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, -1), new Vector2(56, 52));
+            badges[i] = badge.gameObject;
+            var ring = Rect("Ring", rt, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            cardRings[i] = ring.gameObject.AddComponent<Image>();
+            cardRings[i].sprite = Design.TileEdge; cardRings[i].type = Image.Type.Sliced; cardRings[i].pixelsPerUnitMultiplier = Design.TileRadius / 32f;
+            cardRings[i].color = Paper; cardRings[i].raycastTarget = false;
+            cards[i] = rt;
+        }
 
         var so = new SerializedObject(carousel);
         // Key art comes from the track builder, which may not have run yet: a null slot is a blank, not a failure.
         Fill(so.FindProperty("art"), Tracks.All.Select(t => (Object)AssetDatabase.LoadAssetAtPath<Sprite>(Art + $"Textures/UI/Tracks/{t.id}.png")).ToArray());
+        Fill(so.FindProperty("maps"), Tracks.All.Select(t => (Object)AssetDatabase.LoadAssetAtPath<Sprite>(Art + $"Textures/UI/Tracks/{t.id}_map.png")).ToArray());
+        var lengths = so.FindProperty("lengths");
+        var metres = TrackLengths();
+        lengths.arraySize = Tracks.Count;
+        for (int i = 0; i < Tracks.Count; i++) lengths.GetArrayElementAtIndex(i).floatValue = metres.TryGetValue(Tracks.At(i).id, out var m) ? m : 0f;
         so.FindProperty("single").objectReferenceValue = single;
         so.FindProperty("grid").objectReferenceValue = grid.gameObject;
         Fill(so.FindProperty("cells"), cells.Cast<Object>().ToArray());
@@ -529,11 +689,42 @@ public static class MenuSetup
         so.FindProperty("nameLabel").objectReferenceValue = nameLabel;
         so.FindProperty("blurbLabel").objectReferenceValue = blurb;
         so.FindProperty("bestLabel").objectReferenceValue = best;
+        so.FindProperty("factsLabel").objectReferenceValue = facts;
         so.FindProperty("difficultyRow").objectReferenceValue = difficulty.gameObject;
         so.FindProperty("difficulty").objectReferenceValue = bar;
+        so.FindProperty("mapImage").objectReferenceValue = mapImage;
+        Fill(so.FindProperty("gpOnly"), new Object[] { order.gameObject });
+        Fill(so.FindProperty("singleOnly"), new Object[] { bestCaption.gameObject, best.gameObject });
+        Fill(so.FindProperty("cards"), cards.Cast<Object>().ToArray());
+        Fill(so.FindProperty("cardArt"), cardArt.Cast<Object>().ToArray());
+        Fill(so.FindProperty("cardRings"), cardRings.Cast<Object>().ToArray());
+        Fill(so.FindProperty("cardBadges"), badges.Cast<Object>().ToArray());
+        so.FindProperty("tabGp").objectReferenceValue = tabBacks[0];
+        so.FindProperty("tabSingle").objectReferenceValue = tabBacks[1];
+        so.FindProperty("tabGpLabel").objectReferenceValue = tabLabels[0];
+        so.FindProperty("tabSingleLabel").objectReferenceValue = tabLabels[1];
+        so.FindProperty("tabOn").colorValue = Design.Ink600;
+        so.FindProperty("tabOff").colorValue = new Color(0, 0, 0, 0);
+        so.FindProperty("textOn").colorValue = Paper;
+        so.FindProperty("textOff").colorValue = Muted;
         so.ApplyModifiedPropertiesWithoutUndo();
         carousel.ShowInEditor(0);   // Start() never runs in edit mode: the saved scene and MenuPreview show a real card
         return screen;
+    }
+
+    /// Metres a lap per track, from the contract the track builder writes for the Worker (worker/src/tracks.json).
+    static System.Collections.Generic.Dictionary<string, float> TrackLengths()
+    {
+        var found = new System.Collections.Generic.Dictionary<string, float>();
+        const string path = "worker/src/tracks.json";
+        if (!File.Exists(path)) { Debug.LogWarning("[menu] no " + path + ": track lengths left blank"); return found; }
+        var json = File.ReadAllText(path);
+        foreach (var t in Tracks.All)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(json, "\"" + t.id + "\"\\s*:\\s*\\{[^}]*?\"lengthM\"\\s*:\\s*([0-9.]+)");
+            if (m.Success) found[t.id] = float.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+        }
+        return found;
     }
 
     static GameObject BoardScreen(RectTransform parent)
@@ -542,18 +733,73 @@ public static class MenuSetup
         // Overhang the safe area: this sits inside it, and a dim stopping at the cutout leaves a bright live strip.
         var dim = Rect("Dim", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(600, 600));
         dim.gameObject.AddComponent<Image>().color = new Color(Deep.r, Deep.g, Deep.b, 0.68f);
-        var card = Rect("Card", screen.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1240, 840));
-        Design.AsCard(card, Panel);
-        Label("Head", card, display, "BEST TIMES", 72, Paper, TextAlignmentOptions.Center,
-              new Vector2(0.5f, 1), new Vector2(0, -56), new Vector2(1000, 90));
-        var rows = Label("Rows", card, body, "loading…", 40, Paper, TextAlignmentOptions.TopLeft,
-                         new Vector2(0.5f, 1), new Vector2(0, -184), new Vector2(1040, 520));
-        var back = Button("Back", card, "BACK", Slate, Paper, 34,
-                          new Vector2(0.5f, 0), new Vector2(0, 64), new Vector2(300, 100));
-        Wire(back, nameof(ScreenFlow.ShowTitle));
-
+        Header(screen.transform, "RANKING", nameof(ScreenFlow.ShowTitle));
         var feed = screen.AddComponent<LeaderboardFeed>();
-        new SerializedObject(feed).Do(s => s.FindProperty("rows").objectReferenceValue = rows);
+
+        // a tab per track, then the table: ten rows, medals for the top three, your own row lit
+        var names = Tracks.All.Select(t => t.name.ToUpperInvariant()).ToArray();
+        var (tabBacks, tabLabels, tabButtons) = Segmented("Tracks", screen.transform, names,
+                                                           new Vector2(0.5f, 1), new Vector2(0, -164), new Vector2(1480, 92), 32);
+        for (int i = 0; i < tabButtons.Length; i++)
+        {
+            UnityEditor.Events.UnityEventTools.AddIntPersistentListener(tabButtons[i].onClick, feed.SetTrack, i);
+            tabBacks[i].color = i == 0 ? Design.Ink600 : new Color(0, 0, 0, 0);         // as it opens (the feed recolours them)
+            tabLabels[i].color = i == 0 ? Paper : Muted;
+        }
+
+        var card = Rect("Card", screen.transform, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(1480, 770));
+        card.pivot = new Vector2(0.5f, 0);
+        Design.AsCard(card, Panel);
+        Label("RankCap", card, strong, "#", 26, Muted, TextAlignmentOptions.Center, new Vector2(0, 1), new Vector2(72, -28), new Vector2(80, 36));
+        Label("NameCap", card, strong, "DRIVER", 26, Muted, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(150, -28), new Vector2(400, 36)).characterSpacing = 8f;
+        Label("TimeCap", card, strong, "BEST LAP", 26, Muted, TextAlignmentOptions.Right, new Vector2(1, 1), new Vector2(-56, -28), new Vector2(300, 36)).characterSpacing = 8f;
+
+        const int count = 10; const float rowH = 60f, rowGap = 6f;
+        var rowObjects = new GameObject[count]; var rowBacks = new Image[count]; var medals = new Image[count];
+        var ranks = new TMP_Text[count]; var drivers = new TMP_Text[count]; var times = new TMP_Text[count];
+        for (int i = 0; i < count; i++)
+        {
+            var rt = Rect("Row" + i, card, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -76 - i * (rowH + rowGap)), new Vector2(1400, rowH));
+            rt.pivot = new Vector2(0.5f, 1);
+            rowBacks[i] = Design.AsRow(rt, Slate);
+            rowBacks[i].raycastTarget = false;
+            var medal = Rect("Medal", rt, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(72, 0), new Vector2(50, 50));
+            medals[i] = Design.AsPill(medal, Accent);
+            medals[i].raycastTarget = false;
+            ranks[i] = Label("Rank", rt, display, (i + 1).ToString(), 32, Paper, TextAlignmentOptions.Center, new Vector2(0, 0.5f), new Vector2(72, 0), new Vector2(70, 50));
+            ranks[i].rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            drivers[i] = Label("Driver", rt, strong, "", 34, Paper, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(150, 0), new Vector2(900, 50));
+            times[i] = Label("Time", rt, strong, "", 34, Paper, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-40, 0), new Vector2(300, 50));
+            rowObjects[i] = rt.gameObject;
+            rt.gameObject.SetActive(false);
+        }
+        var rows = Label("Rows", card, body, "Loading the fastest laps…", 36, Muted, TextAlignmentOptions.Center,
+                         new Vector2(0.5f, 0.5f), new Vector2(0, -20), new Vector2(1200, 140));
+        rows.textWrappingMode = TextWrappingModes.Normal;
+
+        new SerializedObject(feed).Do(s =>
+        {
+            s.FindProperty("rows").objectReferenceValue = rows;
+            Fill(s.FindProperty("rowObjects"), rowObjects.Cast<Object>().ToArray());
+            Fill(s.FindProperty("rowBacks"), rowBacks.Cast<Object>().ToArray());
+            Fill(s.FindProperty("medals"), medals.Cast<Object>().ToArray());
+            Fill(s.FindProperty("ranks"), ranks.Cast<Object>().ToArray());
+            Fill(s.FindProperty("names"), drivers.Cast<Object>().ToArray());
+            Fill(s.FindProperty("times"), times.Cast<Object>().ToArray());
+            Fill(s.FindProperty("tabs"), tabBacks.Cast<Object>().ToArray());
+            Fill(s.FindProperty("tabLabels"), tabLabels.Cast<Object>().ToArray());
+            s.FindProperty("rowIdle").colorValue = Slate;
+            s.FindProperty("rowMine").colorValue = Design.Ink600;
+            s.FindProperty("tabOn").colorValue = Design.Ink600;
+            s.FindProperty("tabOff").colorValue = new Color(0, 0, 0, 0);
+            s.FindProperty("textOn").colorValue = Paper;
+            s.FindProperty("textOff").colorValue = Muted;
+            var medalColours = s.FindProperty("medalColours");
+            medalColours.arraySize = 3;
+            medalColours.GetArrayElementAtIndex(0).colorValue = new Color(0.86f, 0.66f, 0.22f);   // the trophies' gold, silver, bronze (PodiumSetup)
+            medalColours.GetArrayElementAtIndex(1).colorValue = new Color(0.66f, 0.68f, 0.74f);
+            medalColours.GetArrayElementAtIndex(2).colorValue = new Color(0.70f, 0.42f, 0.24f);
+        });
         return screen;
     }
 
@@ -564,39 +810,58 @@ public static class MenuSetup
         var screen = Rect("Settings", parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject;
         var dim = Rect("Dim", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(600, 600));
         dim.gameObject.AddComponent<Image>().color = new Color(Deep.r, Deep.g, Deep.b, 0.68f);
-        var card = Rect("Card", screen.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1240, 760));
+        Header(screen.transform, "SETTINGS", nameof(ScreenFlow.ShowTitle));
+        var card = Rect("Card", screen.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -56), new Vector2(1240, 660));
         Design.AsCard(card, Panel);
-        Label("Head", card, display, "SETTINGS", 72, Paper, TextAlignmentOptions.Center,
-              new Vector2(0.5f, 1), new Vector2(0, -56), new Vector2(1000, 90));
 
-        SettingRow(card, SettingToggle.Which.Shake, "SCREEN SHAKE", -184);
-        SettingRow(card, SettingToggle.Which.Haptics, "VIBRATION", -296);
-        SettingRow(card, SettingToggle.Which.Fps, "FRAME COUNTER", -408);
-
-        var back = Button("Back", card, "BACK", Slate, Paper, 34,
-                          new Vector2(0.5f, 0), new Vector2(0, 64), new Vector2(300, 100));
-        Wire(back, nameof(ScreenFlow.ShowTitle));
+        SettingRow(card, SettingToggle.Which.Sound, "SOUND", "Everything you hear", -40);
+        SettingRow(card, SettingToggle.Which.Music, "MUSIC", "The soundtrack only", -160);
+        SettingRow(card, SettingToggle.Which.Haptics, "VIBRATION", "Taps, hits and boosts", -280);
+        SettingRow(card, SettingToggle.Which.Shake, "SCREEN SHAKE", "Turn off if it makes you queasy", -400);
+        SettingRow(card, SettingToggle.Which.Fps, "FRAME COUNTER", "For testing", -520);
         return screen;
     }
 
-    static void SettingRow(RectTransform card, SettingToggle.Which which, string caption, float y)
+    /// A settings row: name and a short line on what it does on the left, the switch on the right. The whole row
+    /// is the switch's hit area.
+    static void SettingRow(RectTransform card, SettingToggle.Which which, string caption, string hint, float y)
     {
-        var rt = Rect(caption, card, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, y), new Vector2(1040, 96));
+        var rt = Rect(caption, card, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, y), new Vector2(1140, 104));
         rt.pivot = new Vector2(0.5f, 1);
         Design.AsRow(rt, Design.Ink700);
         var button = rt.gameObject.AddComponent<Button>();
         rt.gameObject.AddComponent<PressFeel>();
-        var label = Label(caption + "Label", rt, body, caption, 42, Paper, TextAlignmentOptions.Left,
-                          new Vector2(0, 0.5f), new Vector2(40, 0), new Vector2(960, 60));
+        var label = Label(caption + "Label", rt, display, caption, 44, Paper, TextAlignmentOptions.Left,
+                          new Vector2(0, 0.5f), new Vector2(40, 14), new Vector2(700, 56));
         label.rectTransform.pivot = new Vector2(0, 0.5f);
+        var sub = Label(caption + "Hint", rt, body, hint, 26, Muted, TextAlignmentOptions.Left,
+                        new Vector2(0, 0.5f), new Vector2(40, -26), new Vector2(700, 36));
+        sub.rectTransform.pivot = new Vector2(0, 0.5f);
+
+        // the switch: a trough with a knob that slides to ON
+        var track = Rect("Switch", rt, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-40, 0), new Vector2(140, 72));
+        track.pivot = new Vector2(1, 0.5f);
+        var trackImg = Design.AsPill(track, Deep);
+        trackImg.raycastTarget = false;
+        var knob = Rect("Knob", track, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(56, 56));
+        Design.AsPill(knob, Paper).raycastTarget = false;
+        var state = Label(caption + "State", rt, strong, "", 26, Muted, TextAlignmentOptions.Right,
+                          new Vector2(1, 0.5f), new Vector2(-200, 0), new Vector2(100, 40));
 
         var toggle = rt.gameObject.AddComponent<SettingToggle>();
         var so = new SerializedObject(toggle);
         so.FindProperty("setting").enumValueIndex = (int)which;
         so.FindProperty("label").objectReferenceValue = label;
         so.FindProperty("caption").stringValue = caption;
+        so.FindProperty("track").objectReferenceValue = trackImg;
+        so.FindProperty("knob").objectReferenceValue = knob;
+        so.FindProperty("state").objectReferenceValue = state;
+        so.FindProperty("onColour").colorValue = Design.Lit;
+        so.FindProperty("offColour").colorValue = Deep;
+        so.FindProperty("travel").floatValue = 34f;
         so.ApplyModifiedPropertiesWithoutUndo();
         UnityEditor.Events.UnityEventTools.AddPersistentListener(button.onClick, toggle.Toggle);
+        toggle.ShowInEditor();
     }
 
 
@@ -743,33 +1008,34 @@ public static class MenuSetup
         var swipe = catcher.gameObject.AddComponent<SwipeSelect>();
         new SerializedObject(swipe).Do(s => s.FindProperty("carousel").objectReferenceValue = garage);
 
+        ShopHeader(screen.transform, "GARAGE", 0);
         var card = Rect("Card", screen.transform, Vector2.zero, new Vector2(0, 1), Vector2.zero, Vector2.zero);
         card.pivot = new Vector2(0, 0.5f);
-        card.offsetMin = new Vector2(64, 112); card.offsetMax = new Vector2(744, -152);
+        card.offsetMin = new Vector2(64, 64); card.offsetMax = new Vector2(744, -172);
         Design.AsCard(card, Panel);
 
-        var nameLabel = Label("Name", card, display, "PHOTON", 96, Paper, TextAlignmentOptions.Left,
-                              new Vector2(0, 1), new Vector2(48, -44), new Vector2(624, 100));
-        nameLabel.enableAutoSizing = true; nameLabel.fontSizeMin = 60; nameLabel.fontSizeMax = 96;
-        var blurb = Label("Blurb", card, body, "", 30, Muted, TextAlignmentOptions.TopLeft,
-                          new Vector2(0, 1), new Vector2(48, -136), new Vector2(608, 60));
+        var nameLabel = Label("Name", card, display, "PHOTON", 88, Paper, TextAlignmentOptions.Left,
+                              new Vector2(0, 1), new Vector2(48, -36), new Vector2(624, 96));
+        nameLabel.enableAutoSizing = true; nameLabel.fontSizeMin = 60; nameLabel.fontSizeMax = 88;
+        var blurb = Label("Blurb", card, body, "", 28, Muted, TextAlignmentOptions.TopLeft,
+                          new Vector2(0, 1), new Vector2(48, -128), new Vector2(608, 72));
         blurb.textWrappingMode = TextWrappingModes.Normal;
 
         // the five powers; their total is the price (KartPricing), and a locked kart shows what it would cost
         var powerBars = new StatBar[5];
         var powerNames = new[] { "SPEED", "TURBO", "GRIP", "ARMOR", "ATTACK" };
-        for (int i = 0; i < 5; i++) powerBars[i] = StatRow(card, powerNames[i], -200 - i * 44, size: 26);
-        var price = Label("Price", card, body, "", 30, Paper, TextAlignmentOptions.Left,
+        for (int i = 0; i < 5; i++) powerBars[i] = StatRow(card, powerNames[i], -214 - i * 42, size: 24);
+        var price = Label("Price", card, strong, "", 28, Paper, TextAlignmentOptions.Left,
                           new Vector2(0, 1), new Vector2(48, -428), new Vector2(624, 36));
 
         // paint swatches: the driver's own colour, then the four paints
-        var swatchCap = Label("PaintCap", card, body, "PAINT", 26, Muted, TextAlignmentOptions.Left,
-                              new Vector2(0, 1), new Vector2(48, -474), new Vector2(200, 36));
+        var swatchCap = Label("PaintCap", card, body, "PAINT", 24, Muted, TextAlignmentOptions.Left,
+                              new Vector2(0, 1), new Vector2(48, -484), new Vector2(200, 36));
         swatchCap.characterSpacing = 6f;
         var swatches = new Image[1 + Paints.All.Length];
         for (int i = 0; i < swatches.Length; i++)
         {
-            var rt = Rect("Swatch" + i, card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(180 + i * 76, -466), new Vector2(56, 56));
+            var rt = Rect("Swatch" + i, card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(180 + i * 76, -474), new Vector2(56, 56));
             rt.pivot = new Vector2(0, 1);
             swatches[i] = Design.AsPill(rt, Color.white);
             var b = rt.gameObject.AddComponent<Button>();
@@ -778,28 +1044,17 @@ public static class MenuSetup
         }
 
         var status = Label("Status", card, body, "", 24, Muted, TextAlignmentOptions.TopLeft,
-                           new Vector2(0, 1), new Vector2(48, -522), new Vector2(608, 28));   // one short line above TEST DRIVE
+                           new Vector2(0, 1), new Vector2(48, -540), new Vector2(608, 28));   // one short line above TEST DRIVE
 
         var secondary = Button("Secondary", card, "TEST DRIVE", Slate, Paper, 36,
-                               new Vector2(0.5f, 0), new Vector2(0, 176), new Vector2(560, 92));
+                               new Vector2(0.5f, 0), new Vector2(0, 168), new Vector2(584, 96));
         UnityEditor.Events.UnityEventTools.AddPersistentListener(secondary.onClick, garage.Secondary);
-        var primary = Button("Primary", card, "UNLOCK", Accent, Paper, 44,
-                             new Vector2(0.5f, 0), new Vector2(0, 56), new Vector2(560, 108));
+        var primary = Button("Primary", card, "UNLOCK", Accent, Paper, 46,
+                             new Vector2(0.5f, 0), new Vector2(0, 48), new Vector2(584, 112));
         UnityEditor.Events.UnityEventTools.AddPersistentListener(primary.onClick, garage.Primary);
 
-        // the shop's other tab
-        var itemsTab = Button("ItemsTab", screen.transform, "ITEMS  >", Slate, Paper, 32,
-                              new Vector2(1, 1), new Vector2(-64, -36), new Vector2(240, 88));
-        itemsTab.GetComponent<RectTransform>().pivot = new Vector2(1, 1);
-        Wire(itemsTab, nameof(ScreenFlow.ShowItems));
-
-        var back = Button("Back", screen.transform, "BACK", Slate, Paper, 32,
-                          new Vector2(0, 1), new Vector2(64, -36), new Vector2(200, 88));
-        back.GetComponent<RectTransform>().pivot = new Vector2(0, 1);
-        Wire(back, nameof(ScreenFlow.ShowTitle));
-
-        var prevArrow = IconButton("Prev", screen.transform, "arrow_basic_w", new Vector2(1, 0), new Vector2(-336, 72), new Vector2(144, 144));
-        var nextArrow = IconButton("Next", screen.transform, "arrow_basic_e", new Vector2(1, 0), new Vector2(-128, 72), new Vector2(144, 144));
+        var prevArrow = IconButton("Prev", screen.transform, "back", new Vector2(1, 0), new Vector2(-336, 72), new Vector2(144, 144));
+        var nextArrow = IconButton("Next", screen.transform, "next", new Vector2(1, 0), new Vector2(-128, 72), new Vector2(144, 144));
         UnityEditor.Events.UnityEventTools.AddPersistentListener(prevArrow.onClick, garage.Previous);
         UnityEditor.Events.UnityEventTools.AddPersistentListener(nextArrow.onClick, garage.Next);
 
@@ -829,42 +1084,39 @@ public static class MenuSetup
     {
         var screen = Rect("Items", parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject;
         var panel = screen.AddComponent<ItemsPanel>();
+        ShopHeader(screen.transform, "GARAGE", 1);
         var card = Rect("Card", screen.transform, Vector2.zero, new Vector2(0, 1), Vector2.zero, Vector2.zero);
         card.pivot = new Vector2(0, 0.5f);
-        card.offsetMin = new Vector2(64, 112); card.offsetMax = new Vector2(744, -152);
+        card.offsetMin = new Vector2(64, 64); card.offsetMax = new Vector2(744, -172);
         Design.AsCard(card, Panel);
 
-        Label("Name", card, display, "ITEMS", 96, Paper, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(48, -40), new Vector2(624, 96));
-        var blurb = Label("Blurb", card, body, "", 26, Muted, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(48, -142), new Vector2(608, 56));
+        Label("Name", card, display, "ITEMS", 88, Paper, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(48, -36), new Vector2(624, 92));
+        var blurb = Label("Blurb", card, body, "", 26, Muted, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(48, -130), new Vector2(608, 56));
         blurb.textWrappingMode = TextWrappingModes.Normal;
-        var loadout = Chip("Loadout", card, "START WITH:  NOTHING", new Vector2(0, -198), out var loadoutLabel);
+        var loadout = Chip("Loadout", card, "START WITH:  NOTHING", new Vector2(0, -192), out var loadoutLabel);
         UnityEditor.Events.UnityEventTools.AddPersistentListener(loadout.onClick, panel.CycleLoadout);
 
         var packs = Inventory.Packs;
         var rows = new Button[packs.Length]; var rowLabels = new TMP_Text[packs.Length]; var rowPrices = new TMP_Text[packs.Length];
         for (int i = 0; i < packs.Length; i++)
         {
-            var rt = Rect("Row" + i, card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -290 - i * 42), new Vector2(600, 40));   // six packs clear the PAY button
+            var rt = Rect("Row" + i, card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -302 - i * 44), new Vector2(600, 40));   // six packs clear the PAY button
             rt.pivot = new Vector2(0, 1);
             Design.AsRow(rt, Design.Ink700);
             rows[i] = rt.gameObject.AddComponent<Button>();
             rt.gameObject.AddComponent<PressFeel>();
             UnityEditor.Events.UnityEventTools.AddIntPersistentListener(rows[i].onClick, panel.Focus, i);
-            rowLabels[i] = Label("Label", rt, strong, packs[i].name.ToUpperInvariant(), 26, Paper, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(20, 0), new Vector2(400, 40));
+            var glyph = Rect("Glyph", rt, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(34, 0), new Vector2(32, 32));
+            var glyphImg = glyph.gameObject.AddComponent<Image>();
+            glyphImg.sprite = Design.Icon(Design.ItemGlyph(packs[i].item) ?? "trap"); glyphImg.color = Paper; glyphImg.preserveAspect = true; glyphImg.raycastTarget = false;
+            rowLabels[i] = Label("Label", rt, strong, packs[i].name.ToUpperInvariant(), 26, Paper, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(64, 0), new Vector2(380, 40));
             rowPrices[i] = Label("Price", rt, body, "", 24, Muted, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-20, 0), new Vector2(180, 40));
         }
 
-        var secondary = Button("Secondary", card, "PAY", Slate, Paper, 36, new Vector2(0.5f, 0), new Vector2(0, 176), new Vector2(560, 92));
+        var secondary = Button("Secondary", card, "PAY", Slate, Paper, 36, new Vector2(0.5f, 0), new Vector2(0, 168), new Vector2(584, 96));
         UnityEditor.Events.UnityEventTools.AddPersistentListener(secondary.onClick, panel.Secondary);
-        var primary = Button("Primary", card, "UNLOCK", Accent, Paper, 44, new Vector2(0.5f, 0), new Vector2(0, 56), new Vector2(560, 108));
+        var primary = Button("Primary", card, "UNLOCK", Accent, Paper, 46, new Vector2(0.5f, 0), new Vector2(0, 48), new Vector2(584, 112));
         UnityEditor.Events.UnityEventTools.AddPersistentListener(primary.onClick, panel.Primary);
-
-        var back = Button("Back", screen.transform, "BACK", Slate, Paper, 32, new Vector2(0, 1), new Vector2(64, -36), new Vector2(200, 88));
-        back.GetComponent<RectTransform>().pivot = new Vector2(0, 1);
-        Wire(back, nameof(ScreenFlow.ShowTitle));
-        var kartsTab = Button("KartsTab", screen.transform, "<  KARTS", Slate, Paper, 32, new Vector2(1, 1), new Vector2(-64, -36), new Vector2(240, 88));
-        kartsTab.GetComponent<RectTransform>().pivot = new Vector2(1, 1);
-        Wire(kartsTab, nameof(ScreenFlow.ShowGarage));
 
         var so = new SerializedObject(panel);
         Fill(so.FindProperty("rows"), rows.Cast<Object>().ToArray());
@@ -887,12 +1139,14 @@ public static class MenuSetup
     {
         var rt = Rect(name, card, new Vector2(0.5f, 1), new Vector2(0.5f, 1), offset, new Vector2(520, 92));
         rt.pivot = new Vector2(0.5f, 1);
-        Design.AsRow(rt, Design.Ink700);
+        Design.AsTile(rt, Design.Ink700, 20f, out float lip);
         var button = rt.gameObject.AddComponent<Button>();
-        rt.gameObject.AddComponent<PressFeel>();
-        label = Label(name + "Label", rt, strong, caption, 36, Paper, TextAlignmentOptions.Center,
+        var feel = rt.gameObject.AddComponent<PressFeel>();
+        var face = Face(name, rt, lip);
+        label = Label(name + "Label", face, strong, caption, 36, Paper, TextAlignmentOptions.Center,
                       new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(500, 60));
         label.enableAutoSizing = true; label.fontSizeMin = 24; label.fontSizeMax = 36;
+        feel.Configure(Design.TileDown, face, lip * (Design.TileLip - 3f) / Design.TileLip);
         return button;
     }
 
@@ -927,12 +1181,12 @@ public static class MenuSetup
     }
 
     // ---------- builders ----------
-    static StatBar StatRow(RectTransform card, string label, float y, int pips = 5, float size = 32f)
+    static StatBar StatRow(RectTransform card, string label, float y, int pips = 5, float size = 32f, float barX = 300f)
     {
         var text = Label(label + "Label", card, body, label, size, Muted, TextAlignmentOptions.Left,
                          new Vector2(0, 1), new Vector2(48, y), new Vector2(240, 48));
         text.characterSpacing = 6f;
-        var row = Rect(label + "Bar", card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(300, y - 6), new Vector2(380, 30));
+        var row = Rect(label + "Bar", card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(barX, y - 6), new Vector2(380, 30));
         row.pivot = new Vector2(0, 1);
         var bar = row.gameObject.AddComponent<StatBar>();
         var images = new Image[pips];
@@ -962,46 +1216,173 @@ public static class MenuSetup
         return t;
     }
 
-    /// Every action in the game is a pill. Nothing else is.
+    /// Every action in the game is a pill you can press: its face over a darker lip, the face (and what is written on
+    /// it) dropping into the lip on press-in (PressFeel). Nothing else is. `icon` sits before the words, or after
+    /// them for a "go on" arrow.
     static Button Button(string name, Transform parent, string caption, Color tint, Color textColour,
-                         float textSize, Vector2 anchor, Vector2 offset, Vector2 dims)
+                         float textSize, Vector2 anchor, Vector2 offset, Vector2 dims, string icon = null, bool iconAfter = false)
     {
         var rt = Rect(name, parent, anchor, anchor, offset, dims);
         rt.pivot = anchor;
-        Design.AsPill(rt, tint);
+        Design.AsButton(rt, tint, out float lip);
         var button = rt.gameObject.AddComponent<Button>();
-        rt.gameObject.AddComponent<PressFeel>();
+        var feel = rt.gameObject.AddComponent<PressFeel>();
         var colours = button.colors;
         colours.highlightedColor = Color.white;
-        colours.pressedColor = new Color(0.88f, 0.88f, 0.88f, 1f);
+        colours.pressedColor = new Color(0.92f, 0.92f, 0.92f, 1f);
+        colours.disabledColor = new Color(0.6f, 0.6f, 0.66f, 0.75f);
         colours.fadeDuration = 0.06f;
         button.colors = colours;
-        var label = Label(name + "Label", rt, display, caption, textSize, tint == Design.Accent ? Design.OnAccent : textColour, TextAlignmentOptions.Center,
+        var face = Face(name, rt, lip);
+        var ink = tint == Design.Accent ? Design.OnAccent : textColour;
+        var label = Label(name + "Label", face, display, caption, textSize, ink, TextAlignmentOptions.Center,
                           new Vector2(0.5f, 0.5f), Vector2.zero, dims);
         label.rectTransform.anchorMin = Vector2.zero;
         label.rectTransform.anchorMax = Vector2.one;
         label.enableAutoSizing = true;
         label.fontSizeMin = textSize * 0.65f;
         label.fontSizeMax = textSize;
-        label.rectTransform.offsetMin = new Vector2(28, 4);
-        label.rectTransform.offsetMax = new Vector2(-28, -8);
+        label.rectTransform.offsetMin = new Vector2(28, 0);
+        label.rectTransform.offsetMax = new Vector2(-28, -2);
+        if (icon != null)
+        {
+            float h = dims.y - lip, s = h * 0.46f;
+            var glyph = Rect(name + "Icon", face, new Vector2(iconAfter ? 1 : 0, 0.5f), new Vector2(iconAfter ? 1 : 0, 0.5f),
+                             new Vector2(iconAfter ? -h * 0.42f : h * 0.42f, 0), new Vector2(s, s));
+            var img = glyph.gameObject.AddComponent<Image>();
+            img.sprite = IconSprite(icon); img.color = ink; img.raycastTarget = false; img.preserveAspect = true;
+            if (iconAfter) label.rectTransform.offsetMax = new Vector2(-h * 0.62f, -2);
+            else label.rectTransform.offsetMin = new Vector2(h * 0.62f, 0);
+        }
+        feel.Configure(Design.PillDown, face, lip * (Design.Lip - 4f) / Design.Lip);
         return button;
     }
 
+    /// What is written on a pressable thing: the area above its lip, which sinks with it.
+    static RectTransform Face(string name, RectTransform rt, float lip)
+    {
+        var face = Rect(name + "Face", rt, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        face.offsetMin = new Vector2(0, lip); face.offsetMax = Vector2.zero;
+        return face;
+    }
+
+    /// A round button with a glyph: back, settings, the garage's arrows.
     static Button IconButton(string name, Transform parent, string icon, Vector2 anchor, Vector2 offset, Vector2 size)
     {
         var rt = Rect(name, parent, anchor, anchor, offset, size);
         rt.pivot = anchor;
-        Design.AsPill(rt, Slate);
+        Design.AsButton(rt, Slate, out float lip);
         var button = rt.gameObject.AddComponent<Button>();
-        rt.gameObject.AddComponent<PressFeel>();
-        var glyph = Rect(name + "Icon", rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, size * 0.42f);
+        var feel = rt.gameObject.AddComponent<PressFeel>();
+        var face = Face(name, rt, lip);
+        var glyph = Rect(name + "Icon", face, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, size * 0.46f);
         var img = glyph.gameObject.AddComponent<Image>();
-        img.sprite = Sprite(icon) ?? AssetDatabase.LoadAssetAtPath<Sprite>(Art + $"Textures/UI/Icons/{icon}.png");
+        img.sprite = IconSprite(icon);
         img.color = Paper;
+        img.preserveAspect = true;
         img.raycastTarget = false;
+        feel.Configure(Design.PillDown, face, lip * (Design.Lip - 4f) / Design.Lip);
         return button;
     }
+
+    /// A pressable tile with a glyph over its name: the title's doors (online, garage, ranking).
+    static Button Tile(string name, Transform parent, string icon, string caption, Vector2 anchor, Vector2 offset, Vector2 dims)
+    {
+        var rt = Rect(name, parent, anchor, anchor, offset, dims);
+        rt.pivot = anchor;
+        Design.AsTile(rt, Slate, 28f, out float lip);
+        var button = rt.gameObject.AddComponent<Button>();
+        var feel = rt.gameObject.AddComponent<PressFeel>();
+        var face = Face(name, rt, lip);
+        var glyph = Rect(name + "Icon", face, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -22), new Vector2(72, 72));
+        glyph.pivot = new Vector2(0.5f, 1);
+        var img = glyph.gameObject.AddComponent<Image>();
+        img.sprite = IconSprite(icon); img.color = Paper; img.preserveAspect = true; img.raycastTarget = false;
+        var label = Label(name + "Label", face, display, caption, 34, Paper, TextAlignmentOptions.Center,
+                          new Vector2(0.5f, 0), new Vector2(0, 18), new Vector2(dims.x - 20, 44));
+        label.enableAutoSizing = true; label.fontSizeMin = 24; label.fontSizeMax = 34;
+        feel.Configure(Design.TileDown, face, lip * (Design.TileLip - 3f) / Design.TileLip);
+        return button;
+    }
+
+    /// The top bar of every screen under the title: a round back button and the screen's name, over a soft scrim so
+    /// it reads on any backdrop. `step` is a quiet "STEP 1 OF 2" at the far right on the screens that are a sequence.
+    static RectTransform Header(Transform screen, string title, string backMethod, string step = null)
+    {
+        // Call it after the screen's backdrop and before its cards: the shade goes over the one and under the other.
+        var shade = Rect("HeaderShade", screen, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, -120), new Vector2(1200, 480));
+        shade.localScale = new Vector3(1, -1, 1);                  // the bottom-up ramp, turned over about its middle: dark at the top
+        var ramp = shade.gameObject.AddComponent<Image>();
+        ramp.sprite = FadeSprite(vertical: true); ramp.color = Deep; ramp.raycastTarget = false;   // full: the track art can be bright day
+
+        var bar = Rect("Header", screen, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, -28), new Vector2(0, 112));
+        bar.pivot = new Vector2(0.5f, 1);
+        var back = IconButton("Back", bar, "back", new Vector2(0, 0.5f), new Vector2(64, 0), new Vector2(108, 108));
+        Wire(back, backMethod);
+        Label("Title", bar, display, title, 80, Paper, TextAlignmentOptions.Left,
+              new Vector2(0, 0.5f), new Vector2(204, 2), new Vector2(1400, 104));
+        if (step != null)
+        {
+            var s = Label("Step", bar, strong, step, 28, Muted, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-64, 0), new Vector2(400, 48));
+            s.characterSpacing = 10f;
+        }
+        return bar;
+    }
+
+    /// The shop's top bar: back to the title, and its two tabs (karts, items), the open one lit.
+    static void ShopHeader(Transform screen, string title, int open)
+    {
+        var bar = Header(screen, title, nameof(ScreenFlow.ShowTitle));
+        var (backs, labels, buttons) = Segmented("Tabs", bar, new[] { "KARTS", "ITEMS" }, new Vector2(1, 0.5f), new Vector2(-64, 0), new Vector2(440, 96), 34);
+        for (int i = 0; i < 2; i++) { backs[i].color = i == open ? Design.Ink600 : new Color(0, 0, 0, 0); labels[i].color = i == open ? Paper : Muted; }
+        Wire(buttons[0], nameof(ScreenFlow.ShowGarage));
+        Wire(buttons[1], nameof(ScreenFlow.ShowItems));
+    }
+
+    /// Two to four options in one trough: the chosen one is lit (the lit violet, Paper words), the rest sit back.
+    /// The caller colours them at run time; this lays them out and wires nothing.
+    static (Image[] backs, TMP_Text[] labels, Button[] buttons) Segmented(string name, Transform parent, string[] options,
+                                                                           Vector2 anchor, Vector2 offset, Vector2 dims, float textSize = 32)
+    {
+        var bar = Rect(name, parent, anchor, anchor, offset, dims);
+        bar.pivot = anchor;
+        var trough = Design.AsPill(bar, Deep);
+        trough.raycastTarget = false;
+        int n = options.Length;
+        float pad = 8f, w = (dims.x - pad * 2) / n;
+        var backs = new Image[n]; var labels = new TMP_Text[n]; var buttons = new Button[n];
+        for (int i = 0; i < n; i++)
+        {
+            var seg = Rect(name + i, bar, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(pad + w * i + w * 0.5f, 0), new Vector2(w - 4, dims.y - pad * 2));
+            backs[i] = Design.AsPill(seg, Slate);
+            buttons[i] = seg.gameObject.AddComponent<Button>();
+            seg.gameObject.AddComponent<PressFeel>();
+            labels[i] = Label(name + i + "Label", seg, display, options[i], textSize, Paper, TextAlignmentOptions.Center,
+                              new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(w - 24, dims.y - pad * 2));
+            labels[i].enableAutoSizing = true; labels[i].fontSizeMin = textSize * 0.6f; labels[i].fontSizeMax = textSize;
+        }
+        return (backs, labels, buttons);
+    }
+
+    /// The light that crosses the primary button every few seconds (Shine), clipped to the button by a Mask.
+    static void Shine(Button button)
+    {
+        var rt = (RectTransform)button.transform;
+        rt.gameObject.AddComponent<Mask>().showMaskGraphic = true;
+        float h = rt.sizeDelta.y;
+        var band = Rect("Shine", rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(h * 0.8f, h * 2.2f));
+        band.localRotation = Quaternion.Euler(0, 0, -20f);
+        band.anchoredPosition = new Vector2(-(rt.sizeDelta.x * 0.5f + h * 0.8f), 0);   // parked off the left end until it runs
+        var img = band.gameObject.AddComponent<Image>();
+        img.sprite = Design.Band; img.color = new Color(1f, 1f, 1f, 0.7f); img.raycastTarget = false;
+        new SerializedObject(rt.gameObject.AddComponent<KartCup.Shine>()).Do(s => s.FindProperty("band").objectReferenceValue = band);
+    }
+
+    /// A kit icon (Icons/), or one of Design's drawn ones (play, back, next, globe, trophy, kart, user, flag).
+    static Sprite IconSprite(string icon) =>
+        System.Array.IndexOf(Design.Drawn, icon) >= 0
+            ? Design.Icon(icon)
+            : Sprite(icon) ?? AssetDatabase.LoadAssetAtPath<Sprite>(Art + $"Textures/UI/Icons/{icon}.png");
 
     /// A picture used as UI: made a sprite on first use (uncompressed, no mips: it is a logo).
     static Sprite UiSprite(string path)

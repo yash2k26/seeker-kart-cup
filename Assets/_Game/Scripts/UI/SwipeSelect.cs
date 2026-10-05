@@ -42,8 +42,10 @@ namespace KartCup
             carousel.Dragging = false;
             float dx = e.position.x - startX;
             float flick = flickPixels * DpiScale();
-            if (dx < -flick) carousel.Next();
-            else if (dx > flick) carousel.Previous();
+            if (Mathf.Abs(dx) <= flick) return;
+            if (dx < 0) carousel.Next(); else carousel.Previous();
+            Haptics.Play(Haptics.Kind.Tick);          // a flick has no button to click for it
+            AudioDirector.Instance?.Click();
         }
 
         /// uGUI does not deliver OnEndDrag to a deactivated object, so releasing the flag here is the only way a

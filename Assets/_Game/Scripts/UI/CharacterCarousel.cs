@@ -23,6 +23,10 @@ namespace KartCup
         GameObject current;
         int index;
 
+        /// The driver on the turntable changed (arrows, a flick, or a face in the roster strip).
+        public static event System.Action<int> Changed;
+        public int Index => index;
+
         void Start()
         {
             index = CharacterDatabase.SelectedIndex;
@@ -31,6 +35,15 @@ namespace KartCup
 
         /// Editor-side preview so the menu scene is not empty when it is opened or screenshotted.
         public void ShowInEditor(int i) { index = i; Show(); if (podium != null) podium.localRotation = Quaternion.Euler(0, baseYaw, 0); }
+
+        /// A face tapped in the roster strip: straight to that driver.
+        public void Pick(int i)
+        {
+            if (roster == null || i < 0 || i >= roster.characters.Length || i == index) return;
+            index = i;
+            CharacterDatabase.SelectedIndex = index;
+            Show();
+        }
 
         void Update()
         {
@@ -68,7 +81,11 @@ namespace KartCup
             var driverPrefab = driverPrefabs.FirstOrDefault(d => d.name.EndsWith(def.driverId)) ?? driverPrefabs.FirstOrDefault();
             if (kartPrefab != null && podium != null) current = Mount(kartPrefab, driverPrefab, podium, def.tint, Application.isPlaying);
 
-            if (nameLabel != null) nameLabel.text = def.displayName.ToUpperInvariant();
+            if (nameLabel != null)
+            {
+                nameLabel.text = def.displayName.ToUpperInvariant();
+                if (Application.isPlaying) UiMotion.Punch(nameLabel.transform, 1.08f, 0.25f);   // a new driver, said out loud
+            }
             if (blurbLabel != null) blurbLabel.text = def.blurb;
             speedBar?.Set(def.speed);
             accelBar?.Set(def.accel);
@@ -76,6 +93,7 @@ namespace KartCup
             weightBar?.Set(def.weight);
             turboBar?.Set(def.turbo);
             attackBar?.Set(def.attack);
+            Changed?.Invoke(index);
         }
 
         /// A display-only kart with its driver on the podium: no physics, no input, no race components, tyres grounded,

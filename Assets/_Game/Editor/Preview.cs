@@ -171,7 +171,7 @@ public static class MenuPreview
     {
         Preview.Batcher(false);
         UnityEditor.SceneManagement.EditorSceneManager.OpenScene("Assets/_Game/Scenes/Menu.unity", UnityEditor.SceneManagement.OpenSceneMode.Single);
-        var canvas = Object.FindFirstObjectByType<Canvas>();
+        var canvas = Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None).First(c => c.name == "UI");   // not the loading curtain's
         var cam = Camera.main;
         canvas.renderMode = RenderMode.ScreenSpaceCamera;       // Overlay never lands in a RenderTexture
         canvas.worldCamera = cam;
@@ -182,6 +182,10 @@ public static class MenuPreview
         var cargs = System.Environment.GetCommandLineArgs();
         for (int k = 0; k < cargs.Length - 1; k++) if (cargs[k] == "-char") int.TryParse(cargs[k + 1], out character);
         if (carousel != null) carousel.ShowInEditor(character);      // Start() never runs in edit mode
+        foreach (var strip in Object.FindObjectsByType<RosterStrip>(FindObjectsSortMode.None)) strip.ShowInEditor(character);
+        int trackCard = 0;                                   // -track N: the track select on that card (-1 the Grand Prix)
+        for (int k = 0; k < cargs.Length - 1; k++) if (cargs[k] == "-track") int.TryParse(cargs[k + 1], out trackCard);
+        foreach (var tracks in Object.FindObjectsByType<TrackCarousel>(FindObjectsSortMode.None)) tracks.ShowInEditor(trackCard);
         // nor does the drivers' seated clip: pose them as the phone will, and keep the posed skin from being culled
         foreach (var anim in Object.FindObjectsByType<Animation>(FindObjectsSortMode.None).Where(a => a.clip != null))
         {

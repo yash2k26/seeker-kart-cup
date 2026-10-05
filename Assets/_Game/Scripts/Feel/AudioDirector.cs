@@ -47,7 +47,7 @@ namespace KartCup
 
             music = gameObject.AddComponent<AudioSource>();
             music.loop = true; music.playOnAwake = false; music.spatialBlend = 0f;
-            music.volume = musicVolume; music.priority = 0;
+            music.volume = MusicLevel; music.priority = 0;
 
             sfx = gameObject.AddComponent<AudioSource>();
             sfx.playOnAwake = false; sfx.spatialBlend = 0f; sfx.priority = 32;
@@ -96,11 +96,16 @@ namespace KartCup
             music.clip = clip; music.volume = 0f; music.Play();
             for (float t = 0; t < crossfade; t += Time.unscaledDeltaTime)
             {
-                music.volume = Mathf.Lerp(0f, musicVolume, t / crossfade);
+                music.volume = Mathf.Lerp(0f, MusicLevel, t / crossfade);
                 yield return null;
             }
-            music.volume = musicVolume;
+            music.volume = MusicLevel;
         }
+
+        float MusicLevel => Settings.Music ? musicVolume : 0f;
+
+        /// The MUSIC switch: the track keeps playing under it, so turning it back on picks up where it is.
+        public void ApplyVolume() { if (music != null) music.volume = MusicLevel; }
 
         public void Play(AudioClip clip, float volume = 1f, float pitch = 1f)
         {
@@ -110,9 +115,14 @@ namespace KartCup
         }
 
         // ---- UI ----
+        float lastClick = -1f;
+
+        /// Every button clicks on press-in (PressFeel); the action it fires may click again on release. One tap is one
+        /// click: a second inside 180 ms is the same tap.
         public void Click()
         {
-            if (clicks.Length == 0) return;
+            if (clicks.Length == 0 || Time.unscaledTime - lastClick < 0.18f) return;
+            lastClick = Time.unscaledTime;
             Play(clicks[Random.Range(0, clicks.Length)], 0.7f, Random.Range(0.97f, 1.04f));
         }
         public void Back() => Play(back, 0.7f);
