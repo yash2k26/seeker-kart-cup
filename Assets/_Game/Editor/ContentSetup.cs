@@ -69,6 +69,7 @@ public static class ContentSetup
             ("Chase",  "character-male-e",   "head_chase"),    // from the user's front art (output/imagegen/heads/chase-front.png)
             ("Beeman", "character-male-f",   "head_beeman"),   // bald, sunglasses, grey beard
             ("Maroo",  "character-male-b",   "head_maroo"),    // curly hair, stubble (tools/blender/art/maroo.py from the user's art)
+            ("Andrew", "character-male-d",   "head_andrew"),   // bald, black frames, stubble (tools/blender/art/andrew.py)
         };
         foreach (var (name, model, headName) in drivers)
         {

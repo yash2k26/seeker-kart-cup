@@ -221,6 +221,7 @@ public static class LookSetup
             ("Runa",   new Color(0.95f, 0.25f, 0.25f)),   // red
             ("Vee",    new Color(0.08f, 0.85f, 0.80f)),   // teal
             ("Maroo",  new Color(0.22f, 0.42f, 1.00f)),   // royal blue
+            ("Andrew", new Color(0.62f, 0.92f, 0.18f)),   // lime
         };
         foreach (var (name, c) in colours)
         {

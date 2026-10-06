@@ -1077,6 +1077,104 @@
    "file": "Maroo/hurt_1.ogg",
    "text": "OW!",
    "seconds": 0.47
+  },
+  {
+   "driver": "Andrew",
+   "kind": "hello",
+   "file": "Andrew/hello_0.ogg",
+   "text": "HEY-YO!",
+   "seconds": 0.828
+  },
+  {
+   "driver": "Andrew",
+   "kind": "hello",
+   "file": "Andrew/hello_1.ogg",
+   "text": "HEY!",
+   "seconds": 0.594
+  },
+  {
+   "driver": "Andrew",
+   "kind": "poke",
+   "file": "Andrew/poke_0.ogg",
+   "text": "HEE HEE!",
+   "seconds": 0.679
+  },
+  {
+   "driver": "Andrew",
+   "kind": "poke",
+   "file": "Andrew/poke_1.ogg",
+   "text": "HUH?",
+   "seconds": 0.521
+  },
+  {
+   "driver": "Andrew",
+   "kind": "poke",
+   "file": "Andrew/poke_2.ogg",
+   "text": "OH!",
+   "seconds": 0.513
+  },
+  {
+   "driver": "Andrew",
+   "kind": "poke",
+   "file": "Andrew/poke_3.ogg",
+   "text": "HEH HEH",
+   "seconds": 0.574
+  },
+  {
+   "driver": "Andrew",
+   "kind": "annoyed",
+   "file": "Andrew/annoyed_0.ogg",
+   "text": "HMPH!",
+   "seconds": 0.539
+  },
+  {
+   "driver": "Andrew",
+   "kind": "annoyed",
+   "file": "Andrew/annoyed_1.ogg",
+   "text": "UGH!",
+   "seconds": 0.606
+  },
+  {
+   "driver": "Andrew",
+   "kind": "go",
+   "file": "Andrew/go_0.ogg",
+   "text": "WOO-HOO!",
+   "seconds": 0.994
+  },
+  {
+   "driver": "Andrew",
+   "kind": "go",
+   "file": "Andrew/go_1.ogg",
+   "text": "WA-HOO!",
+   "seconds": 0.931
+  },
+  {
+   "driver": "Andrew",
+   "kind": "win",
+   "file": "Andrew/win_0.ogg",
+   "text": "HA HA HA!",
+   "seconds": 1.476
+  },
+  {
+   "driver": "Andrew",
+   "kind": "win",
+   "file": "Andrew/win_1.ogg",
+   "text": "YEAH!",
+   "seconds": 0.618
+  },
+  {
+   "driver": "Andrew",
+   "kind": "hurt",
+   "file": "Andrew/hurt_0.ogg",
+   "text": "OOF!",
+   "seconds": 0.416
+  },
+  {
+   "driver": "Andrew",
+   "kind": "hurt",
+   "file": "Andrew/hurt_1.ogg",
+   "text": "OW!",
+   "seconds": 0.492
   }
  ]
 }

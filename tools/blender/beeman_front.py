@@ -17,9 +17,9 @@ sys.path.insert(0, HERE)
 import from_art as fa
 import mert_front as mf
 
-NAME = "beeman"
+NAME = os.environ.get("HEAD_NAME", "beeman")         # another bald head built the same way: HEAD_NAME=andrew
 mf.NAME, mf.C0 = NAME, fa.load(NAME)
-mf.CACHE = os.path.join(HERE, "..", "..", "Builds", "beeman-front", ".fitcache")
+mf.CACHE = os.path.join(HERE, "..", "..", "Builds", f"{NAME}-front", ".fitcache")
 mf.CHART_AREA = 0.15                     # the plain-skin chart: one flat colour (Mert's 0.3)
 
 # One front projection for the face plane, the beard's fronts and the glasses' front-facing faces: UV = (x, z) x

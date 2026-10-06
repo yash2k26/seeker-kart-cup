@@ -629,3 +629,59 @@ MonoBehaviour:
     kind: hurt
     text: OW!
     clip: {fileID: 8300000, guid: 3f38cc8d6cbe44dea917e7dbad6d1d5f, type: 3}
+  - driver: Andrew
+    kind: hello
+    text: HEY-YO!
+    clip: {fileID: 8300000, guid: 14315d61bc3b744b8be0dbe0982fd577, type: 3}
+  - driver: Andrew
+    kind: hello
+    text: HEY!
+    clip: {fileID: 8300000, guid: c1f52007ae50c488e9a678a44a093692, type: 3}
+  - driver: Andrew
+    kind: poke
+    text: HEE HEE!
+    clip: {fileID: 8300000, guid: 7881da45d0a184a43a897b24dedca071, type: 3}
+  - driver: Andrew
+    kind: poke
+    text: HUH?
+    clip: {fileID: 8300000, guid: 6fdf4186eb8fb4d36b369980e3833dcc, type: 3}
+  - driver: Andrew
+    kind: poke
+    text: OH!
+    clip: {fileID: 8300000, guid: ebc21850b273c4d6a84d353f28e173ee, type: 3}
+  - driver: Andrew
+    kind: poke
+    text: HEH HEH
+    clip: {fileID: 8300000, guid: 6771cb08a33e24a59b9d4254cb3c03b9, type: 3}
+  - driver: Andrew
+    kind: annoyed
+    text: HMPH!
+    clip: {fileID: 8300000, guid: a556b16c279b54e2a9ec3daa05013b30, type: 3}
+  - driver: Andrew
+    kind: annoyed
+    text: UGH!
+    clip: {fileID: 8300000, guid: f1437dca2cec14c2b9ca5607871db07d, type: 3}
+  - driver: Andrew
+    kind: go
+    text: WOO-HOO!
+    clip: {fileID: 8300000, guid: 69cd7a030da7f44b585391cf018a7257, type: 3}
+  - driver: Andrew
+    kind: go
+    text: WA-HOO!
+    clip: {fileID: 8300000, guid: 46b6de6c60b4445fbbe40a45d51a938f, type: 3}
+  - driver: Andrew
+    kind: win
+    text: HA HA HA!
+    clip: {fileID: 8300000, guid: b5b34ef950e4d439981ec3dcb8eb4bf5, type: 3}
+  - driver: Andrew
+    kind: win
+    text: YEAH!
+    clip: {fileID: 8300000, guid: 3b1b438c3a7b942b2878f73fdcf026af, type: 3}
+  - driver: Andrew
+    kind: hurt
+    text: OOF!
+    clip: {fileID: 8300000, guid: 59e3c9b8f88164caea3cac83dfb5471a, type: 3}
+  - driver: Andrew
+    kind: hurt
+    text: OW!
+    clip: {fileID: 8300000, guid: fb8a9713d314b48048131bfead27b145, type: 3}
