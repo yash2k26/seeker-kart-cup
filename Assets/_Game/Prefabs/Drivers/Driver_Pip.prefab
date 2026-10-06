@@ -349,7 +349,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4372074783910223345}
-  m_Mesh: {fileID: -3551304922691898458, guid: 4a7f4070cde1c457ca36dc4a99991806, type: 3}
+  m_Mesh: {fileID: 9162996398696397375, guid: 4a7f4070cde1c457ca36dc4a99991806, type: 3}
 --- !u!23 &6371878600937140201
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -418,8 +418,8 @@ MonoBehaviour:
   - {fileID: 7578827742744497768}
   - {fileID: 2182448375403095698}
   halfUv:
-  - {x: 0.08549033, y: 0.03605771}
-  - {x: 0.085490346, y: 0.03605771}
+  - {x: 0.050453886, y: 0.03549099}
+  - {x: 0.047650356, y: 0.03605771}
   lids:
   - {fileID: 1579500746036442098}
   - {fileID: 8775330712300520572}

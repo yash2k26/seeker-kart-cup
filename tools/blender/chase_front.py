@@ -291,7 +291,7 @@ def clay(out):
     me = bpy.data.meshes.new("clay"); me.from_pydata(V.tolist(), [], F.tolist()); me.update()
     ob = bpy.data.objects.new("clay", me); bpy.context.collection.objects.link(ob)
     cols = {"skin": (0.85, 0.55, 0.36), "ear": (0.85, 0.55, 0.36), "nose": (0.85, 0.55, 0.36), "hair": (0.30, 0.17, 0.08),
-            "stache": (0.06, 0.04, 0.03), "locks": (0.45, 0.26, 0.12)}
+            "stache": (0.06, 0.04, 0.03), "locks": (0.45, 0.26, 0.12), "hoop": (0.9, 0.7, 0.1)}
     for k, c in cols.items():
         mat = bpy.data.materials.new(k); mat.use_nodes = True
         b = mat.node_tree.nodes["Principled BSDF"]; b.inputs["Base Color"].default_value = c + (1,)
