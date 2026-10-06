@@ -11,7 +11,7 @@ mkdir -p $RENDERS
 # Toly, Mert, Akshay, Emmett, Bitsy and Pip are built from the user's own art (from_art.py, mert_front.py, akshay_front.py,
 # chase_front.py), not here:
 # naming them explicitly regenerates the old procedural head over the art one.
-names=("$@"); (( $#names )) || names=(runa vee)
+names=("$@"); (( $#names )) || { echo "usage: build_heads.sh <name>... (every driver now has an art head; chars/ keeps the old specs)"; exit 2; }
 for n in $names; do
   # --python-exit-code: Blender exits 0 after a Python error unless told otherwise
   "$BLENDER" -b --python-exit-code 1 -P heads.py -- $n $RENDERS > $RENDERS/$n.log 2>&1 || { echo "FAILED $n — $RENDERS/$n.log"; tail -5 $RENDERS/$n.log; exit 1; }

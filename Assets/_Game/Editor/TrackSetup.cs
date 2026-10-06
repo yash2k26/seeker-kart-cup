@@ -743,7 +743,8 @@ public static partial class TrackSetup
         // name, kart, driver, speed, accel, handling, weight, turbo, attack  (six pips that sum to 0 so nobody is
         // strictly better: a shape, not an edge). This table is the roster's stats; the tint stays LookSetup's. New
         // names are appended, so a roster that grows (Chase and Beeman arrived on 28 Sep 2026, Maroo on 5 Oct, Andrew on 6 Oct) never resets the
-        // select-screen order or the saved character index.
+        // select-screen order or the saved character index. A name taken out of the table leaves the roster (Runa and
+        // Vee on 6 Oct): the ones after it move up, so Cup.Version was bumped with it.
         var rows = new (string name, string kart, string driver, int sp, int ac, int hd, int wt, int tb, int at, string blurb)[]
         {
             ("Toly",     "oodi", "Toly",   1,  0,  0, -1,  1, -1, "Ships blocks faster than you can read them."),
@@ -752,8 +753,6 @@ public static partial class TrackSetup
             ("Emmett",   "oopi", "Emmett", -1, 1,  2, -2,  0,  0, "Threads corners nobody else sees."),
             ("Bitsy",    "oozi", "Bitsy",  1,  1, -1, -1,  2, -2, "All gas, some brakes."),
             ("Pip",      "oodi", "Pip",   -1, -1,  0,  2, -1,  1, "Hard to move, harder to pass."),
-            ("Runa",     "ooli", "Runa",   0,  1,  1, -2, -1,  1, "Never lifts."),
-            ("Vee",      "oopi", "Vee",    1, -1,  1, -1,  0,  0, "Late braker, early apex."),
             ("Chase",    "oozi", "Chase",  0,  1,  1, -2, -1,  1, "Knows every dev on the grid. Waves at all of them."),
             ("Beeman",   "oobi", "Beeman", 2,  0, -1, -1, -1,  1, "Bald, fast, and debugging at sixty frames a second."),
             ("Maroo",    "oopi", "Maroo",  0,  0,  1, -1,  1, -1, "Big curls, bigger drifts."),
@@ -775,7 +774,7 @@ public static partial class TrackSetup
             def.speed = r.sp; def.accel = r.ac; def.handling = r.hd; def.weight = r.wt; def.turbo = r.tb; def.attack = r.at;
             EditorUtility.SetDirty(def);
         }
-        db.characters = defs.ToArray();
+        db.characters = defs.Where(d => rows.Any(r => r.name == d.displayName)).ToArray();
         EditorUtility.SetDirty(db);
         return db;
     }

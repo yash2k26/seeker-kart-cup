@@ -110,7 +110,8 @@ namespace KartCup
 
         // ---- persistence: a cup survives the app being killed, which is the point of having one ----
         const string Key = "kc.cup";
-        const string Version = "2";   // v1 had no track list; a v1 string restores as "no cup" rather than guessing one
+        const string Version = "3";   // v1 had no track list; v2's character indices were into the roster before Runa and
+                                      // Vee left (6 Oct). An older string restores as "no cup" rather than the wrong drivers
 
         static void Save()
         {

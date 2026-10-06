@@ -218,8 +218,6 @@ public static class LookSetup
             ("Emmett", new Color(0.20f, 0.84f, 0.48f)),   // green
             ("Bitsy",  new Color(1.00f, 0.32f, 0.52f)),   // pink
             ("Pip",    new Color(1.00f, 0.80f, 0.18f)),   // yellow
-            ("Runa",   new Color(0.95f, 0.25f, 0.25f)),   // red
-            ("Vee",    new Color(0.08f, 0.85f, 0.80f)),   // teal
             ("Maroo",  new Color(0.22f, 0.42f, 1.00f)),   // royal blue
             ("Andrew", new Color(0.62f, 0.92f, 0.18f)),   // lime
         };

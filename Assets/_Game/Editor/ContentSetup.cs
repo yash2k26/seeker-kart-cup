@@ -64,8 +64,6 @@ public static class ContentSetup
             ("Emmett", "character-male-d",   "head_emmett"),
             ("Bitsy",  "character-female-a", "head_bitsy"),
             ("Pip",    "character-female-b", "head_pip"),
-            ("Runa",   "character-female-c", "head_runa"),
-            ("Vee",    "character-female-d", "head_vee"),
             ("Chase",  "character-male-e",   "head_chase"),    // from the user's front art (output/imagegen/heads/chase-front.png)
             ("Beeman", "character-male-f",   "head_beeman"),   // bald, sunglasses, grey beard
             ("Maroo",  "character-male-b",   "head_maroo"),    // curly hair, stubble (tools/blender/art/maroo.py from the user's art)
