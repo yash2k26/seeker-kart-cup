@@ -598,7 +598,7 @@ public static partial class TrackSetup
         // Water: the sea round the island, or a lake in a basin. One shared material; its surf ring is radial from
         // the origin at the island's shoreline, so the lake (well inside it) gets the caustics without the surf.
         if (!float.IsNaN(V.sea)) Water("Water", new Vector3(0, V.sea, 0), 200f);
-        if (V.lakeRadius > 0f) Water("Lake", new Vector3(V.lake.x, -1.3f, V.lake.y), V.lakeRadius * 0.3f);
+        if (V.lakeRadius > 0f) Water("Lake", new Vector3(V.lake.x, -1.3f, V.lake.y), V.lakeRadius * 0.3f).radius = V.lakeRadius;
 
         // After dark (or at dusk, in mist) the karts spawn with their lamps lit (RaceSpawner reads this marker).
         if (V.night || V.headlights)
@@ -612,7 +612,7 @@ public static partial class TrackSetup
         }
     }
 
-    static void Water(string name, Vector3 pos, float scale)
+    static WaterBody Water(string name, Vector3 pos, float scale)
     {
         var water = GameObject.CreatePrimitive(PrimitiveType.Plane);
         water.name = name;
@@ -620,6 +620,7 @@ public static partial class TrackSetup
         water.transform.localScale = new Vector3(scale, 1, scale);
         water.GetComponent<MeshRenderer>().sharedMaterial = WaterMaterial();
         Object.DestroyImmediate(water.GetComponent<Collider>());
+        return water.AddComponent<WaterBody>();   // where the surface is: spray in the shallows, out of bounds when deep
     }
 
     /// Crash barriers, but only where a circuit would really have them: the outside of a corner. A wall down every
@@ -873,9 +874,14 @@ public static partial class TrackSetup
         fill.color = Design.Accent; fill.raycastTarget = false;
 
         // Pause: top centre, out of both thumbs' way. Back on Android does the same thing.
-        var pauseBtn = IconButton("Pause", safe.transform, "icon_pause", new Vector2(0.5f, 1), new Vector2(0, -20), new Vector2(104, 104));
+        // Pause: beside the position plate (the top centre is the race bar's now). Back on Android does the same thing.
+        var pauseBtn = IconButton("Pause", safe.transform, "icon_pause", new Vector2(0, 1), new Vector2(396, -28), new Vector2(104, 104));
         var big = Text("Big", safe.transform, display, "3", 240, paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 90), new Vector2(1400, 300));
         big.enabled = false;
+        // the start boost: a line under the countdown (StartBoost shows it only while 3-2-1 runs)
+        var startHint = Text("StartHint", safe.transform, body, "TAP DRIFT RIGHT ON GO FOR A BOOST", 34, sand, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, -95), new Vector2(1300, 50));
+        var startBoost = canvasGo.AddComponent<StartBoost>();
+        new SerializedObject(startBoost).Do(b => b.FindProperty("hint").objectReferenceValue = startHint);
         // Under the position readout, on its plate. Track name only: the race number is cup state, and a single race has none.
         Text("Track", safe.transform, body, Tracks.At(Index).name.ToUpperInvariant(), 30,
              Design.Paper, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(56, -170), new Vector2(700, 40));
@@ -947,6 +953,24 @@ public static partial class TrackSetup
                 a.FindProperty("idle").colorValue = Design.Ink700;
             });
         }
+
+        // The race bar across the top (Beach Buggy's): START to FINISH with every racer's face riding along it.
+        var barRt = Rect("RaceBar", safe.transform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -58), new Vector2(880, 12));
+        Design.AsRow(barRt, new Color(Design.Paper.r, Design.Paper.g, Design.Paper.b, 0.45f)).raycastTarget = false;   // a light line: it must read over the night road
+        Text("Start", safe.transform, display, "START", 24, paper, TextAlignmentOptions.Right, new Vector2(0.5f, 1), new Vector2(-462, -46), new Vector2(140, 36));
+        var flag = Rect("FinishFlag", safe.transform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(476, -42), new Vector2(44, 44));
+        var flagImg = flag.gameObject.AddComponent<Image>(); flagImg.sprite = Design.Icon("flag"); flagImg.color = paper; flagImg.raycastTarget = false;
+        var raceBar = barRt.gameObject.AddComponent<RaceProgressBar>();
+        var barPortraits = Directory.Exists(PortraitSetup.Dir) ? Directory.GetFiles(PortraitSetup.Dir, "*.png").OrderBy(f => f).ToArray() : new string[0];
+        new SerializedObject(raceBar).Do(b =>
+        {
+            b.FindProperty("bar").objectReferenceValue = barRt;
+            b.FindProperty("roster").objectReferenceValue = Roster();
+            b.FindProperty("dot").objectReferenceValue = Design.Pill;
+            Fill(b.FindProperty("portraits"), barPortraits.Select(f => (Object)AssetDatabase.LoadAssetAtPath<Sprite>(f)).ToArray());
+            var ids = b.FindProperty("portraitIds"); ids.arraySize = barPortraits.Length;
+            for (int i = 0; i < barPortraits.Length; i++) ids.GetArrayElementAtIndex(i).stringValue = Path.GetFileNameWithoutExtension(barPortraits[i]);
+        });
 
         // Minimap under the lap plate: the circuit line with everyone on it, you as your face.
         var mapPlate = Plate("MapPlate", safe.transform, new Vector2(1, 1), new Vector2(-32, -196), new Vector2(236, 236), deep);

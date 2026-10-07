@@ -24,6 +24,7 @@ namespace KartCup
         Kart kart;
         float lapStart;
         float offTrackSince = -1f, crawlingSince = -1f;
+        float outAt = -1f;                       // out of bounds: the words show, then the kart is put back
 
         void Awake() { kart = GetComponent<Kart>(); }
 
@@ -60,6 +61,23 @@ namespace KartCup
             bool lost = transform.position.y < -8f;
             bool racing = race.state == RaceManager.State.Racing && !finished;
 
+            // Beach Buggy's out of bounds: in deep water (or off the world) the words come up while the kart goes under,
+            // and a moment later it is back on the road. The shallows are drivable: WheelDust throws spray there.
+            bool sunk = WaterBody.SurfaceAt(transform.position, out float water) && transform.position.y < water - 0.7f;
+            if (outAt < 0f && ((racing && sunk) || lost))
+            {
+                outAt = Time.time;
+                if (isPlayer && racing) RaceHud.Instance?.Callout("OUT OF BOUNDS", 1.3f);
+                Debug.Log($"[race] {racerName} out of bounds at {transform.position} ({(lost ? "fell" : "in the water")})");
+            }
+            if (outAt > 0f)
+            {
+                if (Time.time - outAt < 0.9f && !lost) return;          // under the words for a beat (falling: at once)
+                outAt = -1f; crawlingSince = -1f;
+                Respawn(race);
+                return;
+            }
+
             if (!lost && kart.velMag < 1.5f && !kart.grounded) { if (offTrackSince < 0) offTrackSince = Time.time; }
             else offTrackSince = -1f;
 
@@ -70,7 +88,7 @@ namespace KartCup
             // look around must not teleport you — so they get a much longer rope before the game intervenes.
             float patience = isPlayer ? 10f : 5f;
 
-            if (lost || (offTrackSince > 0 && Time.time - offTrackSince > 3f)
+            if ((offTrackSince > 0 && Time.time - offTrackSince > 3f)
                      || (crawlingSince > 0 && Time.time - crawlingSince > patience))
             {
                 crawlingSince = -1f;
@@ -93,12 +111,38 @@ namespace KartCup
         {
             offTrackSince = -1f;
             var cp = race.checkpoints[Mathf.Max(0, checkpointIndex)];
-            kart.rb.position = cp.RespawnPosition;
+            // not on top of a kart put back there a moment ago: step across the road until the spot is clear
+            var at = cp.RespawnPosition;
+            for (int k = 1; k <= 4 && Crowded(race, at); k++) at = cp.RespawnPosition + cp.transform.right * (k % 2 == 1 ? 3f : -3f) * ((k + 1) / 2);
+            kart.rb.position = at;
             kart.rb.rotation = cp.RespawnRotation;
             kart.rb.linearVelocity = Vector3.zero;
             kart.rb.angularVelocity = Vector3.zero;
             if (kart.rotator != null) kart.rotator.rotation = cp.RespawnRotation;
-            Haptics.Play(Haptics.Kind.Hit);
+            if (isPlayer) Haptics.Play(Haptics.Kind.Hit);
+            // back with a sparkle where it lands, blinking, and untouchable for a moment (Beach Buggy's)
+            var sparkle = Resources.Load<GameObject>("FX/BubblePop");
+            if (sparkle != null) Instantiate(sparkle, at, Quaternion.identity);
+            kart.invulnerableUntil = Time.time + 1.6f;
+            StopCoroutine(nameof(Blink)); StartCoroutine(nameof(Blink));
+        }
+
+        bool Crowded(RaceManager race, Vector3 at)
+        {
+            foreach (var r in race.racers) if (r != null && r != this && (r.transform.position - at).sqrMagnitude < 9f) return true;
+            return false;
+        }
+
+        System.Collections.IEnumerator Blink()
+        {
+            var shown = GetComponentsInChildren<Renderer>();
+            for (float t = 0f; t < 1.4f; t += 0.08f)
+            {
+                bool on = ((int)(t / 0.08f)) % 2 == 0;
+                foreach (var r in shown) if (r != null && r is not ParticleSystemRenderer && r is not TrailRenderer) r.enabled = on;
+                yield return new WaitForSeconds(0.08f);
+            }
+            foreach (var r in shown) if (r != null && r is not ParticleSystemRenderer && r is not TrailRenderer) r.enabled = true;
         }
     }
 }

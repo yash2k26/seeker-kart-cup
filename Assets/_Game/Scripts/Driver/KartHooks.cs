@@ -22,7 +22,8 @@ namespace KartCup
         public void Bind(Kart k, BlockyDriverPose pose, bool player)
         {
             kart = k; driver = pose; isPlayer = player; rb = k.rb;
-            body = GetComponentInChildren<BodyJuice>() ?? BodyJuice.Wrap(k);
+            body = GetComponentInChildren<BodyJuice>();
+            if (body == null) body = BodyJuice.Wrap(k);   // (Unity's null: never ?? on a component lookup)
             WheelDust.On(k);
             k.landEvent.AddListener(OnLand);
             k.boostStartEvent.AddListener(OnBoostStart);

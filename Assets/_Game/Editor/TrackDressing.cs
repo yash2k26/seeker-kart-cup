@@ -55,6 +55,57 @@ public static partial class TrackSetup
     }
 
     static Corner? CornerAt(int i) { foreach (var c in corners) if (i >= c.start && i < c.start + c.count) return c; return null; }
+
+    /// Beach Buggy's smashables: things by the road a kart goes straight through in a burst of bits (Smashable), on the
+    /// inside of every apex, where karts cut, and in pairs on the kerb down the straights. Each is back for the next lap.
+    static void Smashables(Transform root, System.Random rnd)
+    {
+        var (kit, names) = V.id switch
+        {
+            "alpine" => ("Holiday", new[] { "present-a-cube", "present-b-round", "present-a-rectangle", "present-b-cube" }),
+            "forest" => ("Nature", new[] { "pot_large", "pot_small", "pot_large" }),
+            "speedway" => ("Racing", new[] { "pylon", "pylon", "barrierRed" }),
+            _ => ("Pirate", new[] { "crate", "barrel", "crate-bottles", "crate" }),
+        };
+        int n = centre.Length, made = 0;
+        void Drop(int i, float side, float dist, float h)
+        {
+            if (made >= 26) return;
+            string k = kit, name = names[rnd.Next(names.Length)];
+            if (V.id == "speedway" && rnd.NextDouble() < 0.4) { k = "Pirate"; name = "barrel"; }   // oil drums by the pit wall
+            MakeSmashable(Prop(root, k, name, Beside(i, side, dist), (float)rnd.NextDouble() * 360f, h));
+            made++;
+        }
+        foreach (var c in corners)
+        {
+            float inside = -c.outside;
+            Drop(c.apex, inside, HalfWidth + Kerb + 0.9f, 1.0f);
+            Drop(Wrap(c.apex + 1, n), inside, HalfWidth + Kerb + 2.2f, 0.9f);
+            Drop(Wrap(c.apex - 1, n), inside, HalfWidth + Kerb + 1.6f, 1.1f);
+        }
+        int every = Samples(140f), side2 = 1;
+        for (int i = Samples(60f); i < n; i += every)
+        {
+            if (CornerAt(i) != null) continue;
+            Drop(i, side2, HalfWidth + 0.6f, 0.95f);
+            Drop(Wrap(i + 1, n), side2, HalfWidth + 1.6f, 0.9f);
+            side2 = -side2;
+        }
+        Debug.Log($"[track] {made} smashables");
+    }
+
+    /// A trigger round the prop and Smashable on it; never static-batched, because it has to fly.
+    static void MakeSmashable(GameObject go)
+    {
+        foreach (var t in go.GetComponentsInChildren<Transform>()) GameObjectUtility.SetStaticEditorFlags(t.gameObject, 0);
+        var b = Bounds(go);
+        var box = go.AddComponent<BoxCollider>();
+        box.isTrigger = true;
+        box.center = go.transform.InverseTransformPoint(b.center);
+        var ls = go.transform.lossyScale;
+        box.size = new Vector3(b.size.x / Mathf.Max(ls.x, 0.001f), b.size.y / Mathf.Max(ls.y, 0.001f), b.size.z / Mathf.Max(ls.z, 0.001f));
+        go.AddComponent<KartCup.Smashable>();
+    }
     static bool Tight(Corner c) => c.total > 70f;
     static List<Corner> Tightest() { var l = new List<Corner>(corners); l.Sort((a, b) => b.total.CompareTo(a.total)); return l; }
 
@@ -267,8 +318,10 @@ public static partial class TrackSetup
         {
             float turn = Turn(i, 6);
             if (Mathf.Abs(turn) < 7f) continue;
-            Place(root, Art + "Models/Props/ToyCar/item-cone.fbx", toycar, centre[i] + right[i] * (HalfWidth - 0.6f) * -Mathf.Sign(turn), 0, 1.6f);
+            // smashable now (Beach Buggy's): clip the apex and the cone flies, which teaches the line without punishing it
+            MakeSmashable(Place(root, Art + "Models/Props/ToyCar/item-cone.fbx", toycar, centre[i] + right[i] * (HalfWidth - 0.6f) * -Mathf.Sign(turn), 0, 1.6f));
         }
+        Smashables(root, rnd);
 
         // after dark (TrackNight.cs): the lamps down the road, the studs along it, and the tunnel over the straight
         SodiumLamps(root);

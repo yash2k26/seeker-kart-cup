@@ -32,6 +32,9 @@ public static class Playtest
     // with -autopilot, frames on the moments that matter: a pickup (the roulette), a hit (the throw), the finish
     static readonly System.Collections.Generic.List<(double at, string name)> moments = new();
     static int lastAmmo, pickups, hits; static bool wasSpinning, wasFinished;
+    // -oob: the player is dropped into the sea 8 s after GO (out of bounds, respawn, blink); -smash: a smashable is put
+    // on the player's line at 12 s. Frames of both, and of the countdown with its start-boost line.
+    static bool oobTest, smashTest, oobDone, smashDone, countShot;
     static double every, nextAuto = -1, until = 50;
     static int autoShot;
 
@@ -66,6 +69,8 @@ public static class Playtest
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-item") item = args[i + 1];
         autopilot = args.Contains("-autopilot"); autoSet = false; autoShot = 0; nextAuto = -1; every = 0; until = 50;
         moments.Clear(); lastAmmo = 0; pickups = 0; hits = 0; wasSpinning = false; wasFinished = false;
+        oobTest = args.Contains("-oob"); smashTest = args.Contains("-smash"); oobDone = smashDone = countShot = false;
+        Smashable.Smashed -= OnSmashed; Smashable.Smashed += OnSmashed;
         for (int i = 0; i < args.Length - 1; i++) { if (args[i] == "-every") double.TryParse(args[i + 1], out every); if (args[i] == "-seconds") double.TryParse(args[i + 1], out until); }
         sweep = null;
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-camsweep")
@@ -211,6 +216,22 @@ public static class Playtest
     {
         var race = Object.FindFirstObjectByType<RaceManager>(); var p = race != null ? race.Player : null;
         if (p == null) return;
+        if (!countShot && race.state == RaceManager.State.Countdown && race.countdown < 1.6f) { countShot = true; Capture($"countdown{track}"); }
+        if (oobTest && !oobDone && goAt >= 0 && t > goAt + 8)
+        {
+            oobDone = true;
+            var rb = p.GetComponent<Kart>().rb; var at = p.transform.position + p.transform.right * 3f; at.y = WaterBody.SurfaceAt(at, out float w) ? w - 2.5f : -9f;
+            rb.position = at; rb.linearVelocity = Vector3.down * 2f;
+            foreach (var d in new[] { 0.3, 0.8, 1.2, 1.5, 2.0 }) moments.Add((t + d, $"oob{track}-{d:0.0}"));
+            Debug.Log($"[playtest] dropped the player at {at}");
+        }
+        if (smashTest && !smashDone && goAt >= 0 && t > goAt + 12)
+        {
+            smashDone = true;
+            Smashable best = null; float bestD = float.MaxValue;
+            foreach (var s in Object.FindObjectsByType<Smashable>(FindObjectsSortMode.None)) { if (s.name.Contains("cone")) continue; float d = (s.transform.position - p.transform.position).sqrMagnitude; if (d < bestD) { bestD = d; best = s; } }
+            if (best != null) { var k = p.GetComponent<Kart>(); var v = k.rb.linearVelocity; var ahead = p.transform.position + (v.sqrMagnitude > 1f ? v.normalized : p.transform.forward) * 14f; best.transform.position = ahead + Vector3.up * 0.2f; Debug.Log($"[playtest] smashable {best.name} put on the line"); }
+        }
         var caster = p.GetComponent<ItemCaster>(); var kart = p.GetComponent<Kart>();
         int ammo = caster != null && caster.item != null ? caster.ammo : 0;
         if (ammo > lastAmmo && pickups < 3) { pickups++; moments.Add((t + 0.2, $"pickup{track}-{pickups}a")); moments.Add((t + 1.0, $"pickup{track}-{pickups}b")); }
@@ -220,7 +241,12 @@ public static class Playtest
         if (p.finished && !wasFinished) foreach (var d in new[] { 0.3, 1.0, 1.7, 2.4, 3.2 }) moments.Add((t + d, $"finish{track}-{d:0.0}"));
         wasFinished = p.finished;
         for (int i = moments.Count - 1; i >= 0; i--)
-            if (t >= moments[i].at) { Capture(moments[i].name); Debug.Log($"[playtest] moment {moments[i].name}"); moments.RemoveAt(i); }
+            if (t >= moments[i].at)
+            {
+                var name = moments[i].name;
+                if (name.StartsWith("side:")) SideShot(name.Substring(5)); else Capture(name);
+                Debug.Log($"[playtest] moment {name}"); moments.RemoveAt(i);
+            }
     }
 
     /// What the feel layer is doing right now: the bubbles drawn, the speed lines' state, the player's boost.
@@ -234,6 +260,16 @@ public static class Playtest
         var lines = Object.FindFirstObjectByType<SpeedLines>(); var img = lines != null ? lines.GetComponent<UnityEngine.UI.Image>() : null;
         var pk = Object.FindFirstObjectByType<RaceManager>()?.Player?.GetComponent<Kart>();
         Debug.Log($"[playtest] probe: speed lines {(img != null ? $"enabled {img.enabled} alpha {img.color.a:0.00} sprite {img.sprite?.name}" : "missing")}; player boostReserve {pk?.boostReserve:0.00} speed {pk?.velMag:0.0}");
+    }
+
+    static void OnSmashed(Smashable s, Kart k)
+    {
+        if (!EditorApplication.isPlaying) return;
+        double t = EditorApplication.timeSinceStartup - start;
+        if (k.GetComponent<KartProgress>()?.isPlayer != true) return;
+        foreach (var d in new[] { 0.05, 0.25, 0.6 }) moments.Add((t + d, $"smash{track}-{d:0.00}"));
+        itemFrom = k.transform.position + k.transform.right * 7f + k.transform.forward * 6f + Vector3.up * 2.5f; itemAt = s.transform.position + Vector3.up * 1.5f;
+        foreach (var d in new[] { 0.15, 0.45 }) moments.Add((t + d, $"side:smash{track}-side-{d:0.00}"));
     }
 
     static void SetCamera(float[] v)

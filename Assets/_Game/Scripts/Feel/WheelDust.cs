@@ -11,7 +11,7 @@ namespace KartCup
     {
         Kart kart;
         readonly List<(KartWheel wheel, ParticleSystem ps)> rear = new();
-        Color ground, smoke;
+        Color ground, smoke, spray;
 
         public static void On(Kart kart)
         {
@@ -37,7 +37,8 @@ namespace KartCup
                 _ => new Color(0.88f, 0.76f, 0.56f),            // Palm Bay's sand
             };
             smoke = new Color(0.86f, 0.86f, 0.9f);
-            if (NightScene.Instance != null) { ground *= 0.5f; smoke *= 0.45f; ground.a = smoke.a = 1f; }
+            spray = new Color(0.85f, 0.94f, 1f);
+            if (NightScene.Instance != null) { ground *= 0.5f; smoke *= 0.45f; spray *= 0.6f; ground.a = smoke.a = spray.a = 1f; }
         }
 
         void Update()
@@ -50,15 +51,19 @@ namespace KartCup
             {
                 if (wheel == null || ps == null) continue;
                 bool offroad = wheel.surfaceProps != null && wheel.surfaceProps.speed < 0.95f;
+                // in the shallows: white spray, bigger and faster (Beach Buggy's curtains of water)
+                bool wet = WaterBody.SurfaceAt(wheel.contactPoint, out float surface) && wheel.contactPoint.y < surface + 0.1f;
                 float rate = 0f;
-                if (wheel.grounded && speed > 3f && !far)
-                    rate = offroad ? Mathf.Lerp(8f, 46f, Mathf.InverseLerp(3f, 28f, speed))
+                if ((wheel.grounded || wet) && speed > 3f && !far)
+                    rate = wet ? Mathf.Lerp(30f, 70f, Mathf.InverseLerp(3f, 25f, speed))
+                         : offroad ? Mathf.Lerp(8f, 46f, Mathf.InverseLerp(3f, 28f, speed))
                          : kart.drifting ? 22f : 0f;
                 var e = ps.emission; e.rateOverTime = rate;
                 if (rate > 0f)
                 {
-                    ps.transform.position = wheel.contactPoint + Vector3.up * 0.15f;
-                    var m = ps.main; m.startColor = offroad ? ground : smoke;
+                    ps.transform.position = wet ? new Vector3(wheel.contactPoint.x, surface + 0.1f, wheel.contactPoint.z) : wheel.contactPoint + Vector3.up * 0.15f;
+                    var m = ps.main; m.startColor = wet ? spray : offroad ? ground : smoke;
+                    m.startSpeedMultiplier = wet ? 3.2f : 1f; m.startSizeMultiplier = wet ? 1.5f : 1f;
                 }
             }
         }

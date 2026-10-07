@@ -283,6 +283,7 @@ namespace KartCup
             // all but vanished (dark over HDR daylight is still daylight once it is tone-mapped).
             if (overlay != null && overlay.TryGetComponent<Canvas>(out var canvas)) canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             flightFrom = Time.realtimeSinceStartup; flightFrame = Time.frameCount;
+            Letterbox.Show(true);                                        // cinema bars over the lap (Beach Buggy's fly-through)
         }
 
         /// Gives the camera back to its rig and brings the stage back.
@@ -292,8 +293,11 @@ namespace KartCup
             flying = false;
             float flown = Time.realtimeSinceStartup - flightFrom;
             if (flown > 2.5f) RenderBudget.Report((Time.frameCount - flightFrame) / flown);   // (a tap that skips it at once proves nothing)
+            // no cut: from the drone's last shot the camera eases down onto the chase position while 3-2-1 runs
+            Vector3 fromPos = raceCam != null ? raceCam.transform.position : Vector3.zero; Quaternion fromRot = raceCam != null ? raceCam.transform.rotation : Quaternion.identity;
             if (raceCam != null) raceCam.transform.SetLocalPositionAndRotation(rigPos, rigRot);
-            if (rig != null) rig.enabled = true;
+            if (rig != null) { rig.enabled = true; CameraBlend.From(raceCam, fromPos, fromRot, 0.9f); }
+            Letterbox.Show(false);
             foreach (var go in hiddenStage) if (go != null) go.SetActive(true);
             hiddenStage.Clear();
             if (overlay != null && overlay.TryGetComponent<Canvas>(out var canvas)) { canvas.renderMode = RenderMode.ScreenSpaceCamera; canvas.worldCamera = cam; canvas.planeDistance = 0.6f; }

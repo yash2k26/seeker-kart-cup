@@ -1048,10 +1048,12 @@ namespace PowerslideKartPhysics
         public enum SpinAxis { Yaw, Pitch, Roll }
         // KartCup: what the last spin-out was, so the feel layer can tell a strike (flipped, thrown) from a slip (oil)
         public SpinAxis lastSpinAxis = SpinAxis.Yaw;
+        [System.NonSerialized] public float invulnerableUntil;
         public int lastSpinCount;
 
         // Start spinning out around the given axis for the number of rotations
         public void SpinOut(SpinAxis spinType, int spinCount) {
+            if (Time.time < invulnerableUntil) { return; }   // KartCup: just put back on the road, blinking
             if (!spinningOut) {
                 CancelDrift();
                 CancelDriftBoost(true);

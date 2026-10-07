@@ -25,6 +25,7 @@ public static class FeelSetup
         HitPuff();
         Dizzy();
         WheelDust();
+        SmashPuff();
         AssetDatabase.SaveAssets();
         Debug.Log("[feel] built BubblePop, HitPuff, Dizzy, WheelDust");
     }
@@ -83,6 +84,31 @@ public static class FeelSetup
         }
         foreach (var ps in go.GetComponentsInChildren<ParticleSystem>()) { var mm = ps.main; mm.simulationSpace = ParticleSystemSimulationSpace.Local; }
         Save(go, "HitPuff", 2f);
+    }
+
+    /// A prop smashed: a puff of dust and chips thrown out of it.
+    static void SmashPuff()
+    {
+        var go = new GameObject("SmashPuff");
+        var dust = Particles("Dust", go.transform, Alpha("FX_SmashDust", Load("fx_puff"), new Color(0.84f, 0.78f, 0.66f, 0.9f)));
+        {
+            var m = dust.main; m.startLifetime = new ParticleSystem.MinMaxCurve(0.5f, 0.9f); m.startSpeed = new ParticleSystem.MinMaxCurve(1f, 3.5f);
+            m.startSize = new ParticleSystem.MinMaxCurve(0.7f, 1.4f); m.gravityModifier = -0.05f; m.maxParticles = 14;
+            m.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+            Burst(dust, 9);
+            var sh = dust.shape; sh.enabled = true; sh.shapeType = ParticleSystemShapeType.Sphere; sh.radius = 0.5f;
+            var lim = dust.limitVelocityOverLifetime; lim.enabled = true; lim.drag = 3f;
+            var sz = dust.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.EaseInOut(0f, 0.6f, 1f, 1.5f));
+            Fade(dust, Color.white, new Color(0.8f, 0.76f, 0.68f));
+        }
+        var chips = Particles("Chips", go.transform, Alpha("FX_Chip", Load("fx_dot", "Assets/_Game/Art/Textures/FX/fx_dot.png"), new Color(0.55f, 0.38f, 0.22f, 1f)));
+        {
+            var m = chips.main; m.startLifetime = new ParticleSystem.MinMaxCurve(0.6f, 1.0f); m.startSpeed = new ParticleSystem.MinMaxCurve(3f, 7f);
+            m.startSize = new ParticleSystem.MinMaxCurve(0.12f, 0.26f); m.gravityModifier = 2f; m.maxParticles = 16;
+            Burst(chips, 12);
+            var sh = chips.shape; sh.enabled = true; sh.shapeType = ParticleSystemShapeType.Hemisphere; sh.radius = 0.4f; sh.rotation = new Vector3(-90, 0, 0);
+        }
+        Save(go, "SmashPuff", 1.6f);
     }
 
     /// Stars circling the driver's head while the kart spins: three quads that KartCup.Dizzy turns and faces to the lens.
