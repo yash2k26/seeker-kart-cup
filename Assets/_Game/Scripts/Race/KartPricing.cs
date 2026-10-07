@@ -7,7 +7,9 @@ namespace KartCup
     {
         public const int FreeMax = 11, StreetMax = 15, HeroMax = 19;
 
-        public static double SolFor(int total) => total <= FreeMax ? 0 : total <= StreetMax ? 0.10 : total <= HeroMax ? 0.15 : 0.25;
+        // 8 Oct 2026 (research/26): Beach Buggy's car prices in the US and Europe ($4.99-9.99, 0.043-0.114 SOL) and what
+        // Solana players pay for an item they cannot resell. Was 0.10 / 0.15 / 0.25.
+        public static double SolFor(int total) => total <= FreeMax ? 0 : total <= StreetMax ? 0.05 : total <= HeroMax ? 0.08 : 0.12;
         public static string TierFor(int total) => total <= FreeMax ? "FREE" : total <= StreetMax ? "STREET" : total <= HeroMax ? "HERO" : "LEGEND";
     }
 }

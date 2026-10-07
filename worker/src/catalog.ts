@@ -15,7 +15,7 @@ export type Sku = { sku: string; kind: 'kart' | 'paint' | 'bundle' | 'item'; nam
  *  table and rule (KartSetup.cs, KartPricing.cs), so a card reads right before the Worker has quoted it. */
 export function solForPowers(p: Powers): number {
   const total = p.speed + p.turbo + p.grip + p.armor + p.attack;
-  return total <= 11 ? 0 : total <= 15 ? 0.10 : total <= 19 ? 0.15 : 0.25;
+  return total <= 11 ? 0 : total <= 15 ? 0.05 : total <= 19 ? 0.08 : 0.12;
 }
 const kart = (id: string, name: string, blurb: string, speed: number, turbo: number, grip: number, armor: number, attack: number): Sku => {
   const powers = { speed, turbo, grip, armor, attack };
@@ -26,8 +26,9 @@ const pack = (id: string, item: string, name: string, blurb: string, qty: number
 
 // research/23: sell karts, paint and what you take into a race, never drivers (three are real people). Every price
 // is in SOL (1 Oct 2026: no dollars anywhere; SKR is derived from it in prices.ts). Karts by their powers: Street
-// 0.10, Hero 0.15, Legend 0.25. Paint 0.03; packs of three race items 0.01; and two bundles: the Founder's Pack is
-// the intended purchase, the Full Garage is the anchor that makes it look sane.
+// 0.05, Hero 0.08, Legend 0.12 (8 Oct, research/26: Beach Buggy's US/EU car prices and what Solana players pay for
+// an item they cannot resell; were 0.10 / 0.15 / 0.25). Paint 0.03; packs of three race items 0.01; and two bundles:
+// the Founder's Pack (0.32 of contents for 0.18) is the intended purchase, the Full Garage (0.64 for 0.35) the anchor.
 export const CATALOG: Sku[] = [
   { sku: 'paint.sunset',   kind: 'paint', name: 'Sunset',   blurb: 'Ember fading to gold.',                    sol: 0.03 },
   { sku: 'paint.midnight', kind: 'paint', name: 'Midnight', blurb: 'Deep navy, gloss black trim.',             sol: 0.03 },
@@ -53,9 +54,9 @@ export const CATALOG: Sku[] = [
   pack('sunbomb', 'Sun Bomb',    'Sun Bombs x3', 'Lob it, count to two, stand well back.',    3, 0.015),
 
   { sku: 'bundle.founder', kind: 'bundle', name: "Founder's Pack", blurb: 'Photon, Hotfix, Mempool, Slasher, two paints and the Founder badge. Sold once, never again.',
-    sol: 0.35, until: '2027-01-10T00:00:00Z', grants: ['kart.race-future', 'kart.firetruck', 'kart.taxi', 'kart.police', 'paint.sunset', 'paint.midnight', 'badge.founder'] },
+    sol: 0.18, until: '2027-01-10T00:00:00Z', grants: ['kart.race-future', 'kart.firetruck', 'kart.taxi', 'kart.police', 'paint.sunset', 'paint.midnight', 'badge.founder'] },
   { sku: 'bundle.garage',  kind: 'bundle', name: 'Full Garage', blurb: 'Every kart and paint, including the ones we add this season, plus the Founder badge.',
-    sol: 0.6, grants: ['kart.taxi', 'kart.van', 'kart.hatchback-sports', 'kart.police', 'kart.firetruck', 'kart.garbage-truck', 'kart.tractor', 'kart.race-future',
+    sol: 0.35, grants: ['kart.taxi', 'kart.van', 'kart.hatchback-sports', 'kart.police', 'kart.firetruck', 'kart.garbage-truck', 'kart.tractor', 'kart.race-future',
                          'paint.sunset', 'paint.midnight', 'paint.rally', 'paint.white', 'badge.founder'] },
 ];
 
