@@ -31,6 +31,9 @@ namespace KartCup
         public static void ArmTrial(string id) { PlayerPrefs.SetString(TrialArmed, id); PlayerPrefs.Save(); }
         public static string ArmedTrial => PlayerPrefs.GetString(TrialArmed, "");
 
+        /// A chest's test drive: the kart's free trial handed back (the garage's TEST DRIVE arms it again).
+        public static void GrantTrial(string id) { PlayerPrefs.DeleteKey("kc.trial.used." + id); PlayerPrefs.Save(); }
+
         /// Called by the spawner when a trial kart actually rolls onto the grid: the trial is spent.
         public static void SpendTrial(string id)
         {
@@ -70,7 +73,16 @@ namespace KartCup
         {
             if (string.IsNullOrEmpty(sku)) return true;
             cache ??= PlayerPrefs.GetString(Key, "").Split(',', System.StringSplitOptions.RemoveEmptyEntries);
-            return System.Array.IndexOf(cache, sku) >= 0;
+            return System.Array.IndexOf(cache, sku) >= 0 || System.Array.IndexOf(Earned, sku) >= 0;
+        }
+
+        /// What chests gave (paints), kept apart from the Worker's list, which Set overwrites. On this phone only.
+        const string EarnedKey = "kc.earned";
+        static string[] Earned => PlayerPrefs.GetString(EarnedKey, "").Split(',', System.StringSplitOptions.RemoveEmptyEntries);
+        public static void Earn(string sku)
+        {
+            if (string.IsNullOrEmpty(sku) || System.Array.IndexOf(Earned, sku) >= 0) return;
+            PlayerPrefs.SetString(EarnedKey, string.Join(",", Earned.Append(sku))); PlayerPrefs.Save();
         }
     }
 }

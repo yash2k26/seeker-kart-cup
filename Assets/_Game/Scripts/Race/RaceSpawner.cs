@@ -23,6 +23,7 @@ namespace KartCup
         void Start()
         {
             if (roster == null || roster.characters.Length == 0) { Debug.LogError("[race] no roster"); return; }
+            Chests.ClearLast();
             if (RoomClient.InRaceRoom) { SpawnOnline(); return; }
 
             // A race entered outside a cup (editor playtest, a direct scene load) still needs a grid.
@@ -32,16 +33,17 @@ namespace KartCup
                 int.TryParse(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Replace("Race", ""), out int n);
                 Cup.Begin(CharacterDatabase.SelectedIndex, roster.characters.Length, new[] { Mathf.Clamp(n - 1, 0, Tracks.Count - 1) });
             }
-            int count = Mathf.Min(racers, gridSlots.Length);
+            // Kartel Weekly's time trial: the player alone on the grid (Weekly.Racing)
+            int count = Weekly.Racing ? 1 : Mathf.Min(racers, gridSlots.Length);
 
             for (int slot = 0; slot < count && slot < Cup.Grid.Count; slot++)
             {
                 // The grid comes from the cup: pole on race one, then the standings reversed, so leading costs you
                 // track position next time out.
-                int character = Cup.Grid[slot];
+                int character = Weekly.Racing ? Cup.PlayerCharacter : Cup.Grid[slot];
                 var def = roster.At(character);
                 bool isPlayer = character == Cup.PlayerCharacter;
-                var kartId = isPlayer ? PlayerKart(def, allowTrial: true) : def.kartId;
+                var kartId = isPlayer && !Weekly.Racing ? PlayerKart(def, allowTrial: true) : def.kartId;
                 var kart = Spawn(def, gridSlots[slot], isPlayer, character, kartId, online: false);
                 if (isPlayer && raceCamera != null) raceCamera.Initialize(kart);
             }
@@ -56,12 +58,17 @@ namespace KartCup
             var race = RaceManager.Instance;
             if (race == null) yield break;
             var show = PodiumShow.Ensure();
-            Loadout(race);
+            if (Weekly.Racing) { var boxes = FindAnyObjectByType<ItemBag>(); if (boxes != null) boxes.gameObject.SetActive(false); }   // the time trial: no items
+            else Loadout(race);
             if (show == null) { race.BeginCountdown(); yield break; }
             race.Hold();
-            TurboPad.Spawn(System.Environment.TickCount);
-            OilSlick.Spawn(System.Environment.TickCount + 1, Tracks.At(Cup.TrackIndex).difficulty);   // solo only: rooms never get them
-            show.Prizes(Tracks.At(Cup.TrackIndex).kicker, Tracks.At(Cup.TrackIndex).name.ToUpperInvariant(), new[] { "1ST", "2ND", "3RD" });
+            if (Weekly.Racing) show.Prizes("KARTEL WEEKLY · TIME TRIAL", Tracks.At(Cup.TrackIndex).name.ToUpperInvariant(), System.Array.Empty<string>());
+            else
+            {
+                TurboPad.Spawn(System.Environment.TickCount);
+                OilSlick.Spawn(System.Environment.TickCount + 1, Tracks.At(Cup.TrackIndex).difficulty);   // solo only: rooms never get them
+                show.Prizes(Tracks.At(Cup.TrackIndex).kicker, Tracks.At(Cup.TrackIndex).name.ToUpperInvariant(), new[] { "1ST", "2ND", "3RD" });
+            }
             float until = Time.time + show.IntroSeconds, skippable = Time.time + 0.6f;
             while (Time.time < until && !(Time.time > skippable && PodiumShow.Tapped())) yield return null;
             show.End();
@@ -144,8 +151,9 @@ namespace KartCup
             def.ApplyTo(kart);
             // A room with money on it races equal karts: the garage pick is paint there. Its powers count in solo
             // races and free rooms, where nobody bought a place on the podium.
+            // The Weekly's time trial is the same: a prize is never bought.
             bool paidRoom = online && RoomClient.Instance != null && RoomClient.Instance.Room.IsPaid;
-            if (!paidRoom) garage?.Find(kartId)?.ApplyTo(kart);
+            if (!paidRoom && !Weekly.Racing) garage?.Find(kartId)?.ApplyTo(kart);
             if (isPlayer) CharacterDef.Paint(go, Paints.ColorFor(def)); else def.ApplyLivery(go);
             if (NightScene.Instance != null) go.AddComponent<Headlights>().Init(kart, isPlayer);   // lamps lit after dark
 

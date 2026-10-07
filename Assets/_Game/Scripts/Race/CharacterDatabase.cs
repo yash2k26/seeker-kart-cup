@@ -9,9 +9,14 @@ namespace KartCup
         public CharacterDef[] characters = System.Array.Empty<CharacterDef>();
 
         const string Key = "kc.character";
+        static int count;   // the roster's size, from the database once loaded
+        void OnEnable() { if (characters != null && characters.Length > 0) count = characters.Length; }
+
+        /// Always a driver on the roster: a phone that picked Maroo (10) or Andrew (11) before Runa and Vee left (6 Oct)
+        /// had an index past the end, and its kart was never put on the grid.
         public static int SelectedIndex
         {
-            get => PlayerPrefs.GetInt(Key, 0);
+            get { int i = Mathf.Max(0, PlayerPrefs.GetInt(Key, 0)); return count > 0 && i >= count ? count - 1 : i; }
             set { PlayerPrefs.SetInt(Key, value); PlayerPrefs.Save(); }
         }
 

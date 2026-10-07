@@ -104,12 +104,14 @@ namespace KartCup
             return p;
         }
 
-        public static Awaitable<RaceStart> StartRace(string trackId) => Post<RaceStart>("/v1/race/start", new { deviceId = DeviceId, trackId });
+        /// mode "weekly": a Kartel Weekly time trial (the Worker files it under this week's board).
+        public static Awaitable<RaceStart> StartRace(string trackId, string mode = null) => Post<RaceStart>("/v1/race/start", new { deviceId = DeviceId, trackId, mode });
         /// `path`: the drive, 5 samples a second of [t s, x, y, z]; the Worker's referee must believe it (worker/src/referee.ts).
         public static Awaitable<RaceFinish> FinishRace(string raceToken, int totalMs, List<int> lapMs, List<int> checkpointMs, int position, List<float[]> path)
             => Post<RaceFinish>("/v1/race/finish", new { raceToken, totalMs, lapMs, checkpointMs, position, path });
         public static Awaitable<RaceFinish> ClaimRace(string raceToken) => Post<RaceFinish>("/v1/race/claim", new { raceToken });
         public static Awaitable<Board> Leaderboard(string track) => Get<Board>($"/v1/leaderboard?track={track}");
+        public static Awaitable<KartCup.Weekly.Board> WeeklyBoard(string wallet) => Get<KartCup.Weekly.Board>("/v1/weekly" + (string.IsNullOrEmpty(wallet) ? "" : "?wallet=" + wallet));
         public static Awaitable<Profile> Me() => Get<Profile>("/v1/me");
         public static Awaitable<object> DeleteMe() => Send<object>("DELETE", "/v1/me", null);
         public static Awaitable<object> ConfirmTx(string signature, string raceId) => Post<object>("/v1/tx/confirm", new { signature, raceId });

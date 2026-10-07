@@ -4,6 +4,7 @@ import { json, bad, now } from './index';
 import { signHmac, readHmac } from './auth';
 import { getProfile } from './chain';
 import { geoOf, referee, finishT, lapTimes, crossingsToFinish, type Sample } from './referee';
+import { weekOf } from './weekly';
 
 /** Is this a circuit the generator builds (TrackSetup.cs writes tracks.json)? Own keys only, never 'constructor'. */
 export const knownTrack = (id: unknown): id is string => geoOf(id) !== undefined;
@@ -13,14 +14,16 @@ const deviceOk = (d: unknown): d is string => typeof d === 'string' && d.length 
 
 type RaceToken = { r: string; d: string; t: string; s: number };
 
-/** POST /v1/race/start { deviceId, trackId } → { raceId, raceToken } — no session needed (guest mode). */
+/** POST /v1/race/start { deviceId, trackId, mode? } → { raceId, raceToken } — no session needed (guest mode).
+ *  mode "weekly": a Kartel Weekly time trial, only on this week's circuit (anything else is an ordinary race). */
 export async function raceStart(req: Request, env: Env) {
-  const { deviceId, trackId } = await req.json<any>().catch(() => ({}));
+  const { deviceId, trackId, mode } = await req.json<any>().catch(() => ({}));
   if (!deviceOk(deviceId) || !knownTrack(trackId)) return bad('deviceId and known trackId required');
   const raceId = crypto.randomUUID();
   const startedMs = Date.now();
-  await env.DB.prepare('INSERT INTO race_sessions (race_id, device_id, track_id, started_at) VALUES (?1, ?2, ?3, ?4)')
-    .bind(raceId, deviceId, trackId, Math.floor(startedMs / 1000)).run();
+  const weekly = mode === 'weekly' && trackId === weekOf(now()).track ? 'weekly' : null;
+  await env.DB.prepare('INSERT INTO race_sessions (race_id, device_id, track_id, started_at, mode, country) VALUES (?1, ?2, ?3, ?4, ?5, ?6)')
+    .bind(raceId, deviceId, trackId, Math.floor(startedMs / 1000), weekly, req.headers.get('cf-ipcountry')).run();
   return json({ raceId, raceToken: await signHmac(env, { r: raceId, d: deviceId, t: trackId, s: startedMs } satisfies RaceToken) });
 }
 
@@ -61,7 +64,7 @@ export async function raceFinish(req: Request, env: Env, _ctx: ExecutionContext,
   const v = validate(tok.t, b, tok.s);
   if ('why' in v) return bad(`rejected: ${v.why}`, 422);
 
-  const session = await env.DB.prepare('SELECT wallet, finished_at FROM race_sessions WHERE race_id = ?1').bind(tok.r).first<any>();
+  const session = await env.DB.prepare('SELECT wallet, finished_at, mode, country FROM race_sessions WHERE race_id = ?1').bind(tok.r).first<any>();
   if (!session) return bad('unknown race', 404);
   if (session.finished_at) return bad('already finished', 409);
   const owner: string | null = session.wallet ?? wallet;
@@ -74,8 +77,8 @@ export async function raceFinish(req: Request, env: Env, _ctx: ExecutionContext,
   }
   await env.DB.batch([
     env.DB.prepare('UPDATE race_sessions SET finished_at = ?2, wallet = COALESCE(wallet, ?3) WHERE race_id = ?1').bind(tok.r, now(), owner),
-    env.DB.prepare('INSERT INTO results (race_id, device_id, wallet, track_id, total_ms, best_lap_ms, laps_json, position, is_pb, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)')
-      .bind(tok.r, tok.d, owner, tok.t, v.totalMs, bestLap, JSON.stringify(v.lapMs), Number.isInteger(b.position) ? b.position : null, isPb ? 1 : 0, now()),
+    env.DB.prepare('INSERT INTO results (race_id, device_id, wallet, track_id, total_ms, best_lap_ms, laps_json, position, is_pb, created_at, mode, country) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)')
+      .bind(tok.r, tok.d, owner, tok.t, v.totalMs, bestLap, JSON.stringify(v.lapMs), Number.isInteger(b.position) ? b.position : null, isPb ? 1 : 0, now(), session.mode, session.country),
   ]);
   return json({ accepted: true, isPersonalBest: isPb, raceId: tok.r, totalMs: v.totalMs, lapMs: v.lapMs, memo: isPb ? `kc:pb:${tok.r}` : null });
 }

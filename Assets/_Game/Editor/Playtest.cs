@@ -21,7 +21,7 @@ public static class Playtest
     static bool armed, heldShot;
     static Vector3 itemFrom, itemAt;   // a second camera for the item frames: beside the road, on where it lands
     static int prevQuality;
-    static readonly double[] shotTimes = { 5, 12, 22, 34 };
+    static readonly double[] shotTimes = { 5, 12, 22, 34, 46 };   // the last: the results card, after the podium
     static readonly double[] introTimes = { 2.2, 3.4, 4.6, 7.2 };   // the drone's lap before the flag, and a turbo pad from above
     static int introShot;
 
@@ -43,6 +43,7 @@ public static class Playtest
         noHud = args.Contains("-nohud");     // a clean frame of the world, no HUD over it
         vista = args.Contains("-vista");     // and, per shot, a second frame from the player's spot toward the lighthouse
         mobile = args.Contains("-mobile");   // the phone's quality tier (Forward, eight lights per object), restored on exit
+        KartCup.Weekly.Racing = args.Contains("-weekly");   // Kartel Weekly's time trial: alone on track, no items
         look = "Lighthouse";
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-look") look = args[i + 1];   // what the vista frames look at
         item = null; itemShot = 0; thrownAt = -1; goAt = -1; armed = false; heldShot = false;
@@ -148,7 +149,7 @@ public static class Playtest
             captureAt = -1;
             shot++;
         }
-        if (t < 38) return;
+        if (t < 50) return;
 
         EditorApplication.update -= Tick;
         Report(t);

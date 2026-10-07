@@ -17,9 +17,9 @@ namespace KartCup
         [SerializeField] CharacterDatabase roster;
         [SerializeField] TMP_Text playLabel;      // says CONTINUE CUP when one is half-run
 
-        const int Select = 1, Track = 4, Rooms = 5, Lobby = 6, Garage = 7, Items = 8;
+        const int Select = 1, Track = 4, Rooms = 5, Lobby = 6, Garage = 7, Items = 8, WeeklyScreen = 9;
         // How deep each panel sits under the title: going deeper slides in from the right, coming back from the left.
-        static readonly int[] Depth = { 0, 1, 1, 1, 2, 1, 2, 1, 1 };
+        static readonly int[] Depth = { 0, 1, 1, 1, 2, 1, 2, 1, 1, 1 };
 
         /// Set before loading the menu: open straight into the lobby (rematch) or join a code (invite link).
         public static bool PendingLobby;
@@ -51,6 +51,7 @@ namespace KartCup
 
         void Start()
         {
+            if (IsMenu) Weekly.Racing = false;   // back from a time trial
             Show(startPanel, silent: true);
             // A cup already under way turns the front door into a continue: the character is settled, so re-picking
             // one would just throw the standings away.
@@ -122,6 +123,27 @@ namespace KartCup
         public void ShowLobby() => Show(Lobby);
         public void ShowGarage() => Show(Garage);
         public void ShowItems() => Show(Items);
+        public void ShowWeekly() => Show(WeeklyScreen);
+
+        /// Kartel Weekly's time trial: this week's circuit with the selected driver, alone on track (RaceSpawner).
+        public void StartWeekly()
+        {
+            if (loading || Weekly.TrackIndex < 0) return;
+            AudioDirector.Instance?.Confirm();
+            Weekly.Racing = true;
+            KartApi.Event("weekly_start", new { track = Weekly.Current.track });
+            Cup.Begin(CharacterDatabase.SelectedIndex, RosterSize, new[] { Weekly.TrackIndex });
+            Load(Cup.SceneName);
+        }
+
+        /// A single race on one circuit with the selected driver (the rival toast's RACE).
+        public void RaceOn(int track)
+        {
+            if (loading || track < 0 || track >= Tracks.Count) return;
+            AudioDirector.Instance?.Confirm();
+            Cup.Begin(CharacterDatabase.SelectedIndex, RosterSize, new[] { track });
+            Load(Cup.SceneName);
+        }
 
         /// Starts a NEW cup — every track, or the one chosen on the track panel — with the selected character.
         /// Continuing an existing cup goes through ContinueCup.

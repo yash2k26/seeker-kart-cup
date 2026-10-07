@@ -1,6 +1,7 @@
 // Seeker Kart Cup backend — one Worker, one D1. See research/14 for the reasoning behind every route.
 import { challenge, verify, readSession } from './auth';
 import { raceStart, raceFinish, raceClaim, leaderboard, me, deleteMe, event, demoUnlock } from './race';
+import { weekly } from './weekly';
 import { rpcProxy, txConfirm, purchaseVerify } from './chain';
 import { roomsCreate, roomsInfo, roomsSocket, roomsPublic, roomsEntry, invitePage, config } from './rooms';
 export { RoomDO } from './room';
@@ -38,7 +39,7 @@ export interface Env {
 const LIMITED = new Set([
   'POST /rpc', 'POST /v1/auth/challenge', 'POST /v1/auth/verify', 'POST /v1/race/start', 'POST /v1/race/finish',
   'POST /v1/race/claim', 'POST /v1/tx/confirm', 'POST /v1/purchase/verify', 'POST /v1/demo/unlock', 'POST /v1/event',
-  'POST /v1/rooms', 'GET /v1/rooms/public', 'GET /v1/config', 'GET /v1/leaderboard',
+  'POST /v1/rooms', 'GET /v1/rooms/public', 'GET /v1/config', 'GET /v1/leaderboard', 'GET /v1/weekly',
 ]);
 
 async function limited(req: Request, env: Env, key: string, rl: RateLimit | undefined = env.RL): Promise<boolean> {
@@ -61,6 +62,7 @@ const routes: Record<string, Handler> = {
   'POST /v1/tx/confirm': txConfirm,
   'POST /v1/purchase/verify': purchaseVerify,
   'GET /v1/leaderboard': leaderboard,
+  'GET /v1/weekly': weekly,
   'GET /v1/me': me,
   'DELETE /v1/me': deleteMe,
   'POST /v1/event': event,

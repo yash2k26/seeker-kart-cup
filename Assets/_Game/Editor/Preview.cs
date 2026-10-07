@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
@@ -201,6 +202,29 @@ public static class MenuPreview
             Graphics.Blit(still, film);
         }
 
+        // Kartel Weekly and the chests from known samples: no Worker in edit mode, and the chests are this machine's
+        var now = System.DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        Weekly.Preview(new Weekly.Board
+        {
+            week = 2961, track = "beach", nextTrack = "alpine", startsAt = now - 2 * 86400, endsAt = now + 4 * 86400 + 13 * 3600, now = now,
+            pot = 2000, split = new List<int> { 50, 30, 20 }, minSeekers = 3, seekers = 5, entrants = 9,
+            entries = new List<Weekly.Row>
+            {
+                new() { rank = 1, name = "mert.skr", wallet = "a", isSeeker = true, bestMs = 41230, prizePlace = 1 },
+                new() { rank = 2, name = "toly.skr", wallet = "b", isSeeker = true, bestMs = 41870, prizePlace = 2 },
+                new() { rank = 3, name = "7xKX…9fQa", wallet = "c", bestMs = 42010 },
+                new() { rank = 4, name = "akshay.skr", wallet = "d", isSeeker = true, bestMs = 42550, prizePlace = 3 },
+                new() { rank = 5, name = "you.skr", wallet = "me", isSeeker = true, bestMs = 43170 },
+                new() { rank = 6, name = "chase.skr", wallet = "f", isSeeker = true, bestMs = 43800 },
+                new() { rank = 7, name = "beeman.skr", wallet = "g", isSeeker = true, bestMs = 44920 },
+            },
+            me = new Weekly.Row { rank = 5, name = "you.skr", wallet = "me", isSeeker = true, bestMs = 43170, gapMs = 620, entrants = 9 },
+        });
+        Chests.Preview(12, Chests.Tier.Gold, Chests.Tier.Silver);
+        foreach (var w in Object.FindObjectsByType<WeeklyCard>(FindObjectsInactive.Include, FindObjectsSortMode.None)) w.ShowInEditor();
+        foreach (var c in Object.FindObjectsByType<ChestButton>(FindObjectsInactive.Include, FindObjectsSortMode.None)) c.ShowInEditor();
+        foreach (var t in Object.FindObjectsByType<TitleToast>(FindObjectsInactive.Include, FindObjectsSortMode.None)) t.ShowInEditor("mert.skr beat your Palm Bay lap by 0.42 s", "RACE");
+
         var flow = Object.FindFirstObjectByType<ScreenFlow>();
         var panels = new SerializedObject(flow).FindProperty("panels");
         for (int i = 0; i < panels.arraySize; i++)
@@ -212,6 +236,7 @@ public static class MenuPreview
             if (i == 6) foreach (var lobby in Object.FindObjectsByType<LobbyPanel>(FindObjectsSortMode.None)) lobby.RefreshSample();
             if (i == 7) foreach (var garage in Object.FindObjectsByType<GaragePanel>(FindObjectsSortMode.None)) garage.ShowInEditor(KartSetup.Karts.Length - 1);
             if (i == 8) foreach (var shop in Object.FindObjectsByType<ItemsPanel>(FindObjectsSortMode.None)) shop.ShowInEditor(0);
+            if (i == 9) foreach (var weekly in Object.FindObjectsByType<WeeklyPanel>(FindObjectsSortMode.None)) weekly.ShowInEditor();
             if (i != 7 && carousel != null) carousel.SetVisible(true);
             foreach (var img in Object.FindObjectsByType<Image>(FindObjectsSortMode.None))
                 if (img.name == "Single" || img.name == "Cell0")
@@ -221,6 +246,23 @@ public static class MenuPreview
             Canvas.ForceUpdateCanvases();
             Shot(cam, $"menu{i}");
         }
+        // The chest overlay over the title: a gold chest open, then the page that explains chests
+        var reveal = Object.FindObjectsByType<ChestReveal>(FindObjectsInactive.Include, FindObjectsSortMode.None).FirstOrDefault();
+        if (reveal != null)
+        {
+            for (int j = 0; j < panels.arraySize; j++) ((GameObject)panels.GetArrayElementAtIndex(j).objectReferenceValue).SetActive(j == 0);
+            var rc = reveal.GetComponent<Canvas>();
+            rc.renderMode = RenderMode.ScreenSpaceCamera; rc.worldCamera = cam; rc.planeDistance = 0.5f;
+            Chests.Karts = AssetDatabase.LoadAssetAtPath<KartDatabase>("Assets/_Game/Data/Karts.asset");
+            reveal.PreviewInEditor(Chests.Tier.Gold, Chests.PreviewRoll(Chests.Tier.Gold));
+            Canvas.ForceUpdateCanvases(); Shot(cam, "chest-open");
+            reveal.PreviewInEditor(Chests.Tier.Treasure, Chests.PreviewRoll(Chests.Tier.Treasure));
+            Canvas.ForceUpdateCanvases(); Shot(cam, "chest-golden");
+            reveal.PreviewInEditor(Chests.Tier.Wood, null);
+            Canvas.ForceUpdateCanvases(); Shot(cam, "chest-info");
+            reveal.GetComponent<CanvasGroup>().alpha = 0f;
+        }
+
         // The title's street without the UI over it: the whole set, then each driver close, heads turned to the lens
         // as MeetActor would have them (it never runs in edit mode).
         canvas.gameObject.SetActive(false);

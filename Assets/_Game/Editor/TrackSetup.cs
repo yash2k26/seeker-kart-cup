@@ -1016,6 +1016,7 @@ public static partial class TrackSetup
         var again = TextButton("Again", card, "NEXT RACE", Design.Accent, paper, 46, display, new Vector2(0.5f, 0), new Vector2(276, 80), new Vector2(500, 124));
         var menu = TextButton("Menu", card, "QUIT CUP", Design.Ink700, paper, 46, display, new Vector2(0.5f, 0), new Vector2(-276, 80), new Vector2(500, 124));
 
+        ResultsRewards(card, display, body);
         var results = screen.gameObject.AddComponent<ResultsPanel>();
         // Both labels are rewritten at runtime: mid-cup they read NEXT RACE / QUIT CUP, after the last race NEW CUP / MENU.
         UnityEditor.Events.UnityEventTools.AddPersistentListener(again.onClick, results.Primary);

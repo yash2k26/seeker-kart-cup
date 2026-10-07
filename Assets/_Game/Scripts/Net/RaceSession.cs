@@ -14,6 +14,7 @@ namespace KartCup
 
         [SerializeField] string trackId = "beach";
         [SerializeField] UnityEvent<bool> onResultSubmitted = new();   // isPersonalBest
+        public UnityEvent<bool> ResultSubmitted => onResultSubmitted;
 
         public string RaceId { get; private set; }
         public string RaceToken { get; private set; }
@@ -52,7 +53,7 @@ namespace KartCup
             KartApi.Event("race_start", new { trackId });
             try
             {
-                var s = await KartApi.StartRace(trackId);
+                var s = await KartApi.StartRace(trackId, Weekly.Racing ? "weekly" : null);
                 RaceId = s.raceId; RaceToken = s.raceToken;
             }
             catch (System.Exception e) { Debug.LogWarning("[race] offline start: " + e.Message); RaceToken = null; }

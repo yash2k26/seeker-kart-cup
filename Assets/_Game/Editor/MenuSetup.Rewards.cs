@@ -1,0 +1,292 @@
+using System.Linq;
+using KartCup;
+using TMPro;
+using UnityEditor;
+using UnityEngine;
+using UnityEngine.UI;
+
+/// What brings a player back, in the menu: Kartel Weekly (the title's line and its screen), the chests (the title's
+/// chest and the overlay that opens them, kept across scenes), and the one-line toast at the top of the title.
+public static partial class MenuSetup
+{
+    public const string ChestDir = Art + "Textures/UI/Chests/";
+    static readonly string[] TierIds = { "wood", "silver", "gold", "treasure" };
+    /// The tiers' light: wood brown, silver, gold, and the golden chest in the brand's own gold.
+    public static readonly Color[] TierColours = { new(0.80f, 0.52f, 0.32f), new(0.80f, 0.86f, 0.96f), new(1.00f, 0.78f, 0.25f), Design.Accent };
+
+    public static Sprite[] ChestSprites(bool open) => TierIds.Select(t => UiSprite(ChestDir + $"chest_{t}_{(open ? "open" : "closed")}.png")).ToArray();
+
+    // ---------- the title ----------
+    /// Kartel Weekly's line where the on-chain line was (it comes back when the Worker can't be reached), the chest at
+    /// bottom right (NEW VERSION moves up over it), and the toast across the top.
+    static void TitleRewards(GameObject screen, RectTransform plate)
+    {
+        var sub = plate.Find("Sub");
+        var card = Rect("Weekly", plate, new Vector2(0, 1), new Vector2(0, 1), new Vector2(120, -500), new Vector2(940, 118));
+        card.pivot = new Vector2(0, 1);
+        Design.AsTile(card, Slate, 28f, out float lip);
+        var button = card.gameObject.AddComponent<Button>();
+        var feel = card.gameObject.AddComponent<PressFeel>();
+        var face = Face("Weekly", card, lip);
+        var trophy = Rect("Trophy", face, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(64, 0), new Vector2(64, 64));
+        var ti = trophy.gameObject.AddComponent<Image>();
+        ti.sprite = IconSprite("trophy"); ti.color = Accent; ti.preserveAspect = true; ti.raycastTarget = false;
+        var head = Label("Head", face, strong, "KARTEL WEEKLY", 28, Accent, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(118, -14), new Vector2(740, 40));
+        head.characterSpacing = 6f;
+        var line = Label("Line", face, body, "", 30, Paper, TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(118, 14), new Vector2(740, 44));
+        line.enableAutoSizing = true; line.fontSizeMin = 22; line.fontSizeMax = 30;
+        var chev = Rect("Next", face, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-48, 0), new Vector2(40, 40));
+        var ci = chev.gameObject.AddComponent<Image>();
+        ci.sprite = IconSprite("next"); ci.color = Muted; ci.preserveAspect = true; ci.raycastTarget = false;
+        feel.Configure(Design.TileDown, face, lip * (Design.TileLip - 3f) / Design.TileLip);
+        // on the plate, not the card: the card is what it hides, and a hidden card would never run again
+        var weekly = plate.gameObject.AddComponent<WeeklyCard>();
+        new SerializedObject(weekly).Do(s =>
+        {
+            s.FindProperty("content").objectReferenceValue = card.gameObject;
+            s.FindProperty("fallback").objectReferenceValue = sub != null ? sub.gameObject : null;
+            s.FindProperty("title").objectReferenceValue = head;
+            s.FindProperty("line").objectReferenceValue = line;
+        });
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(button.onClick, weekly.Tap);
+        card.gameObject.SetActive(false);                 // until the Worker answers
+
+        // the chest: what is waiting (bobbing, with a count), or the golden one the stars fill toward
+        var tile = Rect("Chest", screen.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-64, 96), new Vector2(232, 232));
+        tile.pivot = new Vector2(1, 0);
+        Design.AsTile(tile, Deep, 28f, out float tlip);
+        var tbutton = tile.gameObject.AddComponent<Button>();
+        var tfeel = tile.gameObject.AddComponent<PressFeel>();
+        var tface = Face("Chest", tile, tlip);
+        var bob = Rect("Bob", tface, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 4), new Vector2(200, 200));
+        var chestImg = bob.gameObject.AddComponent<Image>();
+        chestImg.preserveAspect = true; chestImg.raycastTarget = false;
+        var closed = ChestSprites(false);
+        chestImg.sprite = closed[3];
+        var badge = Rect("Count", tile, new Vector2(1, 1), new Vector2(1, 1), new Vector2(14, 14), new Vector2(68, 68));
+        badge.pivot = new Vector2(1, 1);
+        Design.AsPill(badge, Design.Tiers[0]).raycastTarget = false;
+        var count = Label("CountLabel", badge, display, "1", 38, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 2), new Vector2(68, 68));
+        tfeel.Configure(Design.TileDown, tface, tlip * (Design.TileLip - 3f) / Design.TileLip);
+        var meter = Rect("Meter", screen.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-64, 40), new Vector2(232, 40));
+        meter.pivot = new Vector2(1, 0);
+        Design.AsPill(meter, Deep).raycastTarget = false;
+        var fillRt = Rect("Fill", meter, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        fillRt.offsetMin = new Vector2(4, 4); fillRt.offsetMax = new Vector2(-4, -4);
+        var fill = Design.AsPill(fillRt, Accent);
+        fill.type = Image.Type.Filled; fill.fillMethod = Image.FillMethod.Horizontal; fill.fillAmount = 0.4f; fill.raycastTarget = false;
+        var star = Rect("Star", meter, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(26, 0), new Vector2(34, 34));
+        var starImg = star.gameObject.AddComponent<Image>();
+        starImg.sprite = IconSprite("star"); starImg.color = Paper; starImg.preserveAspect = true; starImg.raycastTarget = false;
+        var meterText = Label("MeterLabel", meter, strong, "0/15", 26, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(12, 1), new Vector2(200, 40));
+        var chestButton = tile.gameObject.AddComponent<ChestButton>();
+        new SerializedObject(chestButton).Do(s =>
+        {
+            s.FindProperty("chest").objectReferenceValue = chestImg;
+            s.FindProperty("meterFill").objectReferenceValue = fill;
+            s.FindProperty("count").objectReferenceValue = count;
+            s.FindProperty("meter").objectReferenceValue = meterText;
+            s.FindProperty("countBadge").objectReferenceValue = badge.gameObject;
+            Fill(s.FindProperty("closedSprites"), closed.Cast<Object>().ToArray());
+        });
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(tbutton.onClick, chestButton.Tap);
+        if (screen.transform.Find("Update") is RectTransform update) update.anchoredPosition = new Vector2(-64, 360);
+
+        // the toast: one line, one action, under the profile chip, over the hoarding
+        var toastRoot = Rect("Toast", screen.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-64, -156), new Vector2(1060, 108));
+        toastRoot.pivot = new Vector2(1, 1);
+        var group = toastRoot.gameObject.AddComponent<CanvasGroup>();
+        group.alpha = 0f; group.blocksRaycasts = false;
+        var pill = Rect("Pill", toastRoot, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        Design.AsCard(pill, Panel);
+        var text = Label("Text", pill, strong, "", 30, Paper, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(40, 0), new Vector2(770, 80));
+        text.enableAutoSizing = true; text.fontSizeMin = 20; text.fontSizeMax = 30;
+        var act = Button("Act", pill, "RACE", Design.Ink600, Paper, 34, new Vector2(1, 0.5f), new Vector2(-14, 0), new Vector2(220, 84));
+        var toast = toastRoot.gameObject.AddComponent<TitleToast>();
+        new SerializedObject(toast).Do(s =>
+        {
+            s.FindProperty("group").objectReferenceValue = group;
+            s.FindProperty("pill").objectReferenceValue = pill;
+            s.FindProperty("text").objectReferenceValue = text;
+            s.FindProperty("actionLabel").objectReferenceValue = act.GetComponentInChildren<TMP_Text>();
+        });
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(act.onClick, toast.Act);
+    }
+
+    // ---------- Kartel Weekly's screen ----------
+    static GameObject WeeklyScreen(RectTransform parent)
+    {
+        var screen = Rect("Weekly", parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject;
+        var dim = Rect("Dim", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(600, 600));
+        dim.gameObject.AddComponent<Image>().color = new Color(Deep.r, Deep.g, Deep.b, 0.72f);
+        Header(screen.transform, "KARTEL WEEKLY", nameof(ScreenFlow.ShowTitle));
+        var panel = screen.AddComponent<WeeklyPanel>();
+
+        // left: the circuit, the clock, the prizes, the rules in a line, RACE
+        var info = Rect("Card", screen.transform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(64, 40), new Vector2(820, 790));
+        info.pivot = Vector2.zero;
+        Design.AsCard(info, Panel);
+        var artBox = Rect("Art", info, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -28), new Vector2(764, 250));
+        artBox.pivot = new Vector2(0.5f, 1);
+        Design.AsCard(artBox, Slate).raycastTarget = false;
+        artBox.gameObject.AddComponent<Mask>().showMaskGraphic = true;
+        var art = Rect("Picture", artBox, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject.AddComponent<Image>();
+        art.preserveAspect = false; art.raycastTarget = false;
+        var trackArt = Tracks.All.Select(t => UiSprite(Art + $"Textures/UI/Tracks/{t.id}.png")).ToArray();
+        art.sprite = trackArt.FirstOrDefault();
+        var name = Label("Track", info, display, "PALM BAY", 66, Paper, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(40, -296), new Vector2(740, 80));
+        var clock = Label("Clock", info, strong, "", 26, Muted, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(42, -376), new Vector2(740, 40));
+        clock.characterSpacing = 6f;
+        var prizes = Label("Prizes", info, strong, "", 32, Paper, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(42, -428), new Vector2(740, 90));
+        prizes.textWrappingMode = TextWrappingModes.Normal;
+        var rules = Label("Rules", info, body, "Free to enter  ·  the same kart for everyone, items off  ·  your best lap counts  ·  one prize per Seeker  ·  18+  ·  not open in India",
+                          24, Muted, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(42, -526), new Vector2(740, 84));
+        rules.textWrappingMode = TextWrappingModes.Normal;
+        var race = Button("Race", info, "RACE", Accent, Paper, 56, new Vector2(0, 0), new Vector2(40, 36), new Vector2(456, 132), icon: "flag");
+        Shine(race);
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(race.onClick, panel.Race);
+        var rulesButton = Button("RulesButton", info, "RULES", Slate, Paper, 38, new Vector2(1, 0), new Vector2(-40, 36), new Vector2(260, 132));
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(rulesButton.onClick, panel.Rules);
+
+        // right: the board
+        var board = Rect("Board", screen.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-64, 40), new Vector2(1290, 790));
+        board.pivot = new Vector2(1, 0);
+        Design.AsCard(board, Panel);
+        Label("RankCap", board, strong, "#", 26, Muted, TextAlignmentOptions.Center, new Vector2(0, 1), new Vector2(72, -28), new Vector2(80, 36));
+        Label("NameCap", board, strong, "DRIVER", 26, Muted, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(150, -28), new Vector2(400, 36)).characterSpacing = 8f;
+        Label("PrizeCap", board, strong, "PRIZE", 26, Muted, TextAlignmentOptions.Right, new Vector2(1, 1), new Vector2(-330, -28), new Vector2(240, 36)).characterSpacing = 8f;
+        Label("TimeCap", board, strong, "BEST LAP", 26, Muted, TextAlignmentOptions.Right, new Vector2(1, 1), new Vector2(-56, -28), new Vector2(240, 36)).characterSpacing = 8f;
+        const int count = 8; const float rowH = 64f, rowGap = 8f;
+        var rowObjects = new GameObject[count]; var rowBacks = new Image[count];
+        var ranks = new TMP_Text[count]; var names = new TMP_Text[count]; var times = new TMP_Text[count]; var prizeLabels = new TMP_Text[count];
+        for (int i = 0; i < count; i++)
+        {
+            var rt = Rect("Row" + i, board, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -80 - i * (rowH + rowGap)), new Vector2(1210, rowH));
+            rt.pivot = new Vector2(0.5f, 1);
+            rowBacks[i] = Design.AsRow(rt, Slate); rowBacks[i].raycastTarget = false;
+            ranks[i] = Label("Rank", rt, display, (i + 1).ToString(), 32, Paper, TextAlignmentOptions.Center, new Vector2(0, 0.5f), new Vector2(68, 0), new Vector2(80, 50));
+            ranks[i].rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            names[i] = Label("Driver", rt, strong, "", 32, Paper, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(130, 0), new Vector2(640, 50));
+            prizeLabels[i] = Label("Prize", rt, strong, "", 30, Accent, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-290, 0), new Vector2(240, 50));
+            times[i] = Label("Time", rt, strong, "", 32, Paper, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-36, 0), new Vector2(240, 50));
+            rowObjects[i] = rt.gameObject;
+            rt.gameObject.SetActive(false);
+        }
+        var state = Label("State", board, body, "Loading this week…", 34, Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 0), new Vector2(1100, 140));
+        state.textWrappingMode = TextWrappingModes.Normal;
+        var mine = Label("Mine", board, strong, "", 30, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 30), new Vector2(1210, 50));
+        mine.enableAutoSizing = true; mine.fontSizeMin = 22; mine.fontSizeMax = 30;
+
+        new SerializedObject(panel).Do(s =>
+        {
+            s.FindProperty("art").objectReferenceValue = art;
+            Fill(s.FindProperty("trackArt"), trackArt.Cast<Object>().ToArray());
+            s.FindProperty("trackName").objectReferenceValue = name;
+            s.FindProperty("clock").objectReferenceValue = clock;
+            s.FindProperty("prizes").objectReferenceValue = prizes;
+            s.FindProperty("mine").objectReferenceValue = mine;
+            s.FindProperty("state").objectReferenceValue = state;
+            Fill(s.FindProperty("rowObjects"), rowObjects.Cast<Object>().ToArray());
+            Fill(s.FindProperty("rowBacks"), rowBacks.Cast<Object>().ToArray());
+            Fill(s.FindProperty("ranks"), ranks.Cast<Object>().ToArray());
+            Fill(s.FindProperty("names"), names.Cast<Object>().ToArray());
+            Fill(s.FindProperty("times"), times.Cast<Object>().ToArray());
+            Fill(s.FindProperty("prizeLabels"), prizeLabels.Cast<Object>().ToArray());
+            s.FindProperty("rowIdle").colorValue = Slate;
+            s.FindProperty("rowMine").colorValue = Design.Ink600;
+        });
+        return screen;
+    }
+
+    // ---------- opening chests ----------
+    /// ChestReveal's overlay: its own canvas over the menus and the race (under the loading curtain), kept across
+    /// scenes once the menu has run.
+    static void ChestOverlay()
+    {
+        var go = new GameObject("ChestReveal", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster), typeof(CanvasGroup));
+        var canvas = go.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 4500;
+        var scaler = go.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(2400, 1080);
+        scaler.matchWidthOrHeight = 1f;
+        var group = go.GetComponent<CanvasGroup>();
+        group.alpha = 0f; group.blocksRaycasts = false;
+        var reveal = go.AddComponent<ChestReveal>();
+
+        var back = Rect("Back", go.transform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(600, 600));
+        back.gameObject.AddComponent<Image>().color = new Color(Deep.r, Deep.g, Deep.b, 0.95f);
+        var tap = back.gameObject.AddComponent<Button>();
+        tap.transition = Selectable.Transition.None;
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(tap.onClick, reveal.Tap);
+
+        var glow = Rect("Glow", go.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 160), new Vector2(1000, 1000));
+        var glowImg = glow.gameObject.AddComponent<Image>();
+        glowImg.sprite = Design.Glow; glowImg.color = new Color(1, 1, 1, 0.2f); glowImg.raycastTarget = false;
+        var chest = Rect("Chest", go.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 60), new Vector2(420, 420));
+        var chestImg = chest.gameObject.AddComponent<Image>();
+        chestImg.preserveAspect = true; chestImg.raycastTarget = false;
+        var tier = Label("Tier", go.transform, display, "", 76, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -36), new Vector2(2000, 96));
+        tier.enableAutoSizing = true; tier.fontSizeMin = 48; tier.fontSizeMax = 76;
+        var hint = Label("Hint", go.transform, strong, "", 40, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 150), new Vector2(1400, 60));
+        hint.characterSpacing = 12f;
+
+        // what is inside: up to eight cards in two rows of four, flipped over one at a time
+        var cards = new GameObject[8]; var icons = new Image[8]; var edges = new Image[8]; var labels = new TMP_Text[8];
+        for (int i = 0; i < 8; i++)
+        {
+            int row = i / 4, col = i % 4;
+            var card = Rect("Card" + i, go.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-606 + col * 404, -60 - row * 214), new Vector2(380, 196));
+            Design.AsCard(card, Panel).raycastTarget = false;
+            edges[i] = card.Find("Edge")?.GetComponent<Image>();
+            var icon = Rect("Icon", card, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(88, 0), new Vector2(120, 120));
+            icons[i] = icon.gameObject.AddComponent<Image>(); icons[i].preserveAspect = true; icons[i].raycastTarget = false;
+            labels[i] = Label("Label", card, strong, "", 30, Paper, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(170, 0), new Vector2(196, 170));
+            labels[i].textWrappingMode = TextWrappingModes.Normal;
+            labels[i].enableAutoSizing = true; labels[i].fontSizeMin = 20; labels[i].fontSizeMax = 30;
+            cards[i] = card.gameObject;
+            card.gameObject.SetActive(false);
+        }
+
+        var infoRoot = Rect("Info", go.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -150), new Vector2(1900, 420));
+        var info = Label("Text", infoRoot, body, "", 32, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1900, 420));
+        info.textWrappingMode = TextWrappingModes.Normal; info.lineSpacing = 18f;
+        infoRoot.gameObject.SetActive(false);
+
+        var collect = Button("Collect", go.transform, "COLLECT", Accent, Paper, 46, new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(520, 124));
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(collect.onClick, reveal.Collect);
+        collect.gameObject.SetActive(false);
+
+        new SerializedObject(reveal).Do(s =>
+        {
+            s.FindProperty("group").objectReferenceValue = group;
+            s.FindProperty("chest").objectReferenceValue = chest;
+            s.FindProperty("glow").objectReferenceValue = glow;
+            s.FindProperty("chestImage").objectReferenceValue = chestImg;
+            s.FindProperty("glowImage").objectReferenceValue = glowImg;
+            s.FindProperty("tierLabel").objectReferenceValue = tier;
+            s.FindProperty("hint").objectReferenceValue = hint;
+            s.FindProperty("info").objectReferenceValue = info;
+            s.FindProperty("collectLabel").objectReferenceValue = collect.GetComponentInChildren<TMP_Text>();
+            s.FindProperty("collectButton").objectReferenceValue = collect.gameObject;
+            s.FindProperty("infoRoot").objectReferenceValue = infoRoot.gameObject;
+            Fill(s.FindProperty("cards"), cards.Cast<Object>().ToArray());
+            Fill(s.FindProperty("cardIcons"), icons.Cast<Object>().ToArray());
+            Fill(s.FindProperty("cardEdges"), edges.Cast<Object>().ToArray());
+            Fill(s.FindProperty("cardLabels"), labels.Cast<Object>().ToArray());
+            Fill(s.FindProperty("closedSprites"), ChestSprites(false).Cast<Object>().ToArray());
+            Fill(s.FindProperty("openSprites"), ChestSprites(true).Cast<Object>().ToArray());
+            var colours = s.FindProperty("tierColors");
+            colours.arraySize = TierColours.Length;
+            for (int i = 0; i < TierColours.Length; i++) colours.GetArrayElementAtIndex(i).colorValue = TierColours[i];
+            var ids = s.FindProperty("itemIds");
+            ids.arraySize = Inventory.Packs.Length;
+            for (int i = 0; i < Inventory.Packs.Length; i++) ids.GetArrayElementAtIndex(i).stringValue = Inventory.Packs[i].id;
+            Fill(s.FindProperty("itemIcons"), Inventory.Packs.Select(p => (Object)Design.Icon(Design.ItemGlyph(p.item))).ToArray());
+            s.FindProperty("kartIcon").objectReferenceValue = IconSprite("kart");
+            s.FindProperty("paintIcon").objectReferenceValue = Design.Pill;
+            s.FindProperty("karts").objectReferenceValue = AssetDatabase.LoadAssetAtPath<KartDatabase>("Assets/_Game/Data/Karts.asset");
+        });
+    }
+}

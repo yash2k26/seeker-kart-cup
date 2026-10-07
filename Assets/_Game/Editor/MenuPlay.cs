@@ -44,11 +44,17 @@ public static class MenuPlay
             (5, () => Report("title-a")), (9, () => Report("title-b")), (14, () => Report("title-c")),
             (14.2, () => flow.Play()), (14.55, () => Shot("fly")), (15.3, () => Shot("hello", ui: true)), (16.5, () => Shot("select", ui: true)),
             (16.55, () => Object.FindFirstObjectByType<CharacterCarousel>().Poke()), (16.75, () => Shot("poke", ui: true)),
-            (16.9, () => Object.FindFirstObjectByType<CharacterCarousel>().Pick(10)), (17.6, () => Shot("pick", ui: true)),
+            (16.9, () => Object.FindFirstObjectByType<CharacterCarousel>().Pick(9)), (17.6, () => Shot("pick", ui: true)),
             (17.7, () => flow.ShowTitle()), (18.5, () => Shot("back", ui: true)),
             (18.7, () => flow.Play()), (19.8, () => flow.ShowTrack()), (21.0, () => Shot("track", ui: true)),
             (21.2, () => flow.StartRace()), (21.32, () => Shot("curtain", ui: true)),
             (29.0, () => { Debug.Log($"[menuplay] race scene: {UnityEngine.SceneManagement.SceneManager.GetActiveScene().name}, curtain alpha {LoadingCurtain.Instance?.GetComponent<CanvasGroup>()?.alpha}"); Shot("race", ui: true); }),
+            // a win: the podium, then the card with the chest it earned, OPEN, three taps, what was inside
+            (45.0, () => { var race = Object.FindFirstObjectByType<RaceManager>(); if (race != null && race.Player != null) race.Finish(race.Player); }),
+            (56.0, () => { Debug.Log($"[menuplay] chest earned: {Chests.LastEarn.tier} (+{Chests.LastEarn.stars} stars), waiting {Chests.Pending}"); Shot("results", ui: true); }),
+            (56.2, () => Object.FindFirstObjectByType<ChestBadge>()?.Open()), (57.4, () => Shot("chest-drop", ui: true)),
+            (57.6, () => ChestReveal.Instance?.Tap()), (58.0, () => ChestReveal.Instance?.Tap()), (58.4, () => ChestReveal.Instance?.Tap()),
+            (61.0, () => Shot("chest-cards", ui: true)),
         };
         if (stage < steps.Length) { if (t >= steps[stage].at) steps[stage++].act(); return; }
         EditorApplication.update -= Tick;
@@ -76,7 +82,8 @@ public static class MenuPlay
     /// `ui`: the overlay canvases (menu, curtain) borrow the camera for the shot, as they would draw on the phone.
     static void Shot(string name, bool ui = false)
     {
-        var cam = Camera.main;
+        // the podium borrows the race camera off its rig (and its MainCamera tag with it): any enabled camera will do
+        var cam = Camera.main ?? Object.FindObjectsByType<Camera>(FindObjectsSortMode.None).Where(c => c.isActiveAndEnabled && c.targetTexture == null).OrderByDescending(c => c.depth).FirstOrDefault();
         if (cam == null) { Debug.LogWarning("[menuplay] no camera for " + name); return; }
         int w = 2400, h = 1080;
         var moved = ui ? Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None).Where(c => c.isRootCanvas && c.renderMode == RenderMode.ScreenSpaceOverlay).ToArray() : new Canvas[0];

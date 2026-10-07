@@ -224,7 +224,7 @@ public static class Design
     /// White glyph on clear, 128 px, made once into Gen/Icons. play, back, next, globe, trophy, kart, user, flag; the
     /// race items (rocket, homing, bomb, nitro, bouncer, sunbomb, trap); arc (the loading spinner).
     public static readonly string[] Drawn = { "play", "back", "next", "globe", "trophy", "kart", "user", "flag",
-                                              "rocket", "homing", "bomb", "nitro", "bouncer", "sunbomb", "trap", "arc", "download" };
+                                              "rocket", "homing", "bomb", "nitro", "bouncer", "sunbomb", "trap", "arc", "download", "star" };
     /// The race items' glyphs by ItemManager name.
     public static string ItemGlyph(string item) => item switch
     {
@@ -247,6 +247,7 @@ public static class Design
                                      Mathf.Min(Mathf.Min(Circle(x, y, 30, 34, 15), Circle(x, y, 98, 34, 15)), Box(x, y, 98, 72, 6, 14, 3))),
             "user" => (x, y) => Mathf.Min(Circle(x, y, 64, 84, 22), Box(x, y, 64, 30, 38, 22, 20)),
             "flag" => (x, y) => Mathf.Min(Box(x, y, 34, 64, 5, 46, 4), Flag(x, y)),
+            "star" => (x, y) => Star(x, y, 64, 60, 58, 25),
             // the race items, one glyph each (the HUD's item slot, the shop's rows)
             "rocket" => (x, y) => Mathf.Max(Mathf.Min(Mathf.Min(Seg(x, y, 42, 42, 88, 88, 28), Circle(x, y, 30, 30, 9)),
                                                      Mathf.Min(Seg(x, y, 35, 49, 16, 51, 11), Seg(x, y, 49, 35, 51, 16, 11))),
@@ -305,6 +306,20 @@ public static class Design
         float t = Mathf.Clamp01(Vector2.Dot(p, d) / d.sqrMagnitude);
         return (p - d * t).magnitude - w * 0.5f;
     }
+    /// A five-pointed star (the chests' stars): its points and the pentagon between them, as triangles.
+    static float Star(float x, float y, float cx, float cy, float outer, float inner)
+    {
+        Vector2 P(float deg, float r) => new(cx + r * Mathf.Cos(deg * Mathf.Deg2Rad), cy + r * Mathf.Sin(deg * Mathf.Deg2Rad));
+        float d = float.MaxValue; var c = new Vector2(cx, cy);
+        for (int k = 0; k < 5; k++)
+        {
+            float a = 90f + 72f * k;
+            d = Mathf.Min(d, Tri(x, y, P(a - 36f, inner), P(a, outer), P(a + 36f, inner)));
+            d = Mathf.Min(d, Tri(x, y, c, P(a - 36f, inner), P(a + 36f, inner)));
+        }
+        return d - 1.5f;
+    }
+
     static float Box(float x, float y, float cx, float cy, float hw, float hh, float r)
     {
         float dx = Mathf.Abs(x - cx) - hw + r, dy = Mathf.Abs(y - cy) - hh + r;

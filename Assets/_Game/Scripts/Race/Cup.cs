@@ -46,7 +46,8 @@ namespace KartCup
             var wanted = trackList.ToList();
             Active = true;
             RaceIndex = 0;
-            PlayerCharacter = playerCharacter;
+            PlayerCharacter = ((playerCharacter % rosterSize) + rosterSize) % rosterSize;   // on the roster, or the grid would leave the player out
+            playerCharacter = PlayerCharacter;
             tracks.Clear(); tracks.AddRange(wanted);
             points.Clear();
             grid.Clear();

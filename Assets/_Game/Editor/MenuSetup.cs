@@ -13,7 +13,7 @@ using UnityEngine.UI;
 // Builds Menu.unity: title, character select, track select and leaderboard, over a live 3D vista with the kart you
 // will race.
 // Run: Unity -batchmode -projectPath . -executeMethod MenuSetup.Build -quit   (menu Build > Build Menu Scene)
-public static class MenuSetup
+public static partial class MenuSetup
 {
     const string ScenePath = "Assets/_Game/Scenes/Menu.unity";
     const string Art = "Assets/_Game/Art/";
@@ -60,12 +60,13 @@ public static class MenuSetup
         var lobby = LobbyScreen(safe);
         var garage = GarageScreen(safe, podium, carousel);
         var items = ItemsScreen(safe);
+        var weeklyScreen = WeeklyScreen(safe);
 
         var so = new SerializedObject(flow);
         so.FindProperty("roster").objectReferenceValue = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
         so.FindProperty("playLabel").objectReferenceValue = title.transform.Find("Plate/Actions/Play/PlayFace/PlayLabel")?.GetComponent<TMP_Text>();
         var panels = so.FindProperty("panels");
-        panels.arraySize = 9;
+        panels.arraySize = 10;
         panels.GetArrayElementAtIndex(0).objectReferenceValue = title;
         panels.GetArrayElementAtIndex(1).objectReferenceValue = select;
         panels.GetArrayElementAtIndex(2).objectReferenceValue = board;
@@ -75,9 +76,11 @@ public static class MenuSetup
         panels.GetArrayElementAtIndex(6).objectReferenceValue = lobby;
         panels.GetArrayElementAtIndex(7).objectReferenceValue = garage;
         panels.GetArrayElementAtIndex(8).objectReferenceValue = items;
+        panels.GetArrayElementAtIndex(9).objectReferenceValue = weeklyScreen;
         so.ApplyModifiedPropertiesWithoutUndo();
 
         Curtain();
+        ChestOverlay();
         new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
         var boot = new GameObject("Boot");
         boot.AddComponent<GameBoot>();
@@ -445,6 +448,7 @@ public static class MenuSetup
         var mark = logo.gameObject.AddComponent<Image>();
         mark.sprite = lockup; mark.preserveAspect = true; mark.raycastTarget = false;
         plate.Find("Sub").GetComponent<RectTransform>().anchoredPosition = new Vector2(120, -512);
+        TitleRewards(screen, plate);
 
         return screen;
     }

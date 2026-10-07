@@ -53,8 +53,10 @@ namespace KartCup
             // card say "you finished 6th" while handing out the win's 10 points.
             var order = FinishOrder(race);
             int place = Mathf.Max(1, order.IndexOf(who) + 1);
+            if (Weekly.Racing) { TimeTrial(who); return; }
             Cup.Record(order.Select(r => r.characterIndex).ToList());
             bool newBest = Tracks.RecordBest(Cup.TrackId, who.finishTime);
+            Chests.Earn(place);   // a podium earns a chest (ChestBadge shows it on the card)
 
             bool single = Cup.IsSingleRace, final = Cup.IsFinalRace;
             int cupPlace = Cup.PlayerPlace;
@@ -131,6 +133,25 @@ namespace KartCup
             UiMotion.Show(panel, panel.transform.childCount > 0 ? panel.transform.GetChild(0) : null);
         }
 
+        /// Kartel Weekly's time trial: no podium and no points, just the laps. WeeklyResult on the card adds where the
+        /// best one stands this week once the Worker has it.
+        void TimeTrial(KartProgress who)
+        {
+            float best = who.lapTimes.Count > 0 ? who.lapTimes.Min() : 0f;
+            if (headline != null) headline.text = "TIME TRIAL";
+            if (status != null) status.text = best > 0 ? $"Best lap {RaceHud.Clock(best)}" : "No lap counted";
+            if (table != null) table.text = string.Join("\n", who.lapTimes.Select((t, i) => Row(i, $"Lap {i + 1}", RaceHud.Clock(t), t == best)));
+            if (primaryLabel != null) primaryLabel.text = "TRY AGAIN";
+            if (secondaryLabel != null) secondaryLabel.text = "MENU";
+            Haptics.Play(Haptics.Kind.Tick);
+            AudioDirector.Instance?.Finish(false);
+            RaceSession.Instance?.OnFinish(1);
+            if (saveButton != null) saveButton.SetActive(!KartApi.HasSession);
+            StartCoroutine(CardAfter(1.2f));
+        }
+
+        IEnumerator CardAfter(float seconds) { yield return new WaitForSecondsRealtime(seconds); ShowCard(); }
+
         // ---------- online ----------
         void OnlineFinish(KartProgress who, RaceManager race)
         {
@@ -195,6 +216,7 @@ namespace KartCup
             if (key != ceremonyFor)
             {
                 ceremonyFor = key;
+                if (!room.IsPaid) Chests.Earn(mine != null && !mine.dnf ? place : 0);   // never from a paid room
                 bool cupPodium = final && !single;
                 var top = cupPodium && r.standings != null
                     ? r.standings.Take(3).Select(s => (s.id, s.name)).ToList()
