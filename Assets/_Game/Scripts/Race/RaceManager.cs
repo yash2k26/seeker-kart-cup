@@ -125,7 +125,11 @@ namespace KartCup
             if (p.finished) return;
             p.finished = true;
             p.finishTime = Now;
-            p.GetComponent<Kart>().active = false;
+            // Solo, a kart over the line keeps driving (the player's on autopilot, under a swinging camera); online every
+            // kart stops, as before: what the other phones see of ours is the room's to show.
+            if (RoomClient.InRaceRoom) p.GetComponent<Kart>().active = false;
+            else if (p.isPlayer) FinishLap.Cruise(p);
+            p.GetComponent<KartHooks>()?.OnFinish();                            // the driver's cheer, and the winner's bark
             onFinish.Invoke(p);
             if (p.isPlayer) state = State.Finished;
         }

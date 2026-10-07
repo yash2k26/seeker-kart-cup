@@ -19,6 +19,7 @@ namespace KartCup
         [SerializeField] Color idle = new(0.18f, 0.043f, 0.439f);
         // What the slot shows while an item is held: its glyph (Design's), by ItemManager name.
         [SerializeField] Image itemIcon;
+        [SerializeField] TMP_Text ammoLabel;       // "×3": a box gives three shots, and the slot never said so
         [SerializeField] string[] glyphNames = System.Array.Empty<string>();
         [SerializeField] Sprite[] glyphs = System.Array.Empty<Sprite>();
         TMP_Text itemWord; Color itemWordIdle;
@@ -28,6 +29,11 @@ namespace KartCup
         Kart playerKart;
         ItemCaster playerItems;
         float bigUntil, wrongSince = -1f;
+        // The roulette (Beach Buggy's): a pickup spins through the glyphs before it lands. Tapping ITEM stops it early.
+        const float RollSeconds = 0.75f;
+        float rollUntil, nextFlip; bool rolling, wasArmed; int flips;
+        public bool Rolling => rolling;
+        public void StopRoulette() => rollUntil = 0f;
         int lastPosition, lastLap, lastTier;
         bool itemArmed;
 
@@ -43,7 +49,20 @@ namespace KartCup
             race = RaceManager.Instance;
             if (race == null) return;
             race.onCountdown.AddListener(n => Big(n > 0 ? n.ToString() : "GO!"));
-            race.onFinish.AddListener(p => { if (p.isPlayer) Big("FINISH"); });
+            // The finish says where you came, Beach Buggy's way: a big "4TH", or a gold "1ST!" (in the order karts crossed)
+            race.onFinish.AddListener(p =>
+            {
+                if (!p.isPlayer) return;
+                if (Elimination.Instance != null) { Big("FINISH"); return; }
+                int place = 0; foreach (var r in race.racers) if (r.finished && r.finishTime <= p.finishTime) place++;
+                // high on the screen: the camera swings round to the driver's face, and the word must not sit on it
+                if (bigLabel != null) bigLabel.rectTransform.anchoredPosition = new Vector2(0f, 330f);
+                Big(place <= 1 ? "<color=#FFB126>1ST!</color>" : Ordinal(place).ToUpperInvariant(), 3.2f);
+                // the race is over: what the thumbs used is put away (the buttons go with ResultsPanel)
+                if (itemLabel != null) itemLabel.gameObject.SetActive(false);
+                if (ammoLabel != null) ammoLabel.gameObject.SetActive(false);
+                if (boostFill != null && boostFill.transform.parent != null) boostFill.transform.parent.gameObject.SetActive(false);
+            });
         }
 
         void Big(string s, float seconds = -1f)
@@ -90,7 +109,7 @@ namespace KartCup
             if (timeLabel != null) timeLabel.text = Clock(race.raceTime);
             bool armed = playerItems != null && playerItems.item != null && playerItems.ammo > 0;   // a fired item is no longer held
             string held = armed ? playerItems.item.itemName : null;
-            if (itemLabel != null) itemLabel.text = armed ? (held == "Homing Item" ? "HOMING" : held.ToUpperInvariant()) : "";
+            if (itemLabel != null && !rolling) itemLabel.text = armed ? (held == "Homing Item" ? "HOMING" : held.ToUpperInvariant()) : "";
             if (itemButton != null && (armed != itemArmed || held != heldName))
             {
                 var c = armed ? accent : idle;
@@ -102,6 +121,9 @@ namespace KartCup
                 if (armed) UiMotion.Punch(itemButton.transform, 1.12f, 0.24f);
                 itemArmed = armed; heldName = held;
             }
+
+            Roulette(armed, held);
+            if (ammoLabel != null) ammoLabel.text = armed && !rolling && playerItems.ammo > 1 ? $"×{playerItems.ammo}" : "";
 
             if (boostFill != null && playerKart != null)
             {
@@ -145,6 +167,33 @@ namespace KartCup
             if (!wrong) { wrongSince = -1f; return; }
             if (wrongSince < 0f) wrongSince = Time.time;
             if (Time.time - wrongSince > 1.2f) { Big("WRONG WAY", 0.2f); AudioDirector.Instance?.Warn(); }
+        }
+
+        void Roulette(bool armed, string held)
+        {
+            if (armed && !wasArmed && glyphs.Length > 1) { rollUntil = Time.time + RollSeconds; nextFlip = 0f; rolling = true; flips = 0; }
+            wasArmed = armed;
+            if (!rolling || itemIcon == null) return;
+            if (!armed) { rolling = false; return; }
+            if (Time.time < rollUntil)
+            {
+                if (Time.time < nextFlip) return;
+                nextFlip = Time.time + 0.07f;
+                var next = glyphs[Random.Range(0, glyphs.Length)];
+                if (next == itemIcon.sprite) next = glyphs[(System.Array.IndexOf(glyphs, next) + 1) % glyphs.Length];
+                itemIcon.sprite = next; itemIcon.enabled = true;
+                if (itemWord != null) itemWord.enabled = false;
+                if (itemLabel != null) itemLabel.text = "";
+                if (++flips % 2 == 0) AudioDirector.Instance?.Click();
+                return;
+            }
+            rolling = false;                                         // it lands: the real item, a punch and a chime
+            var glyph = Glyph(held);
+            itemIcon.sprite = glyph; itemIcon.enabled = glyph != null;
+            if (itemWord != null) itemWord.enabled = glyph == null;
+            UiMotion.Punch(itemButton.transform, 1.2f, 0.3f);
+            AudioDirector.Instance?.Confirm();
+            Haptics.Play(Haptics.Kind.Tick);
         }
 
         Sprite Glyph(string item)

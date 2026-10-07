@@ -44,6 +44,9 @@ namespace PowerslideKartPhysics
         public float inputDeadZone = 0.1f;
         Vector2 rotateInput = Vector2.zero;
         bool lookBack;
+        // KartCup: a scripted orbit (degrees round the kart, 0 = behind, 180 = in front) for the finish line's swing
+        [System.NonSerialized] public bool orbitOverride;
+        [System.NonSerialized] public float orbitDegrees;
 
         private void Awake() {
             cam = GetComponent<Camera>();
@@ -119,7 +122,8 @@ namespace PowerslideKartPhysics
             Vector2 rotateInputNormalized = rotateInput.normalized;
 
             // Apply input to movement
-            float targetAngle = rotateInput.magnitude < inputDeadZone ? 0.0f : Mathf.Atan2(rotateInputNormalized.x, rotateInputNormalized.y);
+            float targetAngle = orbitOverride ? orbitDegrees * Mathf.Deg2Rad
+                : rotateInput.magnitude < inputDeadZone ? 0.0f : Mathf.Atan2(rotateInputNormalized.x, rotateInputNormalized.y);
             localDir = lookBack ? Vector3.back : Vector3.Slerp(localDir, new Vector3(-Mathf.Sin(targetAngle), 0.0f, -Mathf.Cos(targetAngle)), 0.1f);
             tempRot.localPosition = new Vector3(localDir.x, 0.0f, localDir.z * (lookBack ? -1.0f : 1.0f)) * distance + Vector3.up * height;
 

@@ -99,7 +99,7 @@ namespace KartCup
                 var w = Podium(c, Name(c));
                 if (paid != null && i < paid.prizes.Count) w.prize = "+" + WalletFlow.Amount(paid.prizes[i], paid.currency);
                 return w;
-            }).ToList(), heading, 1.4f));
+            }).ToList(), heading, 2.6f));   // after the finish line's moment: the place, the swing to the driver's face
         }
 
         // ---------- the podium, then the card ----------

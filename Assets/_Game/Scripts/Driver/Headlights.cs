@@ -55,7 +55,7 @@ namespace KartCup
         {
             foreach (var ps in GetComponentsInChildren<ParticleSystem>(true))
             {
-                if (!(ps.name.Contains("Exhaust") || ps.name.Contains("Drift") || ps.name.Contains("Collision"))) continue;
+                if (!(ps.name.Contains("Exhaust") || ps.name.Contains("Collision"))) continue;   // drift sparks stay bright: they are the tier read
                 var main = ps.main;
                 var start = main.startColor;
                 if (start.mode == ParticleSystemGradientMode.Color) { var c = start.color; main.startColor = new Color(c.r * k, c.g * k, c.b * k, c.a); }

@@ -247,7 +247,7 @@ public static class Design
     public static string ItemGlyph(string item) => item switch
     {
         "Rocket" => "rocket", "Homing Item" => "homing", "Bomb" => "bomb", "Nitro" => "nitro",
-        "Bouncer" => "bouncer", "Sun Bomb" => "sunbomb", "Trap" => "trap", _ => null,
+        "Bouncer" => "bouncer", "Sun Bomb" => "sunbomb", "Trap" => "trap", "Turbo" => "nitro", _ => null,
     };
     public static Sprite Icon(string name)
     {

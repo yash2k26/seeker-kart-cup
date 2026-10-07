@@ -57,7 +57,11 @@ namespace KartCup
                 case Control.Drift: input.SetDriftMobile(down); break;
                 case Control.Brake: input.SetBrakeMobile(down ? 1f : 0f); break;
                 case Control.Boost: input.SetBoostMobile(down); break;
-                case Control.Item: if (down) input.PressItemMobile(); break;
+                case Control.Item:
+                    if (!down) break;
+                    // while the slot is still spinning, a tap stops it on the item (it does not fire it)
+                    if (RaceHud.Instance != null && RaceHud.Instance.Rolling) RaceHud.Instance.StopRoulette(); else input.PressItemMobile();
+                    break;
                 case Control.Accelerate: input.SetAccelMobile(down ? 1f : 0f); break;
                 case Control.SteerLeft: steering?.SetLeft(down); break;
                 case Control.SteerRight: steering?.SetRight(down); break;

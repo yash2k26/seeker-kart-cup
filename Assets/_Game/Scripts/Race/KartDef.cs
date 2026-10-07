@@ -34,7 +34,7 @@ namespace KartCup
             kart.steerRate *= 1f + g * 0.04f;
             kart.maxSteer *= 1f + g * 0.025f;
             kart.sidewaysFriction *= 1f + g * 0.03f;
-            kart.spinDecel *= 1f + a * 0.12f;
+            kart.spinDecel *= Mathf.Max(0.4f, 1f - a * 0.1f);   // ARMOR: a hit costs less speed (spinDecel slows a spinning kart)
             if (kart.rb != null) kart.rb.mass *= 1f + a * 0.08f;
             var powers = KartPowers.On(kart.gameObject);
             powers.attack *= 1f + k * 0.15f;

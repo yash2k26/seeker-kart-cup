@@ -29,6 +29,9 @@ public static class Playtest
     // in motion. -every S: a frame every S seconds from the green light (auto<track>-NN.png). -seconds N: run that long.
     static bool autopilot, autoSet;
     static float[][] sweep;   // -camsweep "dist,height,look,fov;...": each auto frame with the next camera
+    // with -autopilot, frames on the moments that matter: a pickup (the roulette), a hit (the throw), the finish
+    static readonly System.Collections.Generic.List<(double at, string name)> moments = new();
+    static int lastAmmo, pickups, hits; static bool wasSpinning, wasFinished;
     static double every, nextAuto = -1, until = 50;
     static int autoShot;
 
@@ -62,6 +65,7 @@ public static class Playtest
         item = null; itemShot = 0; thrownAt = -1; goAt = -1; armed = false; heldShot = false;
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-item") item = args[i + 1];
         autopilot = args.Contains("-autopilot"); autoSet = false; autoShot = 0; nextAuto = -1; every = 0; until = 50;
+        moments.Clear(); lastAmmo = 0; pickups = 0; hits = 0; wasSpinning = false; wasFinished = false;
         for (int i = 0; i < args.Length - 1; i++) { if (args[i] == "-every") double.TryParse(args[i + 1], out every); if (args[i] == "-seconds") double.TryParse(args[i + 1], out until); }
         sweep = null;
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-camsweep")
@@ -124,10 +128,12 @@ public static class Playtest
             if (t >= nextAuto)
             {
                 Capture($"auto{track}-{autoShot:00}"); autoShot++; nextAuto += every;
+                if (autoShot <= 3) Probe();
                 if (sweep != null) SetCamera(sweep[autoShot % sweep.Length]);   // the next frame is taken with the next camera
             }
             else if (sweep != null && autoShot == 0 && nextAuto - t > every - 0.1) SetCamera(sweep[0]);
         }
+        if (autopilot) Moments(t);
         if (!autopilot && shot < shotTimes.Length && captureAt < 0 && t >= shotTimes[shot])
         {
             var pause = Object.FindFirstObjectByType<PauseMenu>();
@@ -199,6 +205,35 @@ public static class Playtest
         player.gameObject.AddComponent<KartAi>().Configure(null, first, 99);
         Debug.Log($"[playtest] autopilot drives {player.racerName}");
         return true;
+    }
+
+    static void Moments(double t)
+    {
+        var race = Object.FindFirstObjectByType<RaceManager>(); var p = race != null ? race.Player : null;
+        if (p == null) return;
+        var caster = p.GetComponent<ItemCaster>(); var kart = p.GetComponent<Kart>();
+        int ammo = caster != null && caster.item != null ? caster.ammo : 0;
+        if (ammo > lastAmmo && pickups < 3) { pickups++; moments.Add((t + 0.2, $"pickup{track}-{pickups}a")); moments.Add((t + 1.0, $"pickup{track}-{pickups}b")); }
+        lastAmmo = ammo;
+        if (kart != null && kart.spinningOut && !wasSpinning && hits < 3) { hits++; moments.Add((t + 0.35, $"hit{track}-{hits}a")); moments.Add((t + 0.8, $"hit{track}-{hits}b")); }
+        wasSpinning = kart != null && kart.spinningOut;
+        if (p.finished && !wasFinished) foreach (var d in new[] { 0.3, 1.0, 1.7, 2.4, 3.2 }) moments.Add((t + d, $"finish{track}-{d:0.0}"));
+        wasFinished = p.finished;
+        for (int i = moments.Count - 1; i >= 0; i--)
+            if (t >= moments[i].at) { Capture(moments[i].name); Debug.Log($"[playtest] moment {moments[i].name}"); moments.RemoveAt(i); }
+    }
+
+    /// What the feel layer is doing right now: the bubbles drawn, the speed lines' state, the player's boost.
+    static void Probe()
+    {
+        var bubbles = Object.FindObjectsByType<ItemBubble>(FindObjectsSortMode.None);
+        var cam = UnityEngine.Camera.main;
+        int shown = 0, near = 0; foreach (var b in bubbles) { var r = b.GetComponent<Renderer>(); if (r.enabled) shown++; if (cam != null && (b.transform.position - cam.transform.position).magnitude < 40f) near++; }
+        var first = bubbles.Length > 0 ? bubbles[0].GetComponent<Renderer>() : null;
+        Debug.Log($"[playtest] probe: {bubbles.Length} bubbles, {shown} shown, {near} within 40 m; first: {(first != null ? first.sharedMaterial?.shader.name + " bounds " + first.bounds.size + " visible " + first.isVisible + " scale " + first.transform.lossyScale : "none")}");
+        var lines = Object.FindFirstObjectByType<SpeedLines>(); var img = lines != null ? lines.GetComponent<UnityEngine.UI.Image>() : null;
+        var pk = Object.FindFirstObjectByType<RaceManager>()?.Player?.GetComponent<Kart>();
+        Debug.Log($"[playtest] probe: speed lines {(img != null ? $"enabled {img.enabled} alpha {img.color.a:0.00} sprite {img.sprite?.name}" : "missing")}; player boostReserve {pk?.boostReserve:0.00} speed {pk?.velMag:0.0}");
     }
 
     static void SetCamera(float[] v)

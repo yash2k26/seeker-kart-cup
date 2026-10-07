@@ -45,6 +45,7 @@ public static partial class TrackSetup
         EditorBuildSettings.scenes = EditorBuildSettings.scenes
             .Where(s => !s.path.StartsWith("Assets/_Game/Scenes/Race")).ToArray();
         Geometry.Clear();
+        FeelSetup.Build();   // the race-feel FX the scenes and the karts load (bubble material, pops, puffs, dust)
         for (int i = 0; i < Tracks.Count; i++)
         {
             var theme = System.Array.Find(Themes, t => t.id == Tracks.At(i).id);
@@ -713,7 +714,8 @@ public static partial class TrackSetup
     static void ItemBoxes()
     {
         var box = AssetDatabase.LoadAssetAtPath<GameObject>(PKP + "Prefabs/Items/ItemGiver.prefab");
-        var toycar = AssetDatabase.LoadAssetAtPath<Material>(Art + "Materials/ToyCar.mat");
+        var bubble = FeelSetup.BubbleMaterial;
+        var quad = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
         if (box == null) return;
         var root = new GameObject("ItemBoxes").transform;
         root.gameObject.AddComponent<ItemBag>();      // deals each row different items
@@ -726,8 +728,14 @@ public static partial class TrackSetup
                 var go = (GameObject)PrefabUtility.InstantiatePrefab(box, row);
                 go.transform.SetPositionAndRotation(centre[i] + right[i] * (lane - 2) * 3.2f + Vector3.up * 1.4f,
                                                     Quaternion.LookRotation(Forward(i), Vector3.up));
-                Reskin(go, Art + "Models/Props/ToyCar/item-box.fbx", toycar, 1.5f);
-                go.AddComponent<Spin>();
+                // a see-through violet bubble with a gold question mark (Beach Buggy's '?' bubble, Kartel's colours): a quad
+                // that ItemBubble turns to the camera and bobs; 1.8 m across, its trigger (0.7 x scale) 1.26 m round
+                go.GetComponent<MeshFilter>().sharedMesh = quad;
+                var r = go.GetComponent<MeshRenderer>(); r.sharedMaterial = bubble;
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false;
+                go.transform.localScale = Vector3.one * 1.8f;
+                go.transform.position += Vector3.up * 0.25f;
+                go.AddComponent<ItemBubble>();
             }
         }
     }
@@ -823,6 +831,15 @@ public static partial class TrackSetup
         safeRt.offsetMin = Vector2.zero; safeRt.offsetMax = Vector2.zero;
         safe.AddComponent<SafeArea>();
 
+        // Speed lines round the edges while boosting (Beach Buggy blurs the edges): behind every other HUD element
+        var lines = new GameObject("SpeedLines", typeof(RectTransform), typeof(Image));
+        lines.transform.SetParent(canvasGo.transform, false);
+        lines.transform.SetAsFirstSibling();
+        var linesRt = (RectTransform)lines.transform;
+        linesRt.anchorMin = Vector2.zero; linesRt.anchorMax = Vector2.one; linesRt.offsetMin = linesRt.offsetMax = Vector2.zero;
+        var linesImg = lines.GetComponent<Image>(); linesImg.sprite = FeelSetup.SpeedLines; linesImg.color = new Color(1f, 0.96f, 0.86f, 0f); linesImg.raycastTarget = false;
+        lines.AddComponent<SpeedLines>();
+
         // Steering is two arrows on the left thumb; the right thumb keeps drift, item and brake.
         var steering = canvasGo.AddComponent<SteerButtons>();
         new SerializedObject(steering).Do(s => s.FindProperty("input").objectReferenceValue = input);
@@ -894,7 +911,9 @@ public static partial class TrackSetup
         var itemIcon = itemIconRt.gameObject.AddComponent<Image>();
         itemIcon.color = Design.OnAccent; itemIcon.preserveAspect = true; itemIcon.raycastTarget = false; itemIcon.enabled = false;
         hudSo.FindProperty("itemIcon").objectReferenceValue = itemIcon;
-        var held = new[] { "Rocket", "Homing Item", "Bomb", "Nitro", "Bouncer", "Sun Bomb", "Trap" };
+        var ammo = Text("Ammo", itemBtn.transform.Find("ItemFace"), display, "", 40, Design.OnAccent, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-18, 0), new Vector2(110, 60));
+        hudSo.FindProperty("ammoLabel").objectReferenceValue = ammo;
+        var held = new[] { "Rocket", "Homing Item", "Bomb", "Nitro", "Bouncer", "Sun Bomb", "Trap", "Turbo" };   // Turbo: the slot said ITEM
         var glyphNames = hudSo.FindProperty("glyphNames"); glyphNames.arraySize = held.Length;
         for (int i = 0; i < held.Length; i++) glyphNames.GetArrayElementAtIndex(i).stringValue = held[i];
         Fill(hudSo.FindProperty("glyphs"), held.Select(h => (Object)Design.Icon(Design.ItemGlyph(h))).ToArray());

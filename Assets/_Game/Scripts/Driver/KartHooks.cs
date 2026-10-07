@@ -22,7 +22,8 @@ namespace KartCup
         public void Bind(Kart k, BlockyDriverPose pose, bool player)
         {
             kart = k; driver = pose; isPlayer = player; rb = k.rb;
-            body = GetComponent<BodyJuice>();
+            body = GetComponentInChildren<BodyJuice>() ?? BodyJuice.Wrap(k);
+            WheelDust.On(k);
             k.landEvent.AddListener(OnLand);
             k.boostStartEvent.AddListener(OnBoostStart);
             k.spinOutEvent.AddListener(OnSpinOut);
@@ -119,12 +120,42 @@ namespace KartCup
         {
             driver?.OnHit();
             body?.Kick(-0.3f);
+            // Beach Buggy's hit: a struck kart (a rocket flips it, a bouncer rolls it, a bomb's three turns) is thrown up and
+            // lands hard, under a puff of smoke, stars round the driver's head. A slip (oil, a trap's two turns) stays down.
+            bool struck = kart.lastSpinAxis != Kart.SpinAxis.Yaw || kart.lastSpinCount >= 3;
+            if (struck) StartCoroutine(Throw());
+            var puff = Resources.Load<GameObject>("FX/HitPuff");
+            if (puff != null) Instantiate(puff, transform.position + Vector3.up * 0.9f, Quaternion.identity, transform);   // rides with the kart
+            Dizzy.On(transform, struck ? 2.2f : 1.3f);
             if (!isPlayer) return;
             HitStop.Do();
             AudioDirector.Instance?.Hit();
             if (Time.unscaledTime - lastHurt > 4f) { lastHurt = Time.unscaledTime; Voices.Say(DriverId, "hurt"); }   // a bark, not a commentary
             Haptics.Play(Haptics.Kind.Hit);
             CameraFeel.Instance?.Kick(-transform.forward, 1f);
+        }
+
+        /// One physics step after the hit, so a Sun Bomb's own knock (applied right after its spin-out) is not doubled.
+        System.Collections.IEnumerator Throw()
+        {
+            yield return new WaitForFixedUpdate();
+            if (rb != null && rb.linearVelocity.y < 2f) rb.AddForce(Vector3.up * 5.5f, ForceMode.VelocityChange);
+        }
+
+        /// The finish line's camera: round from behind the kart to in front of it, to the driver's face.
+        public void SwingCamera() => StartCoroutine(Swing());
+
+        System.Collections.IEnumerator Swing()
+        {
+            var kc = FindFirstObjectByType<KartCamera>();
+            if (kc == null) yield break;
+            kc.orbitOverride = true;
+            for (float t = 0f; t < 1.8f; t += Time.deltaTime)
+            {
+                kc.orbitDegrees = Mathf.SmoothStep(0f, 155f, t / 1.8f);
+                yield return null;
+            }
+            kc.orbitDegrees = 155f;
         }
 
         void SayWin() => Voices.Say(DriverId, "win");

@@ -29,6 +29,7 @@ namespace KartCup
 
         public void SetSpeed01(float s) => speed01 = Mathf.Clamp01(s);
         public void Boost(float seconds = 3f) => boostUntil = Time.time + seconds;
+        public bool Boosting => Time.time < boostUntil;
         public void Kick(Vector3 worldDir, float strength = 1f) => shakeVel += transform.InverseTransformDirection(worldDir.normalized) * (maxShake * strength * shakeGain);
 
         void LateUpdate()
