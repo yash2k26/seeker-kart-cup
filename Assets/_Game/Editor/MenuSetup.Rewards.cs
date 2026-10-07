@@ -342,7 +342,7 @@ public static partial class MenuSetup
         var reveal = go.AddComponent<ChestReveal>();
 
         var back = Rect("Back", go.transform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(600, 600));
-        back.gameObject.AddComponent<Image>().color = new Color(Deep.r, Deep.g, Deep.b, 0.95f);
+        back.gameObject.AddComponent<Image>().color = new Color(Deep.r, Deep.g, Deep.b, 0.985f);   // blended in linear, 5% left the title's words legible
         var tap = back.gameObject.AddComponent<Button>();
         tap.transition = Selectable.Transition.None;
         UnityEditor.Events.UnityEventTools.AddPersistentListener(tap.onClick, reveal.Tap);
@@ -394,9 +394,34 @@ public static partial class MenuSetup
             var si = sparkles[i].gameObject.AddComponent<Image>(); si.sprite = IconSprite("star"); si.color = new Color(1f, 0.95f, 0.75f, 0.9f); si.raycastTarget = false;
             sparkles[i].gameObject.SetActive(false);
         }
-        var infoRoot = Rect("Info", go.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -150), new Vector2(1900, 420));
-        var info = Label("Text", infoRoot, body, "", 32, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1900, 420));
-        info.textWrappingMode = TextWrappingModes.Normal; info.lineSpacing = 18f;
+        // with nothing to open: how chests come, three tiles to glance at; the drop rates (info) behind DROP RATES
+        var infoRoot = Rect("Info", go.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(2000, 1080));
+        var howTo = Rect("HowTo", infoRoot, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -80), new Vector2(1620, 270));
+        var stars = Chests.StarsFor;
+        var tiles = new (Sprite icon, bool tinted, string title, string line)[]
+        {
+            (IconSprite("trophy"), true, "FINISH TOP 3", "win a chest"),
+            (IconSprite("star"), true, "EARN STARS", $"1st {stars[0]}  ·  2nd {stars[1]}  ·  3rd {stars[2]}"),
+            (ChestSprites(false)[(int)Chests.Tier.Treasure], false, "FILL THE METER", "Golden Treasure Chest"),
+        };
+        for (int i = 0; i < tiles.Length; i++)
+        {
+            var tile = Rect("Tile" + i, howTo, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2((i - 1) * 560, 0), new Vector2(500, 270));
+            Design.AsCard(tile, Panel).raycastTarget = false;
+            var big = tiles[i].tinted ? 110 : 150;   // the chest sprite has room round it; the glyphs don't
+            var icon = Rect("Icon", tile, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 52), new Vector2(big, big)).gameObject.AddComponent<Image>();
+            icon.sprite = tiles[i].icon; icon.color = tiles[i].tinted ? Accent : Color.white; icon.preserveAspect = true; icon.raycastTarget = false;
+            Label("Title", tile, strong, tiles[i].title, 40, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, -42), new Vector2(470, 54));
+            Label("Line", tile, body, tiles[i].line, 28, Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, -92), new Vector2(470, 40));
+            if (i == 0) continue;
+            var arrow = Rect("Arrow" + i, howTo, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2((i - 1.5f) * 560, 0), new Vector2(44, 44)).gameObject.AddComponent<Image>();
+            arrow.sprite = IconSprite("next"); arrow.color = Muted; arrow.raycastTarget = false;
+        }
+        var info = Label("Rates", infoRoot, body, "", 34, Paper, TextAlignmentOptions.Left, new Vector2(0.5f, 0.5f), new Vector2(40, -80), new Vector2(1060, 300));
+        info.lineSpacing = 36f;
+        info.gameObject.SetActive(false);
+        var rates = Button("RatesButton", infoRoot, "DROP RATES", Slate, Paper, 30, new Vector2(0.5f, 0.5f), new Vector2(0, -290), new Vector2(340, 84));
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(rates.onClick, reveal.ToggleRates);
         infoRoot.gameObject.SetActive(false);
 
         var collect = Button("Collect", go.transform, "COLLECT", Accent, Paper, 46, new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(520, 124));
@@ -416,6 +441,8 @@ public static partial class MenuSetup
             s.FindProperty("collectLabel").objectReferenceValue = collect.GetComponentInChildren<TMP_Text>();
             s.FindProperty("collectButton").objectReferenceValue = collect.gameObject;
             s.FindProperty("infoRoot").objectReferenceValue = infoRoot.gameObject;
+            s.FindProperty("howTo").objectReferenceValue = howTo.gameObject;
+            s.FindProperty("ratesLabel").objectReferenceValue = rates.GetComponentInChildren<TMP_Text>();
             Fill(s.FindProperty("cards"), cards.Cast<Object>().ToArray());
             Fill(s.FindProperty("cardIcons"), icons.Cast<Object>().ToArray());
             Fill(s.FindProperty("cardEdges"), edges.Cast<Object>().ToArray());

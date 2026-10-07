@@ -249,7 +249,7 @@ public static class MenuPreview
             Canvas.ForceUpdateCanvases();
             Shot(cam, $"menu{i}");
         }
-        // The chest overlay over the title: a gold chest open, then the page that explains chests
+        // The chest overlay over the title: a gold chest open, then the page that explains chests and its drop rates
         var reveal = Object.FindObjectsByType<ChestReveal>(FindObjectsInactive.Include, FindObjectsSortMode.None).FirstOrDefault();
         if (reveal != null)
         {
@@ -263,6 +263,8 @@ public static class MenuPreview
             Canvas.ForceUpdateCanvases(); Shot(cam, "chest-golden");
             reveal.PreviewInEditor(Chests.Tier.Wood, null);
             Canvas.ForceUpdateCanvases(); Shot(cam, "chest-info");
+            reveal.ToggleRates();
+            Canvas.ForceUpdateCanvases(); Shot(cam, "chest-rates");
             reveal.GetComponent<CanvasGroup>().alpha = 0f;
         }
 

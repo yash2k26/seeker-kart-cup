@@ -11,7 +11,8 @@ namespace KartCup
     /// curtain), so the results card can open the chest it just earned and the title can open the rest.
     /// The ceremony: the chest drops in with its name (the tier is already decided, and shown: no fake climbs, no near
     /// misses), three taps shake it harder with its colour leaking out, it bursts open, and what is inside flips over a
-    /// card at a time, the best last. With nothing to open it shows how chests are earned and their drop rates.
+    /// card at a time, the best last. With nothing to open it shows how chests are earned, three tiles to glance at, and
+    /// the drop rates one tap further.
     public sealed class ChestReveal : MonoBehaviour
     {
         public static ChestReveal Instance { get; private set; }
@@ -20,7 +21,8 @@ namespace KartCup
         [SerializeField] RectTransform chest, glow;
         [SerializeField] Image chestImage, glowImage;
         [SerializeField] TMP_Text tierLabel, hint, info, collectLabel;
-        [SerializeField] GameObject collectButton, infoRoot;
+        [SerializeField] GameObject collectButton, infoRoot, howTo;   // howTo: the three tiles; info: the drop rates
+        [SerializeField] TMP_Text ratesLabel;
         [SerializeField] GameObject[] cards = System.Array.Empty<GameObject>();
         [SerializeField] Image[] cardIcons = System.Array.Empty<Image>(), cardEdges = System.Array.Empty<Image>();
         [SerializeField] TMP_Text[] cardLabels = System.Array.Empty<TMP_Text>();
@@ -85,19 +87,30 @@ namespace KartCup
             SetCards(0);
             chestImage.sprite = closedSprites[(int)Chests.Tier.Treasure];
             chest.localScale = Vector3.one * 0.7f; chest.anchoredPosition = new Vector2(0, 250);
-            tierLabel.text = $"STARS  {Chests.Stars} / {Chests.StarGoal}";
             tierLabel.color = tierColors[(int)Chests.Tier.Treasure];
             hint.text = "";
+            // a table: the chests across, the podium places down
             var o = Chests.Odds;
-            info.text =
-                "Finish on the podium to earn a chest. It opens straight away.\n" +
-                $"1st  ·  wood {o[0][0]}%  ·  silver {o[0][1]}%  ·  gold {o[0][2]}%  ·  golden {o[0][3]}%\n" +
-                $"2nd  ·  wood {o[1][0]}%  ·  silver {o[1][1]}%  ·  gold {o[1][2]}%\n" +
-                $"3rd  ·  wood {o[2][0]}%  ·  silver {o[2][1]}%  ·  gold {o[2][2]}%\n" +
-                $"Stars: 3 for 1st, 2 for 2nd, 1 for 3rd. A full meter is a Golden Treasure Chest.\n" +
-                $"The {Chests.GoldPity}th chest in a row without a gold is a gold. Kartel Weekly: a silver chest for driving it, a golden one for a prize place.\n" +
-                "<size=80%><color=#B4A7DE>Chests are earned, never sold. What is inside is for the game only and has no cash value.</color></size>";
+            static string Col(int t) => $"<pos={150 + t * 230}>";
+            var rows = "<color=#B4A7DE>" + Col(0) + "WOOD" + Col(1) + "SILVER" + Col(2) + "GOLD" + Col(3) + "GOLDEN</color>";
+            for (int p = 0; p < o.Length; p++)
+            {
+                rows += "\n" + new[] { "1ST", "2ND", "3RD" }[p];
+                for (int t = 0; t < o[p].Length; t++) rows += Col(t) + (o[p][t] > 0 ? $"{o[p][t]}%" : "—");
+            }
+            info.text = rows + $"\n<align=center><size=80%><color=#B4A7DE>No gold in {Chests.GoldPity - 1} chests? The next one is gold.  ·  Earned, never sold, no cash value.</color></size>";
+            Rates(false);
             collectButton.SetActive(true); collectLabel.text = "GOT IT";
+        }
+
+        /// The info page's DROP RATES / BACK.
+        public void ToggleRates() { Haptics.Play(Haptics.Kind.Tick); Rates(!info.gameObject.activeSelf); }
+
+        void Rates(bool on)
+        {
+            howTo.SetActive(!on); info.gameObject.SetActive(on);
+            tierLabel.text = on ? "DROP RATES" : $"STARS  {Chests.Stars} / {Chests.StarGoal}";
+            ratesLabel.text = on ? "BACK" : "DROP RATES";
         }
 
         IEnumerator Present()
@@ -204,6 +217,7 @@ namespace KartCup
                 rays.gameObject.SetActive(on);
                 if (on) { raysImage.color = Fade(tierColors[tier], 0f); Tween.Color(raysImage, Fade(tierColors[tier], tier >= 2 ? 0.8f : 0.5f), 0.4f, useUnscaledTime: true); }
             }
+            if (!on) foreach (var c in coins) if (c != null) c.gameObject.SetActive(false);   // CoinBurst lights them
             for (int i = 0; i < sparkles.Length; i++)
             {
                 if (sparkles[i] == null) continue;
