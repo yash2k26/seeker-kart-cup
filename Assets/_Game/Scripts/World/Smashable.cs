@@ -33,7 +33,7 @@ namespace KartCup
             spin = Random.onUnitSphere * Random.Range(360f, 720f);
             hitAt = Time.time;
             Smashed?.Invoke(this, kart);
-            kart.rb.linearVelocity = v * 0.96f;                                   // a bump, not a wall
+            if (!kart.rb.isKinematic) kart.rb.linearVelocity = v * 0.96f;         // a bump, not a wall (another phone's kart is kinematic: leave it)
             var puff = Resources.Load<GameObject>("FX/SmashPuff");
             if (puff != null) Instantiate(puff, transform.position + Vector3.up * 0.4f, Quaternion.identity);
             var p = kart.GetComponent<KartProgress>();

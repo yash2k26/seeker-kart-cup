@@ -53,7 +53,8 @@ namespace KartCup
             race.onFinish.AddListener(p =>
             {
                 if (!p.isPlayer) return;
-                if (Elimination.Instance != null) { Big("FINISH"); return; }
+                // online the order is the room's to say (other phones' karts do not report crossing here): just FINISH
+                if (Elimination.Instance != null || RoomClient.InRaceRoom) { Big("FINISH"); return; }
                 int place = 0; foreach (var r in race.racers) if (r.finished && r.finishTime <= p.finishTime) place++;
                 // high on the screen: the camera swings round to the driver's face, and the word must not sit on it
                 if (bigLabel != null) bigLabel.rectTransform.anchoredPosition = new Vector2(0f, 330f);
