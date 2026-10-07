@@ -20,7 +20,9 @@ namespace KartCup
         [Range(0, 1)] public float shakeGain = 1f;   // settings toggle: 0 = off
 
         Camera cam;
-        Vector3 shakeVel, shakeOffset;
+        Vector3 shakeVel, shakeOffset, rigPos, shakenPos;
+
+        public float BaseFov { get => baseFov; set => baseFov = value; }
         float boostUntil, speed01;
 
         void Awake() { Instance = this; cam = GetComponent<Camera>(); shakeGain = Settings.Shake ? 1f : 0f; }
@@ -37,7 +39,11 @@ namespace KartCup
             // damped spring on a local offset; UKR positions the camera, we add on top after it
             shakeVel += (-80f * shakeOffset - shakeDecay * shakeVel) * Time.unscaledDeltaTime;
             shakeOffset += shakeVel * Time.unscaledDeltaTime;
-            if (shakeOffset.sqrMagnitude > 1e-6f) transform.position += transform.TransformDirection(shakeOffset);
+            // The rig (KartCamera) moves the camera in physics steps, not every frame. On a frame it did not move it, the
+            // position is still last frame's shaken one: shaking that again doubled the offset, and stacked it.
+            if (transform.position != shakenPos) rigPos = transform.position;
+            transform.position = rigPos + transform.TransformDirection(shakeOffset);
+            shakenPos = transform.position;
         }
     }
 }

@@ -9,7 +9,7 @@ namespace KartCup
     /// hit area. The knob slides and the track lights (the shell's lit violet, not the action gold) when it is on.
     public sealed class SettingToggle : MonoBehaviour
     {
-        public enum Which { Shake, Haptics, Fps, Sound, Music }
+        public enum Which { Shake, Haptics, Fps, Sound, Music, AutoGas }
 
         [SerializeField] Which setting;
         [SerializeField] TMP_Text label;
@@ -31,6 +31,7 @@ namespace KartCup
                 case Which.Fps: Settings.ShowFps = !Settings.ShowFps; break;
                 case Which.Sound: Settings.Sound = !Settings.Sound; break;
                 case Which.Music: Settings.Music = !Settings.Music; break;
+                case Which.AutoGas: Settings.AutoGas = !Settings.AutoGas; break;
             }
             Refresh(true);
             if (setting == Which.Haptics) Haptics.Play(Haptics.Kind.Tick);   // felt only when it was just turned on, which is the point
@@ -39,7 +40,7 @@ namespace KartCup
         bool Value => setting switch
         {
             Which.Shake => Settings.Shake, Which.Haptics => Settings.Haptics, Which.Sound => Settings.Sound,
-            Which.Music => Settings.Music, _ => Settings.ShowFps,
+            Which.Music => Settings.Music, Which.AutoGas => Settings.AutoGas, _ => Settings.ShowFps,
         };
 
         /// Edit-mode previews: the row as the player will first see it.

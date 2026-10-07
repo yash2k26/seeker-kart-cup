@@ -849,7 +849,7 @@ public static partial class MenuSetup
         return screen;
     }
 
-    /// Three switches, nothing else. Screen shake is an accessibility setting; the frame counter is a dev tool that
+    /// Switches, nothing else. Screen shake is an accessibility setting; the frame counter is a dev tool that
     /// should not be on screen in a submission video by default.
     static GameObject SettingsScreen(RectTransform parent)
     {
@@ -857,20 +857,21 @@ public static partial class MenuSetup
         var dim = Rect("Dim", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(600, 600));
         dim.gameObject.AddComponent<Image>().color = new Color(Deep.r, Deep.g, Deep.b, 0.68f);
         Header(screen.transform, "SETTINGS", nameof(ScreenFlow.ShowTitle));
-        var card = Rect("Card", screen.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -56), new Vector2(1240, 660));
+        var card = Rect("Card", screen.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -70), new Vector2(1240, 780));
         Design.AsCard(card, Panel);
 
-        SettingRow(card, SettingToggle.Which.Sound, "SOUND", "Everything you hear", -40);
-        SettingRow(card, SettingToggle.Which.Music, "MUSIC", "The soundtrack only", -160);
-        SettingRow(card, SettingToggle.Which.Haptics, "VIBRATION", "Taps, hits and boosts", -280);
-        SettingRow(card, SettingToggle.Which.Shake, "SCREEN SHAKE", "Turn off if it makes you queasy", -400);
-        SettingRow(card, SettingToggle.Which.Fps, "FRAME COUNTER", "For testing", -520);
+        SettingRow(card, SettingToggle.Which.AutoGas, "AUTO GAS", "The kart drives itself; brake to slow down", -40);
+        SettingRow(card, SettingToggle.Which.Sound, "SOUND", "Everything you hear", -160);
+        SettingRow(card, SettingToggle.Which.Music, "MUSIC", "The soundtrack only", -280);
+        SettingRow(card, SettingToggle.Which.Haptics, "VIBRATION", "Taps, hits and boosts", -400);
+        SettingRow(card, SettingToggle.Which.Shake, "SCREEN SHAKE", "Turn off if it makes you queasy", -520);
+        SettingRow(card, SettingToggle.Which.Fps, "FRAME COUNTER", "For testing", -640);
         return screen;
     }
 
     /// A settings row: name and a short line on what it does on the left, the switch on the right. The whole row
     /// is the switch's hit area.
-    static void SettingRow(RectTransform card, SettingToggle.Which which, string caption, string hint, float y)
+    internal static void SettingRow(RectTransform card, SettingToggle.Which which, string caption, string hint, float y)
     {
         var rt = Rect(caption, card, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, y), new Vector2(1140, 104));
         rt.pivot = new Vector2(0.5f, 1);

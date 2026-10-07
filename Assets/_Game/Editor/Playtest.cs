@@ -1,5 +1,6 @@
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using KartCup;
 using PowerslideKartPhysics;
 using UnityEditor;
@@ -24,6 +25,12 @@ public static class Playtest
     static readonly double[] shotTimes = { 5, 12, 22, 34, 46 };   // the last: the results card, after the podium
     static readonly double[] introTimes = { 2.2, 3.4, 4.6, 7.2 };   // the drone's lap before the flag, and a turbo pad from above
     static int introShot;
+    // -autopilot: the AI drives the player's kart, so the camera, the HUD and everything that happens to a kart are seen
+    // in motion. -every S: a frame every S seconds from the green light (auto<track>-NN.png). -seconds N: run that long.
+    static bool autopilot, autoSet;
+    static float[][] sweep;   // -camsweep "dist,height,look,fov;...": each auto frame with the next camera
+    static double every, nextAuto = -1, until = 50;
+    static int autoShot;
 
     [MenuItem("Build/Playtest 30s")]
     public static void Run()
@@ -54,6 +61,11 @@ public static class Playtest
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-look") look = args[i + 1];   // what the vista frames look at
         item = null; itemShot = 0; thrownAt = -1; goAt = -1; armed = false; heldShot = false;
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-item") item = args[i + 1];
+        autopilot = args.Contains("-autopilot"); autoSet = false; autoShot = 0; nextAuto = -1; every = 0; until = 50;
+        for (int i = 0; i < args.Length - 1; i++) { if (args[i] == "-every") double.TryParse(args[i + 1], out every); if (args[i] == "-seconds") double.TryParse(args[i + 1], out until); }
+        sweep = null;
+        for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-camsweep")
+            sweep = args[i + 1].Split(';').Select(v => v.Split(',').Select(x => float.Parse(x, System.Globalization.CultureInfo.InvariantCulture)).ToArray()).ToArray();
         prevQuality = QualitySettings.GetQualityLevel();
         if (mobile) QualitySettings.SetQualityLevel(0, true);
         EditorSceneManager.OpenScene($"Assets/_Game/Scenes/Race{track}.unity", OpenSceneMode.Single);
@@ -105,7 +117,18 @@ public static class Playtest
             }
             introShot++;
         }
-        if (shot < shotTimes.Length && captureAt < 0 && t >= shotTimes[shot])
+        if (autopilot && !autoSet && t > 1) { autoSet = true; if (!Autopilot()) autoSet = false; }   // set first: a throw must not retry every frame
+        if (every > 0 && goAt >= 0)
+        {
+            if (nextAuto < 0) nextAuto = goAt + every;
+            if (t >= nextAuto)
+            {
+                Capture($"auto{track}-{autoShot:00}"); autoShot++; nextAuto += every;
+                if (sweep != null) SetCamera(sweep[autoShot % sweep.Length]);   // the next frame is taken with the next camera
+            }
+            else if (sweep != null && autoShot == 0 && nextAuto - t > every - 0.1) SetCamera(sweep[0]);
+        }
+        if (!autopilot && shot < shotTimes.Length && captureAt < 0 && t >= shotTimes[shot])
         {
             var pause = Object.FindFirstObjectByType<PauseMenu>();
             var race = Object.FindFirstObjectByType<RaceManager>();
@@ -155,13 +178,35 @@ public static class Playtest
             captureAt = -1;
             shot++;
         }
-        if (t < 50) return;
+        if (t < until) return;
 
         EditorApplication.update -= Tick;
         Report(t);
         Debug.Log("[playtest] done");
         if (mobile) QualitySettings.SetQualityLevel(prevQuality, true);
         EditorApplication.Exit(0);
+    }
+
+    /// The player's touch input off, the field's AI in its place, from the first waypoint like everyone else.
+    static bool Autopilot()
+    {
+        var race = Object.FindFirstObjectByType<RaceManager>();
+        var player = race != null ? race.Player : null;
+        var spawner = Object.FindFirstObjectByType<RaceSpawner>();
+        if (player == null || spawner == null) return false;
+        var touch = player.GetComponent<KartInputMobile>(); if (touch != null) Object.DestroyImmediate(touch);   // one KartInput per kart
+        var first = typeof(RaceSpawner).GetField("firstWaypoint", BindingFlags.NonPublic | BindingFlags.Instance)?.GetValue(spawner) as BasicWaypoint;
+        player.gameObject.AddComponent<KartAi>().Configure(null, first, 99);
+        Debug.Log($"[playtest] autopilot drives {player.racerName}");
+        return true;
+    }
+
+    static void SetCamera(float[] v)
+    {
+        var kc = Object.FindFirstObjectByType<KartCamera>(); var feel = CameraFeel.Instance;
+        if (kc != null) { kc.initialDist = v[0]; kc.initialHeight = v[1]; kc.lookAtHeight = v[2]; }
+        if (feel != null && v.Length > 3) feel.BaseFov = v[3];
+        Debug.Log($"[playtest] camera {string.Join(",", v)} for frame {autoShot}");
     }
 
     static void Report(double t)

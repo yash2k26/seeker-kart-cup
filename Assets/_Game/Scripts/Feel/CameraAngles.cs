@@ -15,8 +15,10 @@ namespace KartCup
 
         public static readonly Preset[] Presets =
         {
-            new() { name = "CHASE", dist = 6.3f, height = 3.05f, lookAt = 1.05f, velDist = 1.0f },
-            new() { name = "CLOSE", dist = 4.4f, height = 2.2f, lookAt = 1.0f, velDist = 0.5f },
+            // 8 Oct (Beach Buggy's framing): the kart and driver fill the lower middle of the screen. 4.2 m back is as
+            // close as it goes while the camera still sees over a driver's head: closer and the head hides the road.
+            new() { name = "CHASE", dist = 4.2f, height = 2.3f, lookAt = 1.1f, velDist = 0.7f },
+            new() { name = "CLOSE", dist = 3.6f, height = 1.9f, lookAt = 1.1f, velDist = 0.4f },
             new() { name = "HIGH",  dist = 9.5f, height = 6.2f, lookAt = 0.6f, velDist = 1.2f },
             new() { name = "FRONT", dist = 5.2f, height = 2.1f, lookAt = 0f, velDist = 0.4f, front = true },
         };

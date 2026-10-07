@@ -12,6 +12,8 @@ namespace KartCup
         public static bool ShowFps { get => Get("kc.fps", false); set => Set("kc.fps", value); }
         public static bool Sound { get => Get("kc.sound"); set { Set("kc.sound", value); AudioListener.volume = value ? 1f : 0f; } }
         public static bool Music { get => Get("kc.music"); set { Set("kc.music", value); AudioDirector.Instance?.ApplyVolume(); } }
+        /// The kart accelerates by itself (Beach Buggy's way); off, GAS must be held. ControlLayout moves the buttons to match.
+        public static bool AutoGas { get => Get("kc.autogas"); set { Set("kc.autogas", value); ControlLayout.ApplyAll(); } }
 
         /// Called once at boot so a setting stored last session is live before anything reads it.
         public static void Apply()

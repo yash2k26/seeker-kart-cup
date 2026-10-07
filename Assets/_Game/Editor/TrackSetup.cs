@@ -99,7 +99,7 @@ public static partial class TrackSetup
         var input = Instantiate(PKP + "Prefabs/Scene/Input Manager.prefab", "Input Manager").GetComponent<InputManager>();
         input.enableStandardInput = false;                 // Android runs the new Input System only; legacy axes would throw
         input.enableMobileInput = true;
-        input.mobileAutoAccel = 0f;                        // you hold the gas; nothing moves on its own
+        input.mobileAutoAccel = 0f;                        // as built; ControlLayout turns AUTO GAS (the default setting) on at runtime
         input.mobileDriftHoldSteer = 0.55f;
         EditorUtility.SetDirty(input);
 
@@ -113,8 +113,8 @@ public static partial class TrackSetup
         camGo.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>();
         var kartCam = camGo.AddComponent<KartCamera>();
         kartCam.useLegacyInput = false;                    // it would poll legacy axes every frame otherwise
-        kartCam.initialDist = 6.3f; kartCam.initialHeight = 3.05f; kartCam.smoothRate = 9f;  // low enough to read speed, high enough to see past trackside props
-        kartCam.lookAtHeight = 1.05f;     // ~19 deg down: low and level put the driver's head over the road ahead
+        kartCam.initialDist = 4.2f; kartCam.initialHeight = 2.3f; kartCam.smoothRate = 9f;  // CameraAngles' CHASE: close, kart big on screen
+        kartCam.lookAtHeight = 1.1f;      // ~16 deg down: any lower and the driver's head sits over the road ahead
         camGo.AddComponent<CameraFeel>();
         var angles = camGo.AddComponent<CameraAngles>();
         new SerializedObject(angles).Do(a => a.FindProperty("kartCamera").objectReferenceValue = kartCam);
@@ -832,9 +832,9 @@ public static partial class TrackSetup
         var ink = Design.Ink700;
         Button("SteerLeft", safe.transform, input, HoldButton.Control.SteerLeft, ink, new Vector2(0, 0), new Vector2(64, 64), new Vector2(240, 184), "", display, steering, "arrow_basic_w");
         Button("SteerRight", safe.transform, input, HoldButton.Control.SteerRight, ink, new Vector2(0, 0), new Vector2(328, 64), new Vector2(240, 184), "", display, steering, "arrow_basic_e");
-        Button("Gas", safe.transform, input, HoldButton.Control.Accelerate, Design.Accent, new Vector2(1, 0), new Vector2(-64, 64), new Vector2(288, 184), "GAS", display, steering);
-        Button("Drift", safe.transform, input, HoldButton.Control.Drift, ink, new Vector2(1, 0), new Vector2(-376, 64), new Vector2(224, 184), "DRIFT", display, steering);
-        Button("Brake", safe.transform, input, HoldButton.Control.Brake, ink, new Vector2(1, 0), new Vector2(-624, 64), new Vector2(184, 150), "BRAKE", display, steering);
+        var gasBtn = Button("Gas", safe.transform, input, HoldButton.Control.Accelerate, Design.Accent, new Vector2(1, 0), new Vector2(-64, 64), new Vector2(288, 184), "GAS", display, steering);
+        var driftBtn = Button("Drift", safe.transform, input, HoldButton.Control.Drift, ink, new Vector2(1, 0), new Vector2(-376, 64), new Vector2(224, 184), "DRIFT", display, steering);
+        var brakeBtn = Button("Brake", safe.transform, input, HoldButton.Control.Brake, ink, new Vector2(1, 0), new Vector2(-624, 64), new Vector2(184, 150), "BRAKE", display, steering);
         var itemBtn = Button("Item", safe.transform, input, HoldButton.Control.Item, ink, new Vector2(1, 0), new Vector2(-64, 272), new Vector2(288, 128), "ITEM", display, steering);
 
         // Readouts sit on dark plates: paper on sky and sand failed contrast on the device shots.
@@ -863,6 +863,19 @@ public static partial class TrackSetup
         Text("Track", safe.transform, body, Tracks.At(Index).name.ToUpperInvariant(), 30,
              Design.Paper, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(56, -170), new Vector2(700, 40));
         var fps = Text("Fps", safe.transform, body, "", 22, new Color(1, 1, 1, 0.30f), TextAlignmentOptions.BottomLeft, new Vector2(0, 0), new Vector2(52, 300), new Vector2(1200, 34));
+
+        // AUTO GAS (on by default): no GAS button, DRIFT in its corner. The setting can change mid-race (pause menu).
+        var layout = canvasGo.AddComponent<ControlLayout>();
+        new SerializedObject(layout).Do(l =>
+        {
+            l.FindProperty("input").objectReferenceValue = input;
+            l.FindProperty("gas").objectReferenceValue = gasBtn.rectTransform;
+            l.FindProperty("drift").objectReferenceValue = driftBtn.rectTransform;
+            l.FindProperty("brake").objectReferenceValue = brakeBtn.rectTransform;
+            l.FindProperty("item").objectReferenceValue = itemBtn.rectTransform;
+            l.FindProperty("meter").objectReferenceValue = meterBack;
+            l.FindProperty("itemLabel").objectReferenceValue = item.rectTransform;
+        });
 
         var fpsCounter = canvasGo.AddComponent<FpsCounter>();
         new SerializedObject(fpsCounter).Do(s => s.FindProperty("label").objectReferenceValue = fps);
@@ -947,9 +960,18 @@ public static partial class TrackSetup
         var slate = Design.Ink700;
         var dim = Rect("PauseOverlay", parent, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(600, 600));
         dim.gameObject.AddComponent<Image>().color = new Color(Design.Ink900.r, Design.Ink900.g, Design.Ink900.b, 0.74f);
-        var card = Rect("Card", dim, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(920, 560));
+        var card = Rect("Card", dim, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(920, 900));
         Design.AsCard(card, Design.Ink800);
-        Text("Headline", card, display, "PAUSED", 82, Design.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -50), new Vector2(800, 100));
+        Text("Headline", card, display, "PAUSED", 82, Design.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -40), new Vector2(800, 100));
+        // Beach Buggy's pause has Audio and Controls: the switches a player reaches for mid-race, the settings screen's own rows
+        foreach (var (which, caption, hint, y) in new[] { (SettingToggle.Which.AutoGas, "AUTO GAS", "The kart drives itself", -150f),
+                                                          (SettingToggle.Which.Sound, "SOUND", "Everything you hear", -262f),
+                                                          (SettingToggle.Which.Music, "MUSIC", "The soundtrack only", -374f) })
+        {
+            MenuSetup.SettingRow(card, which, caption, hint, y);
+            var row = (RectTransform)card.Find(caption);
+            row.sizeDelta = new Vector2(820, 100);
+        }
 
         var menu = new GameObject("PauseMenu").AddComponent<PauseMenu>();
         var resume = TextButton("Resume", card, "RESUME", Design.Accent, paper, 48, display, new Vector2(0.5f, 0), new Vector2(0, 244), new Vector2(580, 124));
