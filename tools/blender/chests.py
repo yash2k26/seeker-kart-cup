@@ -3,12 +3,13 @@ kit prop. A plank body and a domed plank lid, metal bands over both with rivets,
 keyhole and a hasp, ring handles; open, the lid swings back on its hinge over a bed of coins lit from inside.
 Tiers: wood (oak, iron), silver (navy-painted planks, polished silver), gold (the brand's violet planks, gold bands),
 golden treasure (gold plate, white-gold bands, set with gems, heaped with coins and gems inside).
-Usage (from tools/blender):  Blender -b --python-exit-code 1 -P chests.py -- ../../Assets/_Game/Art/Textures/UI/Chests
+Usage (from tools/blender):  Blender -b --python-exit-code 1 -P chests.py -- ../../Assets/_Game/Art/Textures/UI/Chests [tier...]
 -> chest_<wood|silver|gold|treasure>_<closed|open>.png, 512 px on transparency, a three-quarter view from the front."""
 import bpy, bmesh, math, os, sys, random
 from mathutils import Vector, Matrix
 
 OUT = os.path.abspath(sys.argv[sys.argv.index("--") + 1])
+ONLY = sys.argv[sys.argv.index("--") + 2:]   # some tiers only (all when none named)
 os.makedirs(OUT, exist_ok=True)
 W, D, H = 1.60, 1.00, 0.72          # body: width (x), depth (y), height (z)
 R = D / 2                           # the lid's dome radius (a half cylinder along x)
@@ -20,7 +21,7 @@ TIERS = {
     "wood":     ((0.46, 0.27, 0.13), 0.65, (0.30, 0.31, 0.34), 0.85, 0.45, False),
     "silver":   ((0.05, 0.08, 0.22), 0.55, (0.90, 0.93, 0.98), 1.00, 0.18, False),
     "gold":     ((0.22, 0.10, 0.52), 0.50, (1.00, 0.72, 0.22), 1.00, 0.25, False),
-    "treasure": ((1.00, 0.68, 0.18), 0.22, (1.00, 0.93, 0.72), 1.00, 0.15, True),
+    "treasure": ((1.00, 0.68, 0.18), 0.26, (1.00, 0.93, 0.72), 1.00, 0.15, True),
 }
 GLOW = {"wood": (1.0, 0.62, 0.28), "silver": (0.75, 0.88, 1.0), "gold": (1.0, 0.78, 0.30), "treasure": (1.0, 0.85, 0.35)}
 
@@ -202,7 +203,7 @@ def treasure_bed(tier, gold, root):
     lo.parent = root; lo.location = (0, 0, H + 0.25)
     return lo
 
-def stage():
+def stage(all_metal):
     sc = bpy.context.scene
     sc.render.engine = "BLENDER_EEVEE"; sc.render.film_transparent = True
     sc.render.resolution_x = sc.render.resolution_y = 512   # the largest the menus draw it is ~420 px
@@ -222,17 +223,20 @@ def stage():
     area("key", (-3.0, -3.2, 4.0), 520, (1.0, 0.92, 0.82), 2.5)
     area("fill", (3.5, -2.5, 1.6), 140, (0.75, 0.82, 1.0), 3.0)
     area("rim", (1.5, 3.5, 3.0), 380, (0.65, 0.55, 1.0), 2.0)
+    if all_metal:   # the front walls mirror the floor below the camera: give them a warm card there, or they go black
+        area("bounce", (1.4, -3.2, -0.9), 50, (1.0, 0.88, 0.70), 4.0)   # dim: brighter and AgX turns the gold cream
     w = bpy.data.worlds.new("w"); sc.world = w; w.use_nodes = True
-    bg = w.node_tree.nodes["Background"]; bg.inputs[1].default_value = 0.35   # reflections for the metal, not a wash over the paint
+    bg = w.node_tree.nodes["Background"]
+    bg.inputs[1].default_value = 1.0 if all_metal else 0.35   # reflections for the metal, not a wash over the paint (the golden one has none)
     env = w.node_tree.nodes.new("ShaderNodeTexEnvironment")
     env.image = bpy.data.images.load(os.path.join(os.path.dirname(bpy.app.binary_path), "..", "Resources",
                                      f"{bpy.app.version[0]}.{bpy.app.version[1]}", "datafiles", "studiolights", "world", "studio.exr"))
     w.node_tree.links.new(env.outputs["Color"], bg.inputs["Color"])
     return sc
 
-for tier in TIERS:
+for tier in ONLY or TIERS:
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    sc = stage()
+    sc = stage(TIERS[tier][5])
     root, hinge, gold, wood = build(tier)
     sc.render.filepath = os.path.join(OUT, f"chest_{tier}_closed.png"); bpy.ops.render.render(write_still=True)
     hinge.rotation_euler = (math.radians(-112), 0, 0)
