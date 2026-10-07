@@ -100,6 +100,7 @@ namespace KartCup
             lastShow = Time.unscaledTime;
             if (panel == 0) backToTour = false;   // left the select screen by BACK: PLAY goes on to the tracks again
             if (backdrop != null) backdrop.Focused = panel == Select || panel == Garage || panel == Items;   // hold a composed angle while a kart is on show; the track panel covers the vista
+            if (backdrop != null) backdrop.Close = panel == Select;                                          // the driver screen frames a person, close
         }
 
         int Direction(int from, int to)

@@ -559,6 +559,7 @@ public static partial class MenuSetup
         so.FindProperty("podium").objectReferenceValue = podium;
         Fill(so.FindProperty("kartPrefabs"), KartSetup.Karts.Select(k => AssetDatabase.LoadAssetAtPath<GameObject>(Prefabs + $"Karts/Kart_{k}.prefab")).Where(k => k != null).ToArray());
         Fill(so.FindProperty("driverPrefabs"), Directory.GetFiles(Prefabs + "Drivers", "Driver_*.prefab").Select(AssetDatabase.LoadAssetAtPath<GameObject>).ToArray());
+        StandingDrivers(so);   // the driver stands on the disc, Beach Buggy's driver screen (MenuSetup.Select.cs)
         so.FindProperty("nameLabel").objectReferenceValue = nameLabel;
         so.FindProperty("blurbLabel").objectReferenceValue = blurb;
         so.FindProperty("speedBar").objectReferenceValue = bars[0];

@@ -6,8 +6,9 @@ using UnityEngine;
 
 namespace KartCup
 {
-    /// The character select: a live kart and driver on the podium, swapped by the arrows. No render textures and no
-    /// portraits to maintain — the thing you race is the thing you are looking at.
+    /// The character select: the driver, standing on the podium and facing you, swapped by the roster strip, a flick or
+    /// the arrows (Beach Buggy's driver screen: the character alone, big, alive; their kart is the garage's). They wave
+    /// hello when they arrive and idle on their own rig's takes. No render textures, no portraits to maintain.
     public sealed class CharacterCarousel : Carousel
     {
         [SerializeField] CharacterDatabase roster;
@@ -19,6 +20,13 @@ namespace KartCup
         // The podium is a turntable: it turns steadily (degrees per second) with the kart standing on it. Swaying the
         // kart alone over bare sand read as floating. Time-based, so the garage and this screen never jump between them.
         [SerializeField] float baseYaw = 65f, spin = 14f;
+        // Standing (the select screen): each driver's idle and greeting takes (MenuSetup builds them from the driver's own
+        // model), how far the rig's origin sits above its feet in that pose, and the world scale they have in a seat.
+        [SerializeField] bool standing = true;
+        [SerializeField] AnimationClip[] idleClips = System.Array.Empty<AnimationClip>(), waveClips = System.Array.Empty<AnimationClip>();
+        [SerializeField] float[] standLifts = System.Array.Empty<float>();
+        [SerializeField] float standScale = 1f, standYaw = 8f;
+        Animation standingAnim; string idleName, waveName;
 
         GameObject current;
         int index;
@@ -74,12 +82,22 @@ namespace KartCup
             if (current == null) return;
             if (hop.isAlive) hop.Complete();
             hop = Tween.PunchLocalPosition(current.transform, new Vector3(0f, 0.5f, 0f), 0.42f, frequency: 2, useUnscaledTime: true);
+            Wave();
+        }
+
+        /// The greeting take, then back to idling.
+        void Wave()
+        {
+            if (standingAnim == null || string.IsNullOrEmpty(waveName) || standingAnim.GetClip(waveName) == null) return;
+            standingAnim.CrossFade(waveName, 0.12f);
+            if (!string.IsNullOrEmpty(idleName)) standingAnim.CrossFadeQueued(idleName, 0.25f, QueueMode.CompleteOthers);
         }
 
         void Update()
         {
             if (!Dragging) DragYaw = Mathf.Lerp(DragYaw, 0f, 1f - Mathf.Exp(-4f * Time.deltaTime));
-            if (podium != null) podium.localRotation = Quaternion.Euler(0, baseYaw + Time.time * spin + DragYaw, 0);
+            // standing, they face you and hold still (a drag still turns them); a kart alone keeps turning on the disc
+            if (podium != null) podium.localRotation = Quaternion.Euler(0, (standing ? standYaw : baseYaw + Time.time * spin) + DragYaw, 0);
         }
 
         public override void Next() { Step(+1); }
@@ -111,7 +129,8 @@ namespace KartCup
             if (current != null) Destroy(current);
             var kartPrefab = kartPrefabs.FirstOrDefault(k => k.name.EndsWith(def.kartId)) ?? kartPrefabs.FirstOrDefault();
             var driverPrefab = driverPrefabs.FirstOrDefault(d => d.name.EndsWith(def.driverId)) ?? driverPrefabs.FirstOrDefault();
-            if (kartPrefab != null && podium != null) current = Mount(kartPrefab, driverPrefab, podium, def.tint, Application.isPlaying);
+            if (standing && driverPrefab != null && podium != null) current = StandUp(driverPrefab, Application.isPlaying);
+            else if (kartPrefab != null && podium != null) current = Mount(kartPrefab, driverPrefab, podium, def.tint, Application.isPlaying);
 
             if (nameLabel != null)
             {
@@ -126,6 +145,42 @@ namespace KartCup
             turboBar?.Set(def.turbo);
             attackBar?.Set(def.attack);
             Changed?.Invoke(index);
+        }
+
+        /// The driver on their feet in the middle of the disc, facing +Z of the podium (standYaw turns that to the camera):
+        /// no seat pose, no steering wheel, their own idle take playing, the feet on the disc's top face.
+        GameObject StandUp(GameObject prefab, bool animate)
+        {
+            int i = System.Array.IndexOf(driverPrefabs, prefab);
+            var idle = i >= 0 && i < idleClips.Length ? idleClips[i] : null;
+            var wave = i >= 0 && i < waveClips.Length ? waveClips[i] : null;
+            float lift = i >= 0 && i < standLifts.Length ? standLifts[i] : 0f;
+            var d = Instantiate(prefab, podium);
+            float scale = standScale / Mathf.Max(0.0001f, podium.lossyScale.x);
+            d.transform.localRotation = Quaternion.identity;
+            d.transform.localScale = Vector3.one * scale;
+            d.transform.localPosition = Vector3.up * (lift * scale);
+            foreach (var pose in d.GetComponentsInChildren<BlockyDriverPose>(true)) { if (pose.Wheel != null) pose.Wheel.gameObject.SetActive(false); pose.enabled = false; }
+            foreach (var t in d.GetComponentsInChildren<Transform>(true)) if (t != d.transform && t.name.ToLowerInvariant().Contains("steering")) t.gameObject.SetActive(false);
+            foreach (var smr in d.GetComponentsInChildren<SkinnedMeshRenderer>(true)) smr.updateWhenOffscreen = true;
+            standingAnim = d.GetComponent<Animation>();
+            if (standingAnim == null) standingAnim = d.AddComponent<Animation>();
+            standingAnim.cullingType = AnimationCullingType.AlwaysAnimate;
+            idleName = idle != null ? idle.name : null; waveName = wave != null ? wave.name : null;
+            if (idle != null)
+            {
+                if (standingAnim.GetClip(idle.name) == null) standingAnim.AddClip(idle, idle.name);
+                standingAnim.clip = idle;
+                idle.SampleAnimation(d, 0f);                              // the pose an edit-mode preview shows too
+                if (Application.isPlaying) standingAnim.Play(idle.name);
+            }
+            if (wave != null && standingAnim.GetClip(wave.name) == null) standingAnim.AddClip(wave, wave.name);
+            if (animate)
+            {
+                Tween.Scale(d.transform, d.transform.localScale * 0.7f, d.transform.localScale, 0.28f, Ease.OutBack);
+                Invoke(nameof(Wave), 0.2f);
+            }
+            return d;
         }
 
         /// A display-only kart with its driver on the podium: no physics, no input, no race components, tyres grounded,

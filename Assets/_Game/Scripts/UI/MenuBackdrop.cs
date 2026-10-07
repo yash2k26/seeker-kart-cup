@@ -16,22 +16,27 @@ namespace KartCup
         [SerializeField] float travel = 2.6f, period = 44f;
         // Select-screen pose. Geometry, not taste: at fov 30 on a 2.22 screen the kart lands at 0.65 width, 0.56 height.
         [SerializeField] float focusAngle = 25f, focusRadius = 12.5f, focusHeight = 4.7f, focusLook = 1.5f, focusYaw = 7f;
+        // The driver screen's pose: a person, not a kart, so much closer and lower (Beach Buggy's driver fills the frame).
+        [SerializeField] float closeAngle = 22f, closeRadius = 8.4f, closeHeight = 2.5f, closeLook = 1.05f, closeYaw = 13f;   // a standing driver is ~2.9 m at seat scale
 
         public bool Focused { get; set; }
-        float blend;
+        public bool Close { get; set; }
+        float blend, close;
 
         void LateUpdate()
         {
             blend = Mathf.MoveTowards(blend, Focused ? 1f : 0f, Time.deltaTime * 1.5f);
+            close = Mathf.MoveTowards(close, Close ? 1f : 0f, Time.deltaTime * 1.5f);
             Apply();
         }
 
         public void Apply()
         {
             if (target == null) return;
-            float a = focusAngle * Mathf.Deg2Rad;
-            var pos = target.position + new Vector3(Mathf.Sin(a) * focusRadius, focusHeight, Mathf.Cos(a) * focusRadius);
-            var rot = Quaternion.LookRotation(target.position + Vector3.up * focusLook - pos) * Quaternion.Euler(0, -focusYaw, 0);
+            float c = Mathf.SmoothStep(0f, 1f, close);
+            float a = Mathf.Lerp(focusAngle, closeAngle, c) * Mathf.Deg2Rad, radius = Mathf.Lerp(focusRadius, closeRadius, c);
+            var pos = target.position + new Vector3(Mathf.Sin(a) * radius, Mathf.Lerp(focusHeight, closeHeight, c), Mathf.Cos(a) * radius);
+            var rot = Quaternion.LookRotation(target.position + Vector3.up * Mathf.Lerp(focusLook, closeLook, c) - pos) * Quaternion.Euler(0, -Mathf.Lerp(focusYaw, closeYaw, c), 0);
             if (meet != null && blend < 1f)
             {
                 float x = Mathf.Sin(Time.time * 2f * Mathf.PI / period) * travel;
@@ -44,9 +49,10 @@ namespace KartCup
         }
 
         /// Edit mode and previews: jump to a pose without waiting for LateUpdate to ease into it.
-        public void Snap(bool focused)
+        public void Snap(bool focused, bool close = false)
         {
             Focused = focused; blend = focused ? 1f : 0f;
+            Close = close; this.close = close ? 1f : 0f;
             Apply();
         }
     }
