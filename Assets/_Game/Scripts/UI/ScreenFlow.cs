@@ -17,9 +17,9 @@ namespace KartCup
         [SerializeField] CharacterDatabase roster;
         [SerializeField] TMP_Text playLabel;      // says CONTINUE CUP when one is half-run
 
-        const int Select = 1, Track = 4, Rooms = 5, Lobby = 6, Garage = 7, Items = 8, WeeklyScreen = 9;
+        const int Select = 1, Track = 4, Rooms = 5, Lobby = 6, Garage = 7, Items = 8, WeeklyScreen = 9, TourScreen = 10;
         // How deep each panel sits under the title: going deeper slides in from the right, coming back from the left.
-        static readonly int[] Depth = { 0, 1, 1, 1, 2, 1, 2, 1, 1, 1 };
+        static readonly int[] Depth = { 0, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1 };
 
         /// Set before loading the menu: open straight into the lobby (rematch) or join a code (invite link).
         public static bool PendingLobby;
@@ -51,7 +51,7 @@ namespace KartCup
 
         void Start()
         {
-            if (IsMenu) Weekly.Racing = false;   // back from a time trial
+            if (IsMenu) { Weekly.Racing = false; RaceMode.Clear(); }   // back from a time trial or an event
             Show(startPanel, silent: true);
             // A cup already under way turns the front door into a continue: the character is settled, so re-picking
             // one would just throw the standings away.
@@ -98,6 +98,7 @@ namespace KartCup
             }
             current = panel;
             lastShow = Time.unscaledTime;
+            if (panel == 0) backToTour = false;   // left the select screen by BACK: PLAY goes on to the tracks again
             if (backdrop != null) backdrop.Focused = panel == Select || panel == Garage || panel == Items;   // hold a composed angle while a kart is on show; the track panel covers the vista
         }
 
@@ -117,6 +118,7 @@ namespace KartCup
         {
             if (Time.unscaledTime - lastShow < 0.3f) return;   // NEXT overlaps PLAY: a double tap must not skip character select
             if (current == Select && roster != null) Voices.Say(roster.At(CharacterDatabase.SelectedIndex)?.driverId, "go");   // the chosen driver is in
+            if (backToTour) { backToTour = false; Show(TourScreen); return; }        // the driver was changed from the Tour
             Show(Track);
         }
         public void ShowRooms() => Show(Rooms);
@@ -124,12 +126,41 @@ namespace KartCup
         public void ShowGarage() => Show(Garage);
         public void ShowItems() => Show(Items);
         public void ShowWeekly() => Show(WeeklyScreen);
+        public void ShowTour() => Show(TourScreen);
+
+        bool backToTour;
+        /// The Tour's CHANGE: the select screen, whose NEXT then comes back to the Tour.
+        public void ChangeDriverFromTour() { backToTour = true; Show(Select); }
+
+        /// A Tour event with the selected driver: its circuit, mode, rival and pace.
+        public void StartTourEvent(Tour.Event e, Tour.CupDef c)
+        {
+            if (loading) return;
+            AudioDirector.Instance?.Confirm();
+            Weekly.Racing = false;
+            Tour.Arm(e, c);
+            Cup.Begin(CharacterDatabase.SelectedIndex, RosterSize, new[] { e.track });
+            Load(Cup.SceneName);
+        }
+
+        /// Today's Daily Challenge with the selected driver.
+        public void StartDaily()
+        {
+            if (loading) return;
+            AudioDirector.Instance?.Confirm();
+            Weekly.Racing = false;
+            var c = Daily.Current;
+            Daily.Arm(c);
+            Cup.Begin(CharacterDatabase.SelectedIndex, RosterSize, new[] { c.track });
+            Load(Cup.SceneName);
+        }
 
         /// Kartel Weekly's time trial: this week's circuit with the selected driver, alone on track (RaceSpawner).
         public void StartWeekly()
         {
             if (loading || Weekly.TrackIndex < 0) return;
             AudioDirector.Instance?.Confirm();
+            RaceMode.Clear();
             Weekly.Racing = true;
             KartApi.Event("weekly_start", new { track = Weekly.Current.track });
             Cup.Begin(CharacterDatabase.SelectedIndex, RosterSize, new[] { Weekly.TrackIndex });
@@ -141,6 +172,7 @@ namespace KartCup
         {
             if (loading || track < 0 || track >= Tracks.Count) return;
             AudioDirector.Instance?.Confirm();
+            RaceMode.Clear();
             Cup.Begin(CharacterDatabase.SelectedIndex, RosterSize, new[] { track });
             Load(Cup.SceneName);
         }
@@ -151,6 +183,7 @@ namespace KartCup
         {
             if (loading || Time.unscaledTime - lastShow < 0.3f) return;   // RACE sits exactly under NEXT: a double tap must not skip track select
             AudioDirector.Instance?.Confirm();
+            RaceMode.Clear();
             int player = CharacterDatabase.SelectedIndex, track = TrackCarousel.Selection;
             KartApi.Event("cup_start", new { character = player, track });
             if (track < 0) Cup.Begin(player, RosterSize);

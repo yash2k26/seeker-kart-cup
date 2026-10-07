@@ -40,6 +40,12 @@ public static partial class TrackSetup
         weekly.enableAutoSizing = true; weekly.fontSizeMin = 22; weekly.fontSizeMax = 32;
         var result = card.gameObject.AddComponent<WeeklyResult>();
         new SerializedObject(result).Do(s => s.FindProperty("line").objectReferenceValue = weekly);
+
+        // a Tour event's stars, a cup it opened, a boss's prize; or the Daily Challenge met (or still to meet)
+        var tourLine = Text("Tour", card, body, "", 32, Design.Accent, TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 300), new Vector2(1100, 50));
+        tourLine.enableAutoSizing = true; tourLine.fontSizeMin = 22; tourLine.fontSizeMax = 32;
+        var tour = card.gameObject.AddComponent<TourResult>();
+        new SerializedObject(tour).Do(s => s.FindProperty("line").objectReferenceValue = tourLine);
     }
 
 }

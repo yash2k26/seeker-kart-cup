@@ -129,6 +129,24 @@ public static class Design
     public static Sprite RingEdge => Edge("ring_edge", 128, 64, 6f);
     public static Sprite Glow => Radial("glow", 128);
     public static Sprite Band => ShineBand("shine", 64);
+    public static Sprite LightRays => Generated("rays", 256, 256, Vector4.zero, (x, y) =>
+    {
+        // a burst of twelve soft beams, clear at the centre and fading out: the light behind an opened chest
+        float dx = x + 0.5f - 128f, dy = y + 0.5f - 128f, r = Mathf.Sqrt(dx * dx + dy * dy) / 128f;
+        float beam = Mathf.Pow(Mathf.Max(0f, Mathf.Cos(Mathf.Atan2(dy, dx) * 12f)), 6f);
+        return new Color(1f, 1f, 1f, beam * Mathf.Pow(Mathf.Clamp01(1f - r), 1.2f) * Mathf.SmoothStep(0f, 1f, r / 0.14f));
+    });
+    /// A gold coin, face on: rim, raised face, an inner ring and a highlight (drawn in colour: not tinted).
+    public static Sprite Coin => Generated("coin", 128, 128, Vector4.zero, (x, y) =>
+    {
+        float dx = x + 0.5f - 64f, dy = y + 0.5f - 64f, r = Mathf.Sqrt(dx * dx + dy * dy);
+        float a = Mathf.Clamp01(60.5f - r);
+        var rim = new Color(0.80f, 0.52f, 0.10f); var face = new Color(1.00f, 0.78f, 0.26f); var ring = new Color(0.88f, 0.60f, 0.14f);
+        var c = r > 52f ? rim : Mathf.Abs(r - 38f) < 3f ? ring : face;
+        float light = Mathf.Clamp01(1f - new Vector2(dx + 22f, dy - 22f).magnitude / 70f) * 0.45f;   // a highlight up and to the left
+        c = Color.Lerp(c, Color.white, light);
+        return new Color(c.r, c.g, c.b, a);
+    });
     public static readonly Color Lit = Hex("7446FF");      // the shell's lit edge: rims, an ON switch, never an action
 
     /// White rounded box over its lip: `lip` sprite pixels of darker band under a face of `size`, the face raised

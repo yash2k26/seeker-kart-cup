@@ -30,6 +30,9 @@ namespace KartCup
         [SerializeField] Sprite[] itemIcons = System.Array.Empty<Sprite>();
         [SerializeField] Sprite kartIcon, paintIcon;
         [SerializeField] KartDatabase karts;
+        [SerializeField] RectTransform rays;                 // the beams behind an opened chest, turning slowly
+        [SerializeField] Image raysImage;
+        [SerializeField] RectTransform[] coins = System.Array.Empty<RectTransform>(), sparkles = System.Array.Empty<RectTransform>();
 
         int taps;
         bool busy, opened;
@@ -44,6 +47,15 @@ namespace KartCup
         }
 
         public bool Showing => group != null && group.blocksRaycasts;
+
+        void Update()
+        {
+            if (rays != null && rays.gameObject.activeSelf) rays.Rotate(0f, 0f, -18f * Time.unscaledDeltaTime);
+            // the sparkles twinkle round an opened chest, each on its own beat
+            for (int i = 0; i < sparkles.Length; i++)
+                if (sparkles[i] != null && sparkles[i].gameObject.activeSelf)
+                    sparkles[i].localScale = Vector3.one * Mathf.Max(0f, Mathf.Sin(Time.unscaledTime * (2.2f + i * 0.37f) + i * 1.7f));
+        }
 
         /// Open what is waiting, one after another; with nothing waiting, how chests work.
         public void OpenNext()
@@ -69,6 +81,7 @@ namespace KartCup
         {
             infoRoot.SetActive(true);
             chest.gameObject.SetActive(true); glow.gameObject.SetActive(false);
+            Effects(false, 0);
             SetCards(0);
             chestImage.sprite = closedSprites[(int)Chests.Tier.Treasure];
             chest.localScale = Vector3.one * 0.7f; chest.anchoredPosition = new Vector2(0, 250);
@@ -101,6 +114,7 @@ namespace KartCup
                 hint.text = "TAP TO OPEN";
                 glow.gameObject.SetActive(true);
                 glowImage.color = Fade(tierColors[(int)tier], 0.15f);
+                Effects(false, (int)tier);
                 chest.gameObject.SetActive(true);
                 chest.localScale = Vector3.one; chest.localRotation = Quaternion.identity;
                 // it drops in with a thump
@@ -174,11 +188,52 @@ namespace KartCup
             glow.localScale = Vector3.one * 1.8f;
             Tween.Scale(glow, Vector3.one * 1.2f, 0.6f, Ease.OutQuad, useUnscaledTime: true);
             Haptics.Play(Haptics.Kind.Win); AudioDirector.Instance?.Confirm();
+            Effects(true, tier);
+            CoinBurst(tier);
             yield return Tween.UIAnchoredPosition(chest, new Vector2(0, 210), 0.35f, Ease.OutQuad, useUnscaledTime: true).ToYieldInstruction();
             opened = true;
         }
 
         void SetCards(int n) { for (int i = 0; i < cards.Length; i++) cards[i].SetActive(i < n); }
+
+        /// The light round an opened chest: beams in its colour behind it, sparkles round it.
+        void Effects(bool on, int tier)
+        {
+            if (rays != null)
+            {
+                rays.gameObject.SetActive(on);
+                if (on) { raysImage.color = Fade(tierColors[tier], 0f); Tween.Color(raysImage, Fade(tierColors[tier], tier >= 2 ? 0.8f : 0.5f), 0.4f, useUnscaledTime: true); }
+            }
+            for (int i = 0; i < sparkles.Length; i++)
+            {
+                if (sparkles[i] == null) continue;
+                sparkles[i].gameObject.SetActive(on && i < 3 + tier * 2);
+                var a = i * 2.39996f; float r = 230f + 60f * (i % 3);
+                sparkles[i].anchoredPosition = new Vector2(Mathf.Cos(a) * r, 210f + Mathf.Sin(a) * r * 0.7f);
+            }
+        }
+
+        /// Coins thrown up out of the chest, falling away as they fade: a handful from silver, a shower from the golden.
+        void CoinBurst(int tier)
+        {
+            int n = Mathf.Min(coins.Length, new[] { 0, 6, 12, coins.Length }[tier]);
+            for (int i = 0; i < coins.Length; i++)
+            {
+                var c = coins[i];
+                if (c == null) continue;
+                c.gameObject.SetActive(i < n);
+                if (i >= n) continue;
+                c.anchoredPosition = new Vector2(Random.Range(-60f, 60f), 120f);
+                c.localScale = Vector3.one * Random.Range(0.6f, 1.1f);
+                var to = new Vector2(Random.Range(-720f, 720f), Random.Range(-260f, 360f));
+                float t = Random.Range(0.7f, 1.2f);
+                Tween.UIAnchoredPosition(c, to, t, Ease.OutQuad, useUnscaledTime: true);
+                Tween.LocalRotation(c, new Vector3(0, 0, Random.Range(-540f, 540f)), t, useUnscaledTime: true);
+                var img = c.GetComponent<Image>();
+                img.color = Color.white;
+                Tween.Alpha(img, 0f, 0.35f, startDelay: t - 0.3f, useUnscaledTime: true);
+            }
+        }
 
         /// Rows of four, each row centred on what it holds.
         void Place(int i, int n)
@@ -216,6 +271,15 @@ namespace KartCup
             tierLabel.text = Chests.Names[(int)tier]; tierLabel.color = tierColors[(int)tier]; hint.text = "";
             for (int i = 0; i < cards.Length; i++) { cards[i].SetActive(i < rewards.Count); if (i < rewards.Count) { Card(i, rewards[i]); Place(i, rewards.Count); } }
             collectButton.SetActive(true); collectLabel.text = "COLLECT";
+            Effects(true, (int)tier);
+            var rnd = new System.Random(3);
+            for (int i = 0; i < coins.Length; i++)                 // the shower, caught mid-air
+            {
+                coins[i].gameObject.SetActive(i < new[] { 0, 6, 12, coins.Length }[(int)tier]);
+                coins[i].anchoredPosition = new Vector2(rnd.Next(-720, 720), rnd.Next(-120, 380));
+                coins[i].localRotation = Quaternion.Euler(0, 0, rnd.Next(0, 360));
+            }
+            for (int i = 0; i < sparkles.Length; i++) sparkles[i].localScale = Vector3.one * (0.5f + 0.5f * (i % 2));
         }
 #endif
     }

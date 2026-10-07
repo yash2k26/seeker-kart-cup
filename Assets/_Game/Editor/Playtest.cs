@@ -44,6 +44,12 @@ public static class Playtest
         vista = args.Contains("-vista");     // and, per shot, a second frame from the player's spot toward the lighthouse
         mobile = args.Contains("-mobile");   // the phone's quality tier (Forward, eight lights per object), restored on exit
         KartCup.Weekly.Racing = args.Contains("-weekly");   // Kartel Weekly's time trial: alone on track, no items
+        KartCup.RaceMode.Clear();                             // -mode elim | duel (the Tour's and Daily's modes)
+        for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-mode")
+        {
+            KartCup.RaceMode.Current = args[i + 1] == "duel" ? KartCup.RaceMode.Kind.Duel : KartCup.RaceMode.Kind.Elimination;
+            if (KartCup.RaceMode.Current == KartCup.RaceMode.Kind.Duel) KartCup.RaceMode.Rival = 1;
+        }
         look = "Lighthouse";
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-look") look = args[i + 1];   // what the vista frames look at
         item = null; itemShot = 0; thrownAt = -1; goAt = -1; armed = false; heldShot = false;

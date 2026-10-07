@@ -6,7 +6,7 @@ namespace KartCup
     /// catalog holds the prices); the character's colour is the free default. Purely a look.
     public static class Paints
     {
-        public sealed class Def { public string id, sku, name; public Color color; public bool skrOnly; }
+        public sealed class Def { public string id, sku, name; public Color color; public bool skrOnly; public string boss; }
 
         public static readonly Def[] All =
         {
@@ -14,6 +14,11 @@ namespace KartCup
             new() { id = "midnight", sku = "paint.midnight", name = "MIDNIGHT",  color = Hex("18213A") },
             new() { id = "rally",    sku = "paint.rally",    name = "SKR RALLY", color = Hex("7B3FE4"), skrOnly = true },
             new() { id = "white",    sku = "paint.white",    name = "WHITE",     color = Hex("F2F2EE") },
+            // Kartel Tour's boss prizes: never sold, only won (Tour.Record grants them)
+            new() { id = "bossmert",   sku = "boss.mert",   name = "MERT ORANGE",  color = Hex("FF6A1A"), boss = "MERT" },
+            new() { id = "bossakshay", sku = "boss.akshay", name = "AKSHAY SKY",   color = Hex("2EC2FF"), boss = "AKSHAY" },
+            new() { id = "bosschase",  sku = "boss.chase",  name = "CHASE CHROME", color = Hex("C9D2DE"), boss = "CHASE" },
+            new() { id = "bosstoly",   sku = "boss.toly",   name = "TOLY GOLD",    color = Hex("FFB126"), boss = "TOLY" },
         };
 
         const string Key = "kc.paint";

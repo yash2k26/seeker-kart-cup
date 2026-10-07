@@ -74,6 +74,17 @@ namespace KartCup
             return LastEarn = (tier, stars, filled);
         }
 
+        /// A chest from outside a podium (a Tour boss, the Daily Challenge): waiting to be opened.
+        public static void Give(Tier tier) { S.pending.Add(tier); Save(); }
+
+        /// Stars from outside a podium (the Daily Challenge): into the meter, a golden chest if it fills.
+        public static void AddStars(int n)
+        {
+            S.stars += n;
+            if (S.stars >= StarGoal) { S.stars -= StarGoal; S.fills++; S.pending.Add(Tier.Treasure); }
+            Save();
+        }
+
         /// Kartel Weekly's Monday claim, once per week: a silver chest for driving it, a golden one for a prize place.
         public static bool ClaimWeekly(int week, bool prizePlace)
         {

@@ -23,7 +23,7 @@ namespace KartCup
         void Start()
         {
             if (roster == null || roster.characters.Length == 0) { Debug.LogError("[race] no roster"); return; }
-            Chests.ClearLast();
+            Chests.ClearLast(); Tour.ClearLast(); Daily.LastPaid = false;
             if (RoomClient.InRaceRoom) { SpawnOnline(); return; }
 
             // A race entered outside a cup (editor playtest, a direct scene load) still needs a grid.
@@ -33,16 +33,17 @@ namespace KartCup
                 int.TryParse(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Replace("Race", ""), out int n);
                 Cup.Begin(CharacterDatabase.SelectedIndex, roster.characters.Length, new[] { Mathf.Clamp(n - 1, 0, Tracks.Count - 1) });
             }
-            // Kartel Weekly's time trial: the player alone on the grid (Weekly.Racing)
-            int count = Weekly.Racing ? 1 : Mathf.Min(racers, gridSlots.Length);
+            // Kartel Weekly's time trial: the player alone on the grid (Weekly.Racing); a duel: the rival on pole, you beside
+            bool duel = RaceMode.Current == RaceMode.Kind.Duel && RaceMode.Rival >= 0;
+            int count = Weekly.Racing ? 1 : duel ? 2 : Mathf.Min(racers, gridSlots.Length);
 
             for (int slot = 0; slot < count && slot < Cup.Grid.Count; slot++)
             {
                 // The grid comes from the cup: pole on race one, then the standings reversed, so leading costs you
                 // track position next time out.
-                int character = Weekly.Racing ? Cup.PlayerCharacter : Cup.Grid[slot];
+                int character = Weekly.Racing ? Cup.PlayerCharacter : duel ? (slot == 0 ? RaceMode.Rival : Cup.PlayerCharacter) : Cup.Grid[slot];
                 var def = roster.At(character);
-                bool isPlayer = character == Cup.PlayerCharacter;
+                bool isPlayer = duel ? slot == 1 : character == Cup.PlayerCharacter;   // (a mirror duel has the same driver twice)
                 var kartId = isPlayer && !Weekly.Racing ? PlayerKart(def, allowTrial: true) : def.kartId;
                 var kart = Spawn(def, gridSlots[slot], isPlayer, character, kartId, online: false);
                 if (isPlayer && raceCamera != null) raceCamera.Initialize(kart);
@@ -58,6 +59,7 @@ namespace KartCup
             var race = RaceManager.Instance;
             if (race == null) yield break;
             var show = PodiumShow.Ensure();
+            if (RaceMode.Current == RaceMode.Kind.Elimination && !Weekly.Racing) gameObject.AddComponent<Elimination>();
             if (Weekly.Racing) { var boxes = FindAnyObjectByType<ItemBag>(); if (boxes != null) boxes.gameObject.SetActive(false); }   // the time trial: no items
             else Loadout(race);
             if (show == null) { race.BeginCountdown(); yield break; }
@@ -180,7 +182,9 @@ namespace KartCup
             {
                 go.AddComponent<KartHooks>().Bind(kart, pose, false);
                 // Personality is seeded from the character, so the same rival drives the same way every time.
-                go.AddComponent<KartAi>().Configure(def, firstWaypoint, character);
+                var ai = go.AddComponent<KartAi>();
+                ai.Configure(def, firstWaypoint, character);
+                ai.skill = Mathf.Clamp(ai.skill * RaceMode.Difficulty, 0.8f, 1.12f);   // the event's pace (Tour cups, bosses)
             }
             // a remote kart gets no hooks and no input: RemoteKart poses the driver and spins the wheels itself
             return kart;

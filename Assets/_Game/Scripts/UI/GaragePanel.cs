@@ -123,10 +123,20 @@ namespace KartCup
                 bool pOwned = Unlocks.Has(paint.sku);
                 var pItem = KartApi.Cfg?.Item(paint.sku);
                 if (nameLabel != null) nameLabel.text = paint.name;
-                if (blurbLabel != null) blurbLabel.text = pItem?.blurb ?? "";
-                if (priceLabel != null) priceLabel.text = pOwned ? "UNLOCKED" : Price(pItem);
-                SetButton(primaryLabel, primaryButton, pOwned ? "SELECTED" : pItem != null ? $"UNLOCK  ·  {Skr(pItem)}" : "…", !pOwned && pItem != null);
-                SetButton(secondaryLabel, secondaryButton, !pOwned && pItem != null && !paint.skrOnly ? $"PAY {Sol(pItem)}" : paint.skrOnly && !pOwned ? "SKR ONLY" : "", !pOwned && pItem != null && !paint.skrOnly);
+                if (paint.boss != null && !pOwned)
+                {
+                    // a Tour prize: shown, never sold
+                    if (blurbLabel != null) blurbLabel.text = $"Beat {paint.boss} in KARTEL TOUR to win it.";
+                    if (priceLabel != null) priceLabel.text = "TOUR PRIZE";
+                    SetButton(primaryLabel, primaryButton, "", false); SetButton(secondaryLabel, secondaryButton, "", false);
+                }
+                else
+                {
+                    if (blurbLabel != null) blurbLabel.text = paint.boss != null ? $"Won from {paint.boss} in Kartel Tour." : pItem?.blurb ?? "";
+                    if (priceLabel != null) priceLabel.text = pOwned ? "UNLOCKED" : Price(pItem);
+                    SetButton(primaryLabel, primaryButton, pOwned ? "SELECTED" : pItem != null ? $"UNLOCK  ·  {Skr(pItem)}" : "…", !pOwned && pItem != null);
+                    SetButton(secondaryLabel, secondaryButton, !pOwned && pItem != null && !paint.skrOnly ? $"PAY {Sol(pItem)}" : paint.skrOnly && !pOwned ? "SKR ONLY" : "", !pOwned && pItem != null && !paint.skrOnly);
+                }
             }
             else
             {

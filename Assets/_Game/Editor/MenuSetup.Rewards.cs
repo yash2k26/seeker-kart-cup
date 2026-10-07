@@ -21,35 +21,39 @@ public static partial class MenuSetup
     /// bottom right (NEW VERSION moves up over it), and the toast across the top.
     static void TitleRewards(GameObject screen, RectTransform plate)
     {
-        var sub = plate.Find("Sub");
-        var card = Rect("Weekly", plate, new Vector2(0, 1), new Vector2(0, 1), new Vector2(120, -500), new Vector2(940, 118));
-        card.pivot = new Vector2(0, 1);
-        Design.AsTile(card, Slate, 28f, out float lip);
-        var button = card.gameObject.AddComponent<Button>();
-        var feel = card.gameObject.AddComponent<PressFeel>();
-        var face = Face("Weekly", card, lip);
-        var trophy = Rect("Trophy", face, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(64, 0), new Vector2(64, 64));
-        var ti = trophy.gameObject.AddComponent<Image>();
-        ti.sprite = IconSprite("trophy"); ti.color = Accent; ti.preserveAspect = true; ti.raycastTarget = false;
-        var head = Label("Head", face, strong, "KARTEL WEEKLY", 28, Accent, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(118, -14), new Vector2(740, 40));
-        head.characterSpacing = 6f;
-        var line = Label("Line", face, body, "", 30, Paper, TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(118, 14), new Vector2(740, 44));
-        line.enableAutoSizing = true; line.fontSizeMin = 22; line.fontSizeMax = 30;
-        var chev = Rect("Next", face, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-48, 0), new Vector2(40, 40));
-        var ci = chev.gameObject.AddComponent<Image>();
-        ci.sprite = IconSprite("next"); ci.color = Muted; ci.preserveAspect = true; ci.raycastTarget = false;
-        feel.Configure(Design.TileDown, face, lip * (Design.TileLip - 3f) / Design.TileLip);
+        // Today's challenge and this week's, side by side where the on-chain line was: the two reasons to come back
+        if (plate.Find("Sub") is Transform sub) Object.DestroyImmediate(sub.gameObject);
+        var (dailyCard, dailyButton, dailyHead, dailyLine) = EventCard("Daily", plate, new Vector2(120, -500), "flag");
+        var daily = plate.gameObject.AddComponent<DailyCard>();
+        var doneTick = Rect("Done", dailyCard, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-16, -14), new Vector2(40, 40));
+        doneTick.pivot = new Vector2(1, 1);
+        var dt = doneTick.gameObject.AddComponent<Image>(); dt.sprite = IconSprite("star"); dt.color = Accent; dt.raycastTarget = false;
+        new SerializedObject(daily).Do(s =>
+        {
+            s.FindProperty("title").objectReferenceValue = dailyHead;
+            s.FindProperty("line").objectReferenceValue = dailyLine;
+            s.FindProperty("done").objectReferenceValue = doneTick.gameObject;
+        });
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(dailyButton.onClick, daily.Tap);
+
+        var (card, button, head, line) = EventCard("Weekly", plate, new Vector2(600, -500), "trophy");
         // on the plate, not the card: the card is what it hides, and a hidden card would never run again
         var weekly = plate.gameObject.AddComponent<WeeklyCard>();
         new SerializedObject(weekly).Do(s =>
         {
             s.FindProperty("content").objectReferenceValue = card.gameObject;
-            s.FindProperty("fallback").objectReferenceValue = sub != null ? sub.gameObject : null;
             s.FindProperty("title").objectReferenceValue = head;
             s.FindProperty("line").objectReferenceValue = line;
         });
         UnityEditor.Events.UnityEventTools.AddPersistentListener(button.onClick, weekly.Tap);
         card.gameObject.SetActive(false);                 // until the Worker answers
+
+        // the Tour beside the title's three doors
+        if (plate.Find("Actions") is RectTransform actions)
+        {
+            var tour = Tile("Tour", actions, "flag", "TOUR", new Vector2(0, 0), new Vector2(780, 64), new Vector2(200, 176));
+            Wire(tour, nameof(ScreenFlow.ShowTour));
+        }
 
         // the chest: what is waiting (bobbing, with a count), or the golden one the stars fill toward
         var tile = Rect("Chest", screen.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-64, 96), new Vector2(232, 232));
@@ -111,6 +115,128 @@ public static partial class MenuSetup
             s.FindProperty("actionLabel").objectReferenceValue = act.GetComponentInChildren<TMP_Text>();
         });
         UnityEditor.Events.UnityEventTools.AddPersistentListener(act.onClick, toast.Act);
+    }
+
+    /// A half-width pressable card on the title: a glyph, an eyebrow, one line, and a chevron.
+    static (RectTransform card, Button button, TMP_Text head, TMP_Text line) EventCard(string name, RectTransform plate, Vector2 at, string icon)
+    {
+        var card = Rect(name, plate, new Vector2(0, 1), new Vector2(0, 1), at, new Vector2(460, 118));
+        card.pivot = new Vector2(0, 1);
+        Design.AsTile(card, Slate, 28f, out float lip);
+        var button = card.gameObject.AddComponent<Button>();
+        var feel = card.gameObject.AddComponent<PressFeel>();
+        var face = Face(name, card, lip);
+        var glyph = Rect("Icon", face, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(48, 0), new Vector2(52, 52));
+        var gi = glyph.gameObject.AddComponent<Image>();
+        gi.sprite = IconSprite(icon); gi.color = Accent; gi.preserveAspect = true; gi.raycastTarget = false;
+        var head = Label("Head", face, strong, "", 24, Accent, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(92, -14), new Vector2(340, 36));
+        head.characterSpacing = 4f; head.enableAutoSizing = true; head.fontSizeMin = 18; head.fontSizeMax = 24;
+        var line = Label("Line", face, body, "", 26, Paper, TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(92, 14), new Vector2(340, 44));
+        line.enableAutoSizing = true; line.fontSizeMin = 18; line.fontSizeMax = 26;
+        feel.Configure(Design.TileDown, face, lip * (Design.TileLip - 3f) / Design.TileLip);
+        return (card, button, head, line);
+    }
+
+    // ---------- Kartel Tour's screen ----------
+    static GameObject TourScreen(RectTransform parent)
+    {
+        var screen = Rect("Tour", parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject;
+        var dim = Rect("Dim", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(600, 600));
+        dim.gameObject.AddComponent<Image>().color = new Color(Deep.r, Deep.g, Deep.b, 0.72f);
+        var bar = Header(screen.transform, "KARTEL TOUR", nameof(ScreenFlow.ShowTitle));
+        var panel = screen.AddComponent<TourPanel>();
+        var starIcon = Rect("Star", bar, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-330, 0), new Vector2(56, 56));
+        var si = starIcon.gameObject.AddComponent<Image>(); si.sprite = IconSprite("star"); si.color = Accent; si.raycastTarget = false;
+        var total = Label("Total", bar, display, "0 / 60", 48, Paper, TextAlignmentOptions.Left, new Vector2(1, 0.5f), new Vector2(-290, 0), new Vector2(240, 64));
+
+        var names = Tour.Cups.Select(c => c.kicker).ToArray();
+        var (tabBacks, tabLabels, tabButtons) = Segmented("Cups", screen.transform, names, new Vector2(0.5f, 1), new Vector2(0, -164), new Vector2(1480, 92), 30);
+        for (int i = 0; i < tabButtons.Length; i++)
+        {
+            UnityEditor.Events.UnityEventTools.AddIntPersistentListener(tabButtons[i].onClick, panel.SetCup, i);
+            tabBacks[i].color = i == 0 ? Design.Ink600 : new Color(0, 0, 0, 0);
+            tabLabels[i].color = i == 0 ? Paper : Muted;
+        }
+
+        // left: the cup, how far through it you are, the boss's prize, and who is driving
+        var info = Rect("Card", screen.transform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(64, 40), new Vector2(700, 760));
+        info.pivot = Vector2.zero;
+        Design.AsCard(info, Panel);
+        var cupName = Label("CupName", info, display, "ROOKIE RUN", 64, Paper, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(44, -40), new Vector2(620, 80));
+        cupName.enableAutoSizing = true; cupName.fontSizeMin = 40; cupName.fontSizeMax = 64;
+        var cupState = Label("CupState", info, body, "", 28, Muted, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(46, -130), new Vector2(610, 90));
+        cupState.textWrappingMode = TextWrappingModes.Normal;
+        Label("PrizeCap", info, strong, "BOSS PRIZE", 24, Muted, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(46, -250), new Vector2(400, 34)).characterSpacing = 8f;
+        var swatch = Rect("Swatch", info, new Vector2(0, 1), new Vector2(0, 1), new Vector2(46, -296), new Vector2(110, 110));
+        swatch.pivot = new Vector2(0, 1);
+        var sw = Design.AsPill(swatch, Accent); sw.raycastTarget = false;
+        var prize = Label("Prize", info, strong, "", 30, Paper, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(180, -330), new Vector2(480, 80));
+        prize.textWrappingMode = TextWrappingModes.Normal; prize.enableAutoSizing = true; prize.fontSizeMin = 22; prize.fontSizeMax = 30;
+        var who = Label("Driver", info, strong, "", 30, Paper, TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(46, 190), new Vector2(610, 44));
+        who.characterSpacing = 4f;
+        var change = Button("Change", info, "CHANGE DRIVER", Slate, Paper, 34, new Vector2(0, 0), new Vector2(40, 40), new Vector2(420, 120), icon: "user");
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(change.onClick, panel.ChangeDriver);
+
+        // right: the five events
+        var list = Rect("List", screen.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-64, 40), new Vector2(1420, 760));
+        list.pivot = new Vector2(1, 0);
+        Design.AsCard(list, Panel);
+        const int count = 5; const float rowH = 128f, gap = 14f;
+        var rows = new GameObject[count]; var titles = new TMP_Text[count]; var modes = new TMP_Text[count]; var tracks = new TMP_Text[count];
+        var stars = new Image[count * 3]; var playBacks = new Image[count]; var plays = new Button[count];
+        for (int i = 0; i < count; i++)
+        {
+            var rt = Rect("Event" + i, list, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -30 - i * (rowH + gap)), new Vector2(1360, rowH));
+            rt.pivot = new Vector2(0.5f, 1);
+            Design.AsRow(rt, Slate).raycastTarget = false;
+            var num = Rect("Num", rt, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(64, 0), new Vector2(76, 76));
+            Design.AsPill(num, Deep).raycastTarget = false;
+            Label("NumLabel", num, display, i == count - 1 ? "B" : (i + 1).ToString(), 40, i == count - 1 ? Accent : Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 2), new Vector2(76, 76));
+            titles[i] = Label("Title", rt, display, "", 40, Paper, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(124, 20), new Vector2(620, 52));
+            titles[i].enableAutoSizing = true; titles[i].fontSizeMin = 26; titles[i].fontSizeMax = 40;
+            modes[i] = Label("Mode", rt, strong, "", 24, Accent, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(126, -26), new Vector2(240, 34));
+            modes[i].characterSpacing = 6f;
+            tracks[i] = Label("Track", rt, body, "", 24, Muted, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(330, -26), new Vector2(360, 34));
+            for (int k = 0; k < 3; k++)
+            {
+                var st = Rect("Star" + k, rt, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-440 + k * 64, 0), new Vector2(56, 56));
+                stars[i * 3 + k] = st.gameObject.AddComponent<Image>();
+                stars[i * 3 + k].sprite = IconSprite("star"); stars[i * 3 + k].raycastTarget = false;
+            }
+            var play = Button("Play", rt, "PLAY", Slate, Paper, 36, new Vector2(1, 0.5f), new Vector2(-18, 0), new Vector2(210, 96), icon: "play");
+            plays[i] = play; playBacks[i] = play.GetComponent<Image>();
+            UnityEditor.Events.UnityEventTools.AddIntPersistentListener(play.onClick, panel.Play, i);
+            rows[i] = rt.gameObject;
+        }
+
+        new SerializedObject(panel).Do(s =>
+        {
+            s.FindProperty("roster").objectReferenceValue = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
+            Fill(s.FindProperty("tabBacks"), tabBacks.Cast<Object>().ToArray());
+            Fill(s.FindProperty("tabLabels"), tabLabels.Cast<Object>().ToArray());
+            s.FindProperty("total").objectReferenceValue = total;
+            s.FindProperty("cupName").objectReferenceValue = cupName;
+            s.FindProperty("cupState").objectReferenceValue = cupState;
+            s.FindProperty("driver").objectReferenceValue = who;
+            Fill(s.FindProperty("rows"), rows.Cast<Object>().ToArray());
+            Fill(s.FindProperty("titles"), titles.Cast<Object>().ToArray());
+            Fill(s.FindProperty("modes"), modes.Cast<Object>().ToArray());
+            Fill(s.FindProperty("tracks"), tracks.Cast<Object>().ToArray());
+            Fill(s.FindProperty("stars"), stars.Cast<Object>().ToArray());
+            Fill(s.FindProperty("playBacks"), playBacks.Cast<Object>().ToArray());
+            Fill(s.FindProperty("plays"), plays.Cast<Object>().ToArray());
+            s.FindProperty("prizeSwatch").objectReferenceValue = sw;
+            s.FindProperty("prizeLabel").objectReferenceValue = prize;
+            s.FindProperty("tabOn").colorValue = Design.Ink600;
+            s.FindProperty("tabOff").colorValue = new Color(0, 0, 0, 0);
+            s.FindProperty("textOn").colorValue = Paper;
+            s.FindProperty("textOff").colorValue = Muted;
+            s.FindProperty("starOn").colorValue = Accent;
+            s.FindProperty("starOff").colorValue = new Color(1f, 1f, 1f, 0.16f);
+            s.FindProperty("playNext").colorValue = Accent;
+            s.FindProperty("playIdle").colorValue = Slate;
+        });
+        return screen;
     }
 
     // ---------- Kartel Weekly's screen ----------
@@ -221,6 +347,10 @@ public static partial class MenuSetup
         tap.transition = Selectable.Transition.None;
         UnityEditor.Events.UnityEventTools.AddPersistentListener(tap.onClick, reveal.Tap);
 
+        var rays = Rect("Rays", go.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 210), new Vector2(1500, 1500));
+        var raysImg = rays.gameObject.AddComponent<Image>();
+        raysImg.sprite = Design.LightRays; raysImg.color = new Color(1, 1, 1, 0f); raysImg.raycastTarget = false;
+        rays.gameObject.SetActive(false);
         var glow = Rect("Glow", go.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 160), new Vector2(1000, 1000));
         var glowImg = glow.gameObject.AddComponent<Image>();
         glowImg.sprite = Design.Glow; glowImg.color = new Color(1, 1, 1, 0.2f); glowImg.raycastTarget = false;
@@ -249,6 +379,21 @@ public static partial class MenuSetup
             card.gameObject.SetActive(false);
         }
 
+        // what flies out of an opened chest, and what twinkles round it (pooled, off until a chest bursts)
+        var coins = new RectTransform[20];
+        for (int i = 0; i < coins.Length; i++)
+        {
+            coins[i] = Rect("Coin" + i, go.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(64, 64));
+            var ci = coins[i].gameObject.AddComponent<Image>(); ci.sprite = Design.Coin; ci.raycastTarget = false;
+            coins[i].gameObject.SetActive(false);
+        }
+        var sparkles = new RectTransform[10];
+        for (int i = 0; i < sparkles.Length; i++)
+        {
+            sparkles[i] = Rect("Sparkle" + i, go.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(48, 48));
+            var si = sparkles[i].gameObject.AddComponent<Image>(); si.sprite = IconSprite("star"); si.color = new Color(1f, 0.95f, 0.75f, 0.9f); si.raycastTarget = false;
+            sparkles[i].gameObject.SetActive(false);
+        }
         var infoRoot = Rect("Info", go.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -150), new Vector2(1900, 420));
         var info = Label("Text", infoRoot, body, "", 32, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1900, 420));
         info.textWrappingMode = TextWrappingModes.Normal; info.lineSpacing = 18f;
@@ -287,6 +432,10 @@ public static partial class MenuSetup
             s.FindProperty("kartIcon").objectReferenceValue = IconSprite("kart");
             s.FindProperty("paintIcon").objectReferenceValue = Design.Pill;
             s.FindProperty("karts").objectReferenceValue = AssetDatabase.LoadAssetAtPath<KartDatabase>("Assets/_Game/Data/Karts.asset");
+            s.FindProperty("rays").objectReferenceValue = rays;
+            s.FindProperty("raysImage").objectReferenceValue = raysImg;
+            Fill(s.FindProperty("coins"), coins.Cast<Object>().ToArray());
+            Fill(s.FindProperty("sparkles"), sparkles.Cast<Object>().ToArray());
         });
     }
 }

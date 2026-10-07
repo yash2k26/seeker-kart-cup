@@ -57,6 +57,7 @@ namespace KartCup
             Cup.Record(order.Select(r => r.characterIndex).ToList());
             bool newBest = Tracks.RecordBest(Cup.TrackId, who.finishTime);
             Chests.Earn(place);   // a podium earns a chest (ChestBadge shows it on the card)
+            if (RaceMode.EventId == "daily") Daily.Record(place); else if (RaceMode.InEvent) Tour.Record(RaceMode.EventId, place);   // TourResult shows it
 
             bool single = Cup.IsSingleRace, final = Cup.IsFinalRace;
             int cupPlace = Cup.PlayerPlace;

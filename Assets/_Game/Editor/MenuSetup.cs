@@ -61,12 +61,13 @@ public static partial class MenuSetup
         var garage = GarageScreen(safe, podium, carousel);
         var items = ItemsScreen(safe);
         var weeklyScreen = WeeklyScreen(safe);
+        var tourScreen = TourScreen(safe);
 
         var so = new SerializedObject(flow);
         so.FindProperty("roster").objectReferenceValue = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
         so.FindProperty("playLabel").objectReferenceValue = title.transform.Find("Plate/Actions/Play/PlayFace/PlayLabel")?.GetComponent<TMP_Text>();
         var panels = so.FindProperty("panels");
-        panels.arraySize = 10;
+        panels.arraySize = 11;
         panels.GetArrayElementAtIndex(0).objectReferenceValue = title;
         panels.GetArrayElementAtIndex(1).objectReferenceValue = select;
         panels.GetArrayElementAtIndex(2).objectReferenceValue = board;
@@ -77,6 +78,7 @@ public static partial class MenuSetup
         panels.GetArrayElementAtIndex(7).objectReferenceValue = garage;
         panels.GetArrayElementAtIndex(8).objectReferenceValue = items;
         panels.GetArrayElementAtIndex(9).objectReferenceValue = weeklyScreen;
+        panels.GetArrayElementAtIndex(10).objectReferenceValue = tourScreen;
         so.ApplyModifiedPropertiesWithoutUndo();
 
         Curtain();
@@ -1072,14 +1074,14 @@ public static partial class MenuSetup
         var price = Label("Price", card, strong, "", 28, Paper, TextAlignmentOptions.Left,
                           new Vector2(0, 1), new Vector2(48, -428), new Vector2(624, 36));
 
-        // paint swatches: the driver's own colour, then the four paints
+        // paint swatches: the driver's own colour, the four for sale, then the Tour bosses' prizes
         var swatchCap = Label("PaintCap", card, body, "PAINT", 24, Muted, TextAlignmentOptions.Left,
                               new Vector2(0, 1), new Vector2(48, -484), new Vector2(200, 36));
         swatchCap.characterSpacing = 6f;
         var swatches = new Image[1 + Paints.All.Length];
         for (int i = 0; i < swatches.Length; i++)
         {
-            var rt = Rect("Swatch" + i, card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(180 + i * 76, -474), new Vector2(56, 56));
+            var rt = Rect("Swatch" + i, card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(180 + i * 54, -478), new Vector2(46, 46));
             rt.pivot = new Vector2(0, 1);
             swatches[i] = Design.AsPill(rt, Color.white);
             var b = rt.gameObject.AddComponent<Button>();

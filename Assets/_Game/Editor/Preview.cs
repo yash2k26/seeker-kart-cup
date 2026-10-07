@@ -221,6 +221,8 @@ public static class MenuPreview
             me = new Weekly.Row { rank = 5, name = "you.skr", wallet = "me", isSeeker = true, bestMs = 43170, gapMs = 620, entrants = 9 },
         });
         Chests.Preview(12, Chests.Tier.Gold, Chests.Tier.Silver);
+        Tour.Preview(("c1e1", 3), ("c1e2", 2), ("c1e3", 3), ("c1e4", 1), ("c1b", 3), ("c2e1", 2));
+        foreach (var d in Object.FindObjectsByType<DailyCard>(FindObjectsInactive.Include, FindObjectsSortMode.None)) d.ShowInEditor();
         foreach (var w in Object.FindObjectsByType<WeeklyCard>(FindObjectsInactive.Include, FindObjectsSortMode.None)) w.ShowInEditor();
         foreach (var c in Object.FindObjectsByType<ChestButton>(FindObjectsInactive.Include, FindObjectsSortMode.None)) c.ShowInEditor();
         foreach (var t in Object.FindObjectsByType<TitleToast>(FindObjectsInactive.Include, FindObjectsSortMode.None)) t.ShowInEditor("mert.skr beat your Palm Bay lap by 0.42 s", "RACE");
@@ -237,6 +239,7 @@ public static class MenuPreview
             if (i == 7) foreach (var garage in Object.FindObjectsByType<GaragePanel>(FindObjectsSortMode.None)) garage.ShowInEditor(KartSetup.Karts.Length - 1);
             if (i == 8) foreach (var shop in Object.FindObjectsByType<ItemsPanel>(FindObjectsSortMode.None)) shop.ShowInEditor(0);
             if (i == 9) foreach (var weekly in Object.FindObjectsByType<WeeklyPanel>(FindObjectsSortMode.None)) weekly.ShowInEditor();
+            if (i == 10) foreach (var tour in Object.FindObjectsByType<TourPanel>(FindObjectsSortMode.None)) tour.ShowInEditor(1);
             if (i != 7 && carousel != null) carousel.SetVisible(true);
             foreach (var img in Object.FindObjectsByType<Image>(FindObjectsSortMode.None))
                 if (img.name == "Single" || img.name == "Cell0")

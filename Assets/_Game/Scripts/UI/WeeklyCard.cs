@@ -25,11 +25,11 @@ namespace KartCup
             if (fallback != null) fallback.SetActive(b == null);
             if (b == null) return;
             var track = Tracks.At(Mathf.Max(0, Weekly.TrackIndex)).name.ToUpperInvariant();
-            if (title != null) title.text = $"KARTEL WEEKLY  ·  {track}";
+            if (title != null) title.text = $"WEEKLY  ·  {track}";
             string where = b.me != null
                 ? $"You're #{b.me.rank}" + (b.me.rank > 1 ? $" · {b.me.gapMs / 1000f:0.00} s to #{b.me.rank - 1}" : " · fastest this week")
                 : b.pot != null ? $"Top 3 Seekers win {b.pot:N0} {b.currency}" : "Free time trial · the same kart for everyone";
-            if (line != null) line.text = $"{where}   ·   ends in {Weekly.Countdown(Weekly.SecondsLeft)}";
+            if (line != null) line.text = $"{where}  ·  {Weekly.Countdown(Weekly.SecondsLeft)} left";
         }
 
         /// Editor-side preview.

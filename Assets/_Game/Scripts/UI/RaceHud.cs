@@ -31,6 +31,13 @@ namespace KartCup
         int lastPosition, lastLap, lastTier;
         bool itemArmed;
 
+        public static RaceHud Instance { get; private set; }
+        void Awake() => Instance = this;
+        void OnDestroy() { if (Instance == this) Instance = null; }
+
+        /// A big word in the middle of the screen for a while (Elimination's knockouts).
+        public void Callout(string s, float seconds) => Big(s, seconds);
+
         void Start()
         {
             race = RaceManager.Instance;
@@ -60,7 +67,8 @@ namespace KartCup
             if (playerKart == null) { playerKart = p.GetComponent<Kart>(); playerItems = p.GetComponent<ItemCaster>(); }
 
             int lap = Mathf.Clamp(p.lap, 1, race.totalLaps);
-            if (lapLabel != null) lapLabel.text = $"LAP {lap}/{race.totalLaps}";
+            if (lapLabel != null) lapLabel.text = Elimination.Instance != null && race.state == RaceManager.State.Racing
+                ? $"OUT IN {Mathf.CeilToInt(Elimination.Instance.SecondsToNext)}" : $"LAP {lap}/{race.totalLaps}";
             if (lap != lastLap)
             {
                 if (lastLap > 0 && lap == race.totalLaps && race.totalLaps > 1) Big("FINAL LAP", 1.4f);
