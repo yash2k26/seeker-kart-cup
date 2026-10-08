@@ -156,7 +156,7 @@ namespace KartCup
             // The Weekly's time trial is the same: a prize is never bought.
             bool paidRoom = online && RoomClient.Instance != null && RoomClient.Instance.Room.IsPaid;
             if (!paidRoom && !Weekly.Racing) garage?.Find(kartId)?.ApplyTo(kart);
-            if (isPlayer) CharacterDef.Paint(go, Paints.ColorFor(def)); else def.ApplyLivery(go);
+            if (isPlayer) { CharacterDef.Paint(go, Paints.ColorFor(def, kartId), Paints.GoldOn(kartId)); Paints.Driving = kartId; } else def.ApplyLivery(go);
             if (NightScene.Instance != null) go.AddComponent<Headlights>().Init(kart, isPlayer);   // lamps lit after dark
 
             var progress = go.AddComponent<KartProgress>();

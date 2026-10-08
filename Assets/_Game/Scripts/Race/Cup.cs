@@ -90,7 +90,13 @@ namespace KartCup
         /// killing the app here offers a fresh cup rather than replaying the final race for ever.
         public static void MarkFinished()
         {
-            if (!IsSingleRace && PlayerPlace == 1) Achievements.Add(Achievements.Stat.GrandPrixWon);
+            if (!IsSingleRace && PlayerPlace == 1)
+            {
+                Achievements.Add(Achievements.Stat.GrandPrixWon);
+                bool fresh = !Paints.GoldFor(Paints.Driving);
+                Paints.EarnGold(Paints.Driving);                     // Beach Buggy's gold skin: this kart's, for winning a Grand Prix in it
+                if (fresh && !string.IsNullOrEmpty(Paints.Driving)) RaceHud.Instance?.Banner("<color=#FFB126>24K GOLD</color>   EARNED FOR THIS KART   ·   PAINT IT IN THE GARAGE");
+            }
             PlayerPrefs.DeleteKey(Key); PlayerPrefs.Save();
         }
 

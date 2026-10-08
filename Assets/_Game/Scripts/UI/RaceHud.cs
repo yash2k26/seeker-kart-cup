@@ -44,10 +44,13 @@ namespace KartCup
         void Awake() => Instance = this;
         void OnDestroy() { if (Instance == this) Instance = null; Achievements.Unlocked -= Award; }
 
-        void Award(Achievements.Def d)
+        void Award(Achievements.Def d) => Banner($"<color=#FFB126>ACHIEVEMENT</color>   {d.title.ToUpperInvariant()}   ·   + {Chests.Names[(int)d.reward]}");
+
+        /// A line on the award plate for a few seconds (an achievement, a gold paint earned).
+        public void Banner(string text)
         {
             if (awardPlate == null || awardLabel == null) return;
-            awardLabel.text = $"<color=#FFB126>ACHIEVEMENT</color>   {d.title.ToUpperInvariant()}   ·   + {Chests.Names[(int)d.reward]}";
+            awardLabel.text = text;
             awardPlate.SetActive(true);
             UiMotion.Punch(awardPlate.transform, 1.12f, 0.3f);
             awardUntil = Time.unscaledTime + 3.2f;

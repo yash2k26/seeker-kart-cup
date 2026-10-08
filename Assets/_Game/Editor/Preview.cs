@@ -250,6 +250,14 @@ public static class MenuPreview
                               $"alpha={string.Join("/", img.GetComponentsInParent<CanvasGroup>(true).Select(g => g.alpha))} colour={img.color} size={img.rectTransform.rect.size}");
             Canvas.ForceUpdateCanvases();
             Shot(cam, $"menu{i}");
+            if (i == 7)   // and the gold, earned for the free kart: Beach Buggy's 24k skin
+            {
+                Unlocks.Earn("gold." + KartSetup.Karts[0]);
+                foreach (var garage in Object.FindObjectsByType<GaragePanel>(FindObjectsSortMode.None)) garage.ShowInEditor(0, Paints.IndexOf("gold") + 1);
+                Canvas.ForceUpdateCanvases(); Shot(cam, "menu7-gold");
+                foreach (var garage in Object.FindObjectsByType<GaragePanel>(FindObjectsSortMode.None)) garage.ShowInEditor(2, Paints.IndexOf("gold") + 1);
+                Canvas.ForceUpdateCanvases(); Shot(cam, "menu7-gold-locked");
+            }
         }
         // The chest overlay over the title: a gold chest open, then the page that explains chests and its drop rates
         var reveal = Object.FindObjectsByType<ChestReveal>(FindObjectsInactive.Include, FindObjectsSortMode.None).FirstOrDefault();

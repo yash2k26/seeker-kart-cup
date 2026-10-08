@@ -20,13 +20,17 @@ namespace KartCup
         public void ApplyLivery(GameObject kartRoot) { if (tint != Color.white) Paint(kartRoot, tint); }
 
         /// Any colour onto the body: the character's tint, or a paint job the player bought.
-        public static void Paint(GameObject kartRoot, Color colour)
+        public static void Paint(GameObject kartRoot, Color colour, bool gold = false)
         {
             foreach (var r in kartRoot.GetComponentsInChildren<MeshRenderer>())
             {
                 if (r.name != "Body") continue;                  // wheels, driver and shadow keep their own colours
                 var mats = r.materials;                          // instances, so one racer's paint is their own
-                for (int i = 0; i < mats.Length; i++) mats[i].SetColor("_BaseColor", colour);
+                for (int i = 0; i < mats.Length; i++)
+                {
+                    mats[i].SetColor("_BaseColor", colour);
+                    if (gold) { mats[i].SetFloat("_Metallic", 0.92f); mats[i].SetFloat("_Smoothness", 0.82f); }   // 24k: a metal, it catches the lamps
+                }
                 r.materials = mats;
             }
         }

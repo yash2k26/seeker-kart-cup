@@ -1085,7 +1085,7 @@ public static partial class MenuSetup
         var swatches = new Image[1 + Paints.All.Length];
         for (int i = 0; i < swatches.Length; i++)
         {
-            var rt = Rect("Swatch" + i, card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(180 + i * 54, -478), new Vector2(46, 46));
+            var rt = Rect("Swatch" + i, card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(180 + i * 49, -480), new Vector2(42, 42));   // ten fit the card (the gold makes ten)
             rt.pivot = new Vector2(0, 1);
             swatches[i] = Design.AsPill(rt, Color.white);
             var b = rt.gameObject.AddComponent<Button>();

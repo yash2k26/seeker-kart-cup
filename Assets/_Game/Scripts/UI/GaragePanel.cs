@@ -57,10 +57,10 @@ namespace KartCup
         void OnProfile(KartApi.Profile _) { if (isActiveAndEnabled) Show(); }
 
         /// Editor-side preview: show a kart for sale on the podium (Start/OnEnable never run in edit mode).
-        public void ShowInEditor(int i)
+        public void ShowInEditor(int i, int paint = -1)
         {
             if (characters != null) characters.SetVisible(false);
-            index = i; paintFocus = -1;
+            index = i; paintFocus = paint;
             Show();
             if (podium != null) podium.localRotation = Quaternion.Euler(0, baseYaw, 0);
         }
@@ -92,7 +92,7 @@ namespace KartCup
             else
             {
                 var p = Paints.All[Mathf.Clamp(i - 1, 0, Paints.All.Length - 1)];
-                if (Unlocks.Has(p.sku)) { Paints.SelectedId = p.id; paintFocus = -1; }
+                if (Paints.Owns(p, Kart?.id)) { Paints.SelectedId = p.id; paintFocus = -1; }
             }
             Haptics.Play(Haptics.Kind.Tick);
             AudioDirector.Instance?.Click();
@@ -111,8 +111,9 @@ namespace KartCup
             var kartPrefab = kartPrefabs.FirstOrDefault(k => k.name == "Kart_" + def.id) ?? kartPrefabs.FirstOrDefault();
             var driverPrefab = character != null ? driverPrefabs.FirstOrDefault(d => d.name.EndsWith(character.driverId)) : null;
             var paint = FocusedPaint;
-            var colour = paint != null ? paint.color : Paints.ColorFor(character);
+            var colour = paint != null ? paint.color : Paints.ColorFor(character, def.id);
             if (kartPrefab != null && podium != null) current = CharacterCarousel.Mount(kartPrefab, driverPrefab ?? driverPrefabs.FirstOrDefault(), podium, colour, Application.isPlaying);
+            if (current != null && (paint != null ? paint.gold : Paints.GoldOn(def.id))) CharacterDef.Paint(current, colour, gold: true);   // 24k is a metal
 
             bool owned = KartDatabase.Owned(def);
             bool selected = KartDatabase.SelectedId == def.id || (string.IsNullOrEmpty(KartDatabase.SelectedId) && character != null && character.kartId == def.id);
@@ -120,10 +121,17 @@ namespace KartCup
 
             if (paint != null)
             {
-                bool pOwned = Unlocks.Has(paint.sku);
+                bool pOwned = Paints.Owns(paint, def.id);
                 var pItem = KartApi.Cfg?.Item(paint.sku);
                 if (nameLabel != null) nameLabel.text = paint.name;
-                if (paint.boss != null && !pOwned)
+                if (paint.gold)
+                {
+                    // Beach Buggy's 24k skin: each kart's own, earned by winning a Grand Prix in it; never sold
+                    if (blurbLabel != null) blurbLabel.text = pOwned ? $"Earned with the {def.displayName}. Every kart has its own." : $"Win a Grand Prix in the {def.displayName} to earn its gold. Never sold.";
+                    if (priceLabel != null) priceLabel.text = pOwned ? "EARNED" : "GRAND PRIX PRIZE";
+                    SetButton(primaryLabel, primaryButton, pOwned ? "SELECTED" : "", false); SetButton(secondaryLabel, secondaryButton, "", false);
+                }
+                else if (paint.boss != null && !pOwned)
                 {
                     // a Tour prize: shown, never sold
                     if (blurbLabel != null) blurbLabel.text = $"Beat {paint.boss} in KARTEL TOUR to win it.";
@@ -159,7 +167,7 @@ namespace KartCup
             {
                 if (swatches[i] == null) continue;
                 var p = i == 0 ? null : Paints.All[Mathf.Clamp(i - 1, 0, Paints.All.Length - 1)];
-                swatches[i].color = i == 0 ? (character != null ? character.tint : Color.white) : (Unlocks.Has(p.sku) ? p.color : Color.Lerp(p.color, Color.black, 0.45f));
+                swatches[i].color = i == 0 ? (character != null ? character.tint : Color.white) : (Paints.Owns(p, def.id) ? p.color : Color.Lerp(p.color, Color.black, 0.45f));
                 bool active = i == 0 ? paintFocus < 0 && string.IsNullOrEmpty(Paints.SelectedId) : paintFocus == i || (paintFocus < 0 && Paints.SelectedId == p.id);
                 swatches[i].transform.localScale = Vector3.one * (active ? 1.18f : 1f);
             }
