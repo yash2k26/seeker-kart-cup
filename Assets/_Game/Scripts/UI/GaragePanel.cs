@@ -52,6 +52,7 @@ namespace KartCup
             WalletFlow.ProfileChanged -= OnProfile;
             if (current != null) Destroy(current);
             if (characters != null) characters.SetVisible(true);
+            var bd = FindFirstObjectByType<MenuBackdrop>(); if (bd != null) bd.Fit = 1f;
         }
 
         void OnProfile(KartApi.Profile _) { if (isActiveAndEnabled) Show(); }
@@ -114,6 +115,7 @@ namespace KartCup
             var colour = paint != null ? paint.color : Paints.ColorFor(character, def.id);
             if (kartPrefab != null && podium != null) current = CharacterCarousel.Mount(kartPrefab, driverPrefab ?? driverPrefabs.FirstOrDefault(), podium, colour, Application.isPlaying);
             if (current != null && (paint != null ? paint.gold : Paints.GoldOn(def.id))) CharacterDef.Paint(current, colour, gold: true);   // 24k is a metal
+            Frame(current);
 
             bool owned = KartDatabase.Owned(def);
             bool selected = KartDatabase.SelectedId == def.id || (string.IsNullOrEmpty(KartDatabase.SelectedId) && character != null && character.kartId == def.id);
@@ -171,6 +173,17 @@ namespace KartCup
                 bool active = i == 0 ? paintFocus < 0 && string.IsNullOrEmpty(Paints.SelectedId) : paintFocus == i || (paintFocus < 0 && Paints.SelectedId == p.id);
                 swatches[i].transform.localScale = Vector3.one * (active ? 1.18f : 1f);
             }
+        }
+
+        /// The menu camera framed to this kart, closer than the shared pose (Beach Buggy's car fills its screen).
+        static void Frame(GameObject kart)
+        {
+            var backdrop = FindFirstObjectByType<MenuBackdrop>();
+            if (backdrop == null || kart == null) return;
+            var b = new Bounds(kart.transform.position, Vector3.zero);
+            foreach (var r in kart.GetComponentsInChildren<MeshRenderer>()) b.Encapsulate(r.bounds);
+            float size = Mathf.Max(b.size.x, b.size.z);
+            backdrop.Fit = Mathf.Clamp(size / 6.0f, 0.8f, 0.92f);   // 4.7 m karts to 5.6 m trucks (wheels and all): 8-20 % closer, the head still in frame
         }
 
         static void SetButton(TMP_Text label, Button button, string text, bool interactable)

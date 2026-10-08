@@ -21,12 +21,16 @@ namespace KartCup
 
         public bool Focused { get; set; }
         public bool Close { get; set; }
-        float blend, close;
+        /// The kart on show, as a share of the biggest (the 4.9 m trucks the pose was set for): a small kart is framed
+        /// closer, so it fills the screen as Beach Buggy's cars do. Eased like the rest.
+        public float Fit { get; set; } = 1f;
+        float blend, close, fit = 1f;
 
         void LateUpdate()
         {
             blend = Mathf.MoveTowards(blend, Focused ? 1f : 0f, Time.deltaTime * 1.5f);
             close = Mathf.MoveTowards(close, Close ? 1f : 0f, Time.deltaTime * 1.5f);
+            fit = Mathf.Lerp(fit, Fit, 1f - Mathf.Exp(-4f * Time.deltaTime));
             Apply();
         }
 
@@ -34,8 +38,9 @@ namespace KartCup
         {
             if (target == null) return;
             float c = Mathf.SmoothStep(0f, 1f, close);
-            float a = Mathf.Lerp(focusAngle, closeAngle, c) * Mathf.Deg2Rad, radius = Mathf.Lerp(focusRadius, closeRadius, c);
-            var pos = target.position + new Vector3(Mathf.Sin(a) * radius, Mathf.Lerp(focusHeight, closeHeight, c), Mathf.Cos(a) * radius);
+            float f = Mathf.Lerp(fit, 1f, c);                                          // the driver screen frames a person, not a kart
+            float a = Mathf.Lerp(focusAngle, closeAngle, c) * Mathf.Deg2Rad, radius = Mathf.Lerp(focusRadius * f, closeRadius, c);
+            var pos = target.position + new Vector3(Mathf.Sin(a) * radius, Mathf.Lerp(focusHeight * f, closeHeight, c), Mathf.Cos(a) * radius);
             var rot = Quaternion.LookRotation(target.position + Vector3.up * Mathf.Lerp(focusLook, closeLook, c) - pos) * Quaternion.Euler(0, -Mathf.Lerp(focusYaw, closeYaw, c), 0);
             if (meet != null && blend < 1f)
             {
@@ -51,7 +56,7 @@ namespace KartCup
         /// Edit mode and previews: jump to a pose without waiting for LateUpdate to ease into it.
         public void Snap(bool focused, bool close = false)
         {
-            Focused = focused; blend = focused ? 1f : 0f;
+            Focused = focused; blend = focused ? 1f : 0f; fit = Fit;
             Close = close; this.close = close ? 1f : 0f;
             Apply();
         }

@@ -238,6 +238,7 @@ public static class MenuPreview
             // OnEnable does not run in edit mode: hand the sample/preview content to the panels that need it.
             if (i == 6) foreach (var lobby in Object.FindObjectsByType<LobbyPanel>(FindObjectsSortMode.None)) lobby.RefreshSample();
             if (i == 7) foreach (var garage in Object.FindObjectsByType<GaragePanel>(FindObjectsSortMode.None)) garage.ShowInEditor(KartSetup.Karts.Length - 1);
+            if (i == 7 && backdrop != null) backdrop.Snap(true);   // the framing GaragePanel just fitted to its kart
             if (i == 8) foreach (var shop in Object.FindObjectsByType<ItemsPanel>(FindObjectsSortMode.None)) shop.ShowInEditor(0);
             if (i == 9) foreach (var weekly in Object.FindObjectsByType<WeeklyPanel>(FindObjectsSortMode.None)) weekly.ShowInEditor();
             if (i == 10) foreach (var tour in Object.FindObjectsByType<TourPanel>(FindObjectsSortMode.None)) tour.ShowInEditor(1);
@@ -254,6 +255,7 @@ public static class MenuPreview
             {
                 Unlocks.Earn("gold." + KartSetup.Karts[0]);
                 foreach (var garage in Object.FindObjectsByType<GaragePanel>(FindObjectsSortMode.None)) garage.ShowInEditor(0, Paints.IndexOf("gold") + 1);
+                if (backdrop != null) backdrop.Snap(true);
                 Canvas.ForceUpdateCanvases(); Shot(cam, "menu7-gold");
                 foreach (var garage in Object.FindObjectsByType<GaragePanel>(FindObjectsSortMode.None)) garage.ShowInEditor(2, Paints.IndexOf("gold") + 1);
                 Canvas.ForceUpdateCanvases(); Shot(cam, "menu7-gold-locked");
