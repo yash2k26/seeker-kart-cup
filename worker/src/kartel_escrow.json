@@ -1,0 +1,2250 @@
+{
+ "address": "KartpVhCHvs2xSBe59LrPYUJ8qUu1PT4DegfFa1nkhv",
+ "metadata": {
+  "name": "kartel_escrow",
+  "version": "0.1.0",
+  "spec": "0.1.0",
+  "description": "Kartel prize escrow: per-room stakes, fair-share payouts, refunds anyone can trigger"
+ },
+ "instructions": [
+  {
+   "name": "cancel",
+   "discriminator": [
+    232,
+    219,
+    223,
+    41,
+    219,
+    236,
+    220,
+    190
+   ],
+   "accounts": [
+    {
+     "name": "caller",
+     "signer": true
+    },
+    {
+     "name": "config",
+     "pda": {
+      "seeds": [
+       {
+        "kind": "const",
+        "value": [
+         99,
+         111,
+         110,
+         102,
+         105,
+         103
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "name": "room",
+     "writable": true,
+     "pda": {
+      "seeds": [
+       {
+        "kind": "const",
+        "value": [
+         114,
+         111,
+         111,
+         109
+        ]
+       },
+       {
+        "kind": "account",
+        "path": "room.code",
+        "account": "Room"
+       },
+       {
+        "kind": "account",
+        "path": "room"
+       }
+      ]
+     }
+    }
+   ],
+   "args": []
+  },
+  {
+   "name": "claim",
+   "discriminator": [
+    62,
+    198,
+    214,
+    193,
+    213,
+    159,
+    108,
+    210
+   ],
+   "accounts": [
+    {
+     "name": "room",
+     "writable": true,
+     "pda": {
+      "seeds": [
+       {
+        "kind": "const",
+        "value": [
+         114,
+         111,
+         111,
+         109
+        ]
+       },
+       {
+        "kind": "account",
+        "path": "room.code",
+        "account": "Room"
+       },
+       {
+        "kind": "account",
+        "path": "room"
+       }
+      ]
+     }
+    },
+    {
+     "name": "player",
+     "writable": true
+    },
+    {
+     "name": "mint",
+     "optional": true
+    },
+    {
+     "name": "vault",
+     "writable": true,
+     "optional": true,
+     "pda": {
+      "seeds": [
+       {
+        "kind": "account",
+        "path": "room"
+       },
+       {
+        "kind": "const",
+        "value": [
+         6,
+         221,
+         246,
+         225,
+         215,
+         101,
+         161,
+         147,
+         217,
+         203,
+         225,
+         70,
+         206,
+         235,
+         121,
+         172,
+         28,
+         180,
+         133,
+         237,
+         95,
+         91,
+         55,
+         145,
+         58,
+         140,
+         245,
+         133,
+         126,
+         255,
+         0,
+         169
+        ]
+       },
+       {
+        "kind": "account",
+        "path": "mint"
+       }
+      ],
+      "program": {
+       "kind": "const",
+       "value": [
+        140,
+        151,
+        37,
+        143,
+        78,
+        36,
+        137,
+        241,
+        187,
+        61,
+        16,
+        41,
+        20,
+        142,
+        13,
+        131,
+        11,
+        90,
+        19,
+        153,
+        218,
+        255,
+        16,
+        132,
+        4,
+        142,
+        123,
+        216,
+        219,
+        233,
+        248,
+        89
+       ]
+      }
+     }
+    },
+    {
+     "name": "player_token",
+     "writable": true,
+     "optional": true
+    },
+    {
+     "name": "token_program",
+     "optional": true,
+     "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+    }
+   ],
+   "args": []
+  },
+  {
+   "name": "close_room",
+   "discriminator": [
+    152,
+    197,
+    88,
+    192,
+    98,
+    197,
+    51,
+    211
+   ],
+   "accounts": [
+    {
+     "name": "room",
+     "writable": true,
+     "pda": {
+      "seeds": [
+       {
+        "kind": "const",
+        "value": [
+         114,
+         111,
+         111,
+         109
+        ]
+       },
+       {
+        "kind": "account",
+        "path": "room.code",
+        "account": "Room"
+       },
+       {
+        "kind": "account",
+        "path": "room"
+       }
+      ]
+     }
+    },
+    {
+     "name": "payer",
+     "writable": true
+    },
+    {
+     "name": "mint",
+     "optional": true
+    },
+    {
+     "name": "vault",
+     "writable": true,
+     "optional": true,
+     "pda": {
+      "seeds": [
+       {
+        "kind": "account",
+        "path": "room"
+       },
+       {
+        "kind": "const",
+        "value": [
+         6,
+         221,
+         246,
+         225,
+         215,
+         101,
+         161,
+         147,
+         217,
+         203,
+         225,
+         70,
+         206,
+         235,
+         121,
+         172,
+         28,
+         180,
+         133,
+         237,
+         95,
+         91,
+         55,
+         145,
+         58,
+         140,
+         245,
+         133,
+         126,
+         255,
+         0,
+         169
+        ]
+       },
+       {
+        "kind": "account",
+        "path": "mint"
+       }
+      ],
+      "program": {
+       "kind": "const",
+       "value": [
+        140,
+        151,
+        37,
+        143,
+        78,
+        36,
+        137,
+        241,
+        187,
+        61,
+        16,
+        41,
+        20,
+        142,
+        13,
+        131,
+        11,
+        90,
+        19,
+        153,
+        218,
+        255,
+        16,
+        132,
+        4,
+        142,
+        123,
+        216,
+        219,
+        233,
+        248,
+        89
+       ]
+      }
+     }
+    },
+    {
+     "name": "treasury_token",
+     "writable": true,
+     "optional": true
+    },
+    {
+     "name": "token_program",
+     "optional": true,
+     "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+    }
+   ],
+   "args": []
+  },
+  {
+   "name": "collect_cut",
+   "discriminator": [
+    66,
+    106,
+    120,
+    143,
+    252,
+    93,
+    250,
+    242
+   ],
+   "accounts": [
+    {
+     "name": "room",
+     "writable": true,
+     "pda": {
+      "seeds": [
+       {
+        "kind": "const",
+        "value": [
+         114,
+         111,
+         111,
+         109
+        ]
+       },
+       {
+        "kind": "account",
+        "path": "room.code",
+        "account": "Room"
+       },
+       {
+        "kind": "account",
+        "path": "room"
+       }
+      ]
+     }
+    },
+    {
+     "name": "treasury",
+     "writable": true
+    },
+    {
+     "name": "mint",
+     "optional": true
+    },
+    {
+     "name": "vault",
+     "writable": true,
+     "optional": true,
+     "pda": {
+      "seeds": [
+       {
+        "kind": "account",
+        "path": "room"
+       },
+       {
+        "kind": "const",
+        "value": [
+         6,
+         221,
+         246,
+         225,
+         215,
+         101,
+         161,
+         147,
+         217,
+         203,
+         225,
+         70,
+         206,
+         235,
+         121,
+         172,
+         28,
+         180,
+         133,
+         237,
+         95,
+         91,
+         55,
+         145,
+         58,
+         140,
+         245,
+         133,
+         126,
+         255,
+         0,
+         169
+        ]
+       },
+       {
+        "kind": "account",
+        "path": "mint"
+       }
+      ],
+      "program": {
+       "kind": "const",
+       "value": [
+        140,
+        151,
+        37,
+        143,
+        78,
+        36,
+        137,
+        241,
+        187,
+        61,
+        16,
+        41,
+        20,
+        142,
+        13,
+        131,
+        11,
+        90,
+        19,
+        153,
+        218,
+        255,
+        16,
+        132,
+        4,
+        142,
+        123,
+        216,
+        219,
+        233,
+        248,
+        89
+       ]
+      }
+     }
+    },
+    {
+     "name": "treasury_token",
+     "writable": true,
+     "optional": true
+    },
+    {
+     "name": "token_program",
+     "optional": true,
+     "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+    }
+   ],
+   "args": []
+  },
+  {
+   "name": "create_room",
+   "discriminator": [
+    130,
+    166,
+    32,
+    2,
+    247,
+    120,
+    178,
+    53
+   ],
+   "accounts": [
+    {
+     "name": "referee",
+     "writable": true,
+     "signer": true,
+     "relations": [
+      "config"
+     ]
+    },
+    {
+     "name": "config",
+     "pda": {
+      "seeds": [
+       {
+        "kind": "const",
+        "value": [
+         99,
+         111,
+         110,
+         102,
+         105,
+         103
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "name": "room",
+     "writable": true,
+     "pda": {
+      "seeds": [
+       {
+        "kind": "const",
+        "value": [
+         114,
+         111,
+         111,
+         109
+        ]
+       },
+       {
+        "kind": "arg",
+        "path": "code"
+       },
+       {
+        "kind": "arg",
+        "path": "round"
+       }
+      ]
+     }
+    },
+    {
+     "name": "mint",
+     "optional": true
+    },
+    {
+     "name": "system_program",
+     "address": "11111111111111111111111111111111"
+    }
+   ],
+   "args": [
+    {
+     "name": "code",
+     "type": {
+      "array": [
+       "u8",
+       5
+      ]
+     }
+    },
+    {
+     "name": "round",
+     "type": "u32"
+    },
+    {
+     "name": "params",
+     "type": {
+      "defined": {
+       "name": "RoomParams"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "initialize",
+   "discriminator": [
+    175,
+    175,
+    109,
+    31,
+    13,
+    152,
+    155,
+    237
+   ],
+   "accounts": [
+    {
+     "name": "admin",
+     "writable": true,
+     "signer": true
+    },
+    {
+     "name": "config",
+     "writable": true,
+     "pda": {
+      "seeds": [
+       {
+        "kind": "const",
+        "value": [
+         99,
+         111,
+         110,
+         102,
+         105,
+         103
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "name": "program",
+     "address": "KartpVhCHvs2xSBe59LrPYUJ8qUu1PT4DegfFa1nkhv"
+    },
+    {
+     "name": "program_data"
+    },
+    {
+     "name": "system_program",
+     "address": "11111111111111111111111111111111"
+    }
+   ],
+   "args": [
+    {
+     "name": "referee",
+     "type": "pubkey"
+    },
+    {
+     "name": "treasury",
+     "type": "pubkey"
+    },
+    {
+     "name": "max_cut_bps",
+     "type": "u16"
+    }
+   ]
+  },
+  {
+   "name": "join",
+   "discriminator": [
+    206,
+    55,
+    2,
+    106,
+    113,
+    220,
+    17,
+    163
+   ],
+   "accounts": [
+    {
+     "name": "player",
+     "writable": true,
+     "signer": true
+    },
+    {
+     "name": "config",
+     "pda": {
+      "seeds": [
+       {
+        "kind": "const",
+        "value": [
+         99,
+         111,
+         110,
+         102,
+         105,
+         103
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "name": "room",
+     "writable": true,
+     "pda": {
+      "seeds": [
+       {
+        "kind": "const",
+        "value": [
+         114,
+         111,
+         111,
+         109
+        ]
+       },
+       {
+        "kind": "account",
+        "path": "room.code",
+        "account": "Room"
+       },
+       {
+        "kind": "account",
+        "path": "room"
+       }
+      ]
+     }
+    },
+    {
+     "name": "mint",
+     "optional": true
+    },
+    {
+     "name": "vault",
+     "writable": true,
+     "optional": true,
+     "pda": {
+      "seeds": [
+       {
+        "kind": "account",
+        "path": "room"
+       },
+       {
+        "kind": "const",
+        "value": [
+         6,
+         221,
+         246,
+         225,
+         215,
+         101,
+         161,
+         147,
+         217,
+         203,
+         225,
+         70,
+         206,
+         235,
+         121,
+         172,
+         28,
+         180,
+         133,
+         237,
+         95,
+         91,
+         55,
+         145,
+         58,
+         140,
+         245,
+         133,
+         126,
+         255,
+         0,
+         169
+        ]
+       },
+       {
+        "kind": "account",
+        "path": "mint"
+       }
+      ],
+      "program": {
+       "kind": "const",
+       "value": [
+        140,
+        151,
+        37,
+        143,
+        78,
+        36,
+        137,
+        241,
+        187,
+        61,
+        16,
+        41,
+        20,
+        142,
+        13,
+        131,
+        11,
+        90,
+        19,
+        153,
+        218,
+        255,
+        16,
+        132,
+        4,
+        142,
+        123,
+        216,
+        219,
+        233,
+        248,
+        89
+       ]
+      }
+     }
+    },
+    {
+     "name": "player_token",
+     "writable": true,
+     "optional": true,
+     "pda": {
+      "seeds": [
+       {
+        "kind": "account",
+        "path": "player"
+       },
+       {
+        "kind": "const",
+        "value": [
+         6,
+         221,
+         246,
+         225,
+         215,
+         101,
+         161,
+         147,
+         217,
+         203,
+         225,
+         70,
+         206,
+         235,
+         121,
+         172,
+         28,
+         180,
+         133,
+         237,
+         95,
+         91,
+         55,
+         145,
+         58,
+         140,
+         245,
+         133,
+         126,
+         255,
+         0,
+         169
+        ]
+       },
+       {
+        "kind": "account",
+        "path": "mint"
+       }
+      ],
+      "program": {
+       "kind": "const",
+       "value": [
+        140,
+        151,
+        37,
+        143,
+        78,
+        36,
+        137,
+        241,
+        187,
+        61,
+        16,
+        41,
+        20,
+        142,
+        13,
+        131,
+        11,
+        90,
+        19,
+        153,
+        218,
+        255,
+        16,
+        132,
+        4,
+        142,
+        123,
+        216,
+        219,
+        233,
+        248,
+        89
+       ]
+      }
+     }
+    },
+    {
+     "name": "token_program",
+     "optional": true,
+     "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+    },
+    {
+     "name": "system_program",
+     "address": "11111111111111111111111111111111"
+    }
+   ],
+   "args": [
+    {
+     "name": "stake",
+     "type": "u64"
+    }
+   ]
+  },
+  {
+   "name": "leave",
+   "discriminator": [
+    59,
+    234,
+    148,
+    108,
+    107,
+    149,
+    173,
+    112
+   ],
+   "accounts": [
+    {
+     "name": "player",
+     "writable": true,
+     "signer": true
+    },
+    {
+     "name": "room",
+     "writable": true,
+     "pda": {
+      "seeds": [
+       {
+        "kind": "const",
+        "value": [
+         114,
+         111,
+         111,
+         109
+        ]
+       },
+       {
+        "kind": "account",
+        "path": "room.code",
+        "account": "Room"
+       },
+       {
+        "kind": "account",
+        "path": "room"
+       }
+      ]
+     }
+    },
+    {
+     "name": "mint",
+     "optional": true
+    },
+    {
+     "name": "vault",
+     "writable": true,
+     "optional": true,
+     "pda": {
+      "seeds": [
+       {
+        "kind": "account",
+        "path": "room"
+       },
+       {
+        "kind": "const",
+        "value": [
+         6,
+         221,
+         246,
+         225,
+         215,
+         101,
+         161,
+         147,
+         217,
+         203,
+         225,
+         70,
+         206,
+         235,
+         121,
+         172,
+         28,
+         180,
+         133,
+         237,
+         95,
+         91,
+         55,
+         145,
+         58,
+         140,
+         245,
+         133,
+         126,
+         255,
+         0,
+         169
+        ]
+       },
+       {
+        "kind": "account",
+        "path": "mint"
+       }
+      ],
+      "program": {
+       "kind": "const",
+       "value": [
+        140,
+        151,
+        37,
+        143,
+        78,
+        36,
+        137,
+        241,
+        187,
+        61,
+        16,
+        41,
+        20,
+        142,
+        13,
+        131,
+        11,
+        90,
+        19,
+        153,
+        218,
+        255,
+        16,
+        132,
+        4,
+        142,
+        123,
+        216,
+        219,
+        233,
+        248,
+        89
+       ]
+      }
+     }
+    },
+    {
+     "name": "player_token",
+     "writable": true,
+     "optional": true
+    },
+    {
+     "name": "token_program",
+     "optional": true,
+     "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+    }
+   ],
+   "args": []
+  },
+  {
+   "name": "lock",
+   "discriminator": [
+    21,
+    19,
+    208,
+    43,
+    237,
+    62,
+    255,
+    87
+   ],
+   "accounts": [
+    {
+     "name": "referee",
+     "signer": true,
+     "relations": [
+      "config"
+     ]
+    },
+    {
+     "name": "config",
+     "pda": {
+      "seeds": [
+       {
+        "kind": "const",
+        "value": [
+         99,
+         111,
+         110,
+         102,
+         105,
+         103
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "name": "room",
+     "writable": true,
+     "pda": {
+      "seeds": [
+       {
+        "kind": "const",
+        "value": [
+         114,
+         111,
+         111,
+         109
+        ]
+       },
+       {
+        "kind": "account",
+        "path": "room.code",
+        "account": "Room"
+       },
+       {
+        "kind": "account",
+        "path": "room"
+       }
+      ]
+     }
+    }
+   ],
+   "args": [
+    {
+     "name": "players",
+     "type": {
+      "vec": "pubkey"
+     }
+    }
+   ]
+  },
+  {
+   "name": "remove_entry",
+   "discriminator": [
+    135,
+    175,
+    236,
+    10,
+    213,
+    208,
+    69,
+    214
+   ],
+   "accounts": [
+    {
+     "name": "referee",
+     "signer": true,
+     "relations": [
+      "config"
+     ]
+    },
+    {
+     "name": "config",
+     "pda": {
+      "seeds": [
+       {
+        "kind": "const",
+        "value": [
+         99,
+         111,
+         110,
+         102,
+         105,
+         103
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "name": "room",
+     "writable": true,
+     "pda": {
+      "seeds": [
+       {
+        "kind": "const",
+        "value": [
+         114,
+         111,
+         111,
+         109
+        ]
+       },
+       {
+        "kind": "account",
+        "path": "room.code",
+        "account": "Room"
+       },
+       {
+        "kind": "account",
+        "path": "room"
+       }
+      ]
+     }
+    },
+    {
+     "name": "player",
+     "writable": true
+    },
+    {
+     "name": "mint",
+     "optional": true
+    },
+    {
+     "name": "vault",
+     "writable": true,
+     "optional": true,
+     "pda": {
+      "seeds": [
+       {
+        "kind": "account",
+        "path": "room"
+       },
+       {
+        "kind": "const",
+        "value": [
+         6,
+         221,
+         246,
+         225,
+         215,
+         101,
+         161,
+         147,
+         217,
+         203,
+         225,
+         70,
+         206,
+         235,
+         121,
+         172,
+         28,
+         180,
+         133,
+         237,
+         95,
+         91,
+         55,
+         145,
+         58,
+         140,
+         245,
+         133,
+         126,
+         255,
+         0,
+         169
+        ]
+       },
+       {
+        "kind": "account",
+        "path": "mint"
+       }
+      ],
+      "program": {
+       "kind": "const",
+       "value": [
+        140,
+        151,
+        37,
+        143,
+        78,
+        36,
+        137,
+        241,
+        187,
+        61,
+        16,
+        41,
+        20,
+        142,
+        13,
+        131,
+        11,
+        90,
+        19,
+        153,
+        218,
+        255,
+        16,
+        132,
+        4,
+        142,
+        123,
+        216,
+        219,
+        233,
+        248,
+        89
+       ]
+      }
+     }
+    },
+    {
+     "name": "player_token",
+     "writable": true,
+     "optional": true
+    },
+    {
+     "name": "token_program",
+     "optional": true,
+     "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+    }
+   ],
+   "args": []
+  },
+  {
+   "name": "settle",
+   "discriminator": [
+    175,
+    42,
+    185,
+    87,
+    144,
+    131,
+    102,
+    212
+   ],
+   "accounts": [
+    {
+     "name": "referee",
+     "signer": true,
+     "relations": [
+      "config"
+     ]
+    },
+    {
+     "name": "config",
+     "pda": {
+      "seeds": [
+       {
+        "kind": "const",
+        "value": [
+         99,
+         111,
+         110,
+         102,
+         105,
+         103
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "name": "room",
+     "writable": true,
+     "pda": {
+      "seeds": [
+       {
+        "kind": "const",
+        "value": [
+         114,
+         111,
+         111,
+         109
+        ]
+       },
+       {
+        "kind": "account",
+        "path": "room.code",
+        "account": "Room"
+       },
+       {
+        "kind": "account",
+        "path": "room"
+       }
+      ]
+     }
+    }
+   ],
+   "args": [
+    {
+     "name": "order",
+     "type": {
+      "vec": "pubkey"
+     }
+    }
+   ]
+  },
+  {
+   "name": "update_config",
+   "discriminator": [
+    29,
+    158,
+    252,
+    191,
+    10,
+    83,
+    219,
+    99
+   ],
+   "accounts": [
+    {
+     "name": "admin",
+     "signer": true,
+     "relations": [
+      "config"
+     ]
+    },
+    {
+     "name": "config",
+     "writable": true,
+     "pda": {
+      "seeds": [
+       {
+        "kind": "const",
+        "value": [
+         99,
+         111,
+         110,
+         102,
+         105,
+         103
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "args": [
+    {
+     "name": "update",
+     "type": {
+      "defined": {
+       "name": "ConfigUpdate"
+      }
+     }
+    }
+   ]
+  }
+ ],
+ "accounts": [
+  {
+   "name": "Config",
+   "discriminator": [
+    155,
+    12,
+    170,
+    224,
+    30,
+    250,
+    204,
+    130
+   ]
+  },
+  {
+   "name": "Room",
+   "discriminator": [
+    156,
+    199,
+    67,
+    27,
+    222,
+    23,
+    185,
+    94
+   ]
+  }
+ ],
+ "events": [
+  {
+   "name": "Claimed",
+   "discriminator": [
+    217,
+    192,
+    123,
+    72,
+    108,
+    150,
+    248,
+    33
+   ]
+  },
+  {
+   "name": "CutCollected",
+   "discriminator": [
+    127,
+    42,
+    214,
+    131,
+    122,
+    79,
+    164,
+    127
+   ]
+  },
+  {
+   "name": "Joined",
+   "discriminator": [
+    16,
+    20,
+    44,
+    48,
+    132,
+    189,
+    68,
+    98
+   ]
+  },
+  {
+   "name": "Refunded",
+   "discriminator": [
+    35,
+    103,
+    149,
+    246,
+    196,
+    123,
+    221,
+    99
+   ]
+  },
+  {
+   "name": "RoomCancelled",
+   "discriminator": [
+    139,
+    79,
+    156,
+    200,
+    40,
+    164,
+    207,
+    171
+   ]
+  },
+  {
+   "name": "RoomClosed",
+   "discriminator": [
+    150,
+    23,
+    85,
+    195,
+    169,
+    114,
+    30,
+    88
+   ]
+  },
+  {
+   "name": "RoomCreated",
+   "discriminator": [
+    9,
+    177,
+    128,
+    166,
+    26,
+    19,
+    14,
+    243
+   ]
+  },
+  {
+   "name": "RoomLocked",
+   "discriminator": [
+    139,
+    9,
+    142,
+    55,
+    220,
+    219,
+    98,
+    158
+   ]
+  },
+  {
+   "name": "RoomSettled",
+   "discriminator": [
+    139,
+    64,
+    121,
+    102,
+    137,
+    174,
+    165,
+    105
+   ]
+  }
+ ],
+ "errors": [
+  {
+   "code": 6000,
+   "name": "NotUpgradeAuthority",
+   "msg": "Only the program's upgrade authority may initialize it"
+  },
+  {
+   "code": 6001,
+   "name": "NotAdmin",
+   "msg": "Only the admin may change the config"
+  },
+  {
+   "code": 6002,
+   "name": "NotReferee",
+   "msg": "Only the referee may do this"
+  },
+  {
+   "code": 6003,
+   "name": "Paused",
+   "msg": "New rooms and stakes are paused"
+  },
+  {
+   "code": 6004,
+   "name": "BadCode",
+   "msg": "Room codes are five characters A-Z / 2-9 without O or I"
+  },
+  {
+   "code": 6005,
+   "name": "BadMaxPlayers",
+   "msg": "A room seats 2 to 6 players"
+  },
+  {
+   "code": 6006,
+   "name": "BadStakeRange",
+   "msg": "Stakes must be above zero, with the minimum at or under the maximum"
+  },
+  {
+   "code": 6007,
+   "name": "CutTooHigh",
+   "msg": "The cut is above the allowed maximum"
+  },
+  {
+   "code": 6008,
+   "name": "BadTtl",
+   "msg": "A room lives between 10 minutes and 24 hours"
+  },
+  {
+   "code": 6009,
+   "name": "NotOpen",
+   "msg": "The room is not open"
+  },
+  {
+   "code": 6010,
+   "name": "NotLocked",
+   "msg": "The room is not locked"
+  },
+  {
+   "code": 6011,
+   "name": "NotFinished",
+   "msg": "The room is not finished"
+  },
+  {
+   "code": 6012,
+   "name": "AlreadyFinished",
+   "msg": "The room is already settled or cancelled"
+  },
+  {
+   "code": 6013,
+   "name": "Expired",
+   "msg": "The room has expired"
+  },
+  {
+   "code": 6014,
+   "name": "RoomFull",
+   "msg": "Every seat is taken"
+  },
+  {
+   "code": 6015,
+   "name": "AlreadyJoined",
+   "msg": "This wallet already has a stake in the room"
+  },
+  {
+   "code": 6016,
+   "name": "StakeOutOfRange",
+   "msg": "The stake is outside the room's range or not a whole number of its units"
+  },
+  {
+   "code": 6017,
+   "name": "NoEntry",
+   "msg": "This wallet has no stake in the room"
+  },
+  {
+   "code": 6018,
+   "name": "TooFewPlayers",
+   "msg": "A race needs at least two players"
+  },
+  {
+   "code": 6019,
+   "name": "BadRanking",
+   "msg": "The finishing order must name every staked wallet exactly once"
+  },
+  {
+   "code": 6020,
+   "name": "BadField",
+   "msg": "The field must name staked wallets, each once"
+  },
+  {
+   "code": 6021,
+   "name": "CannotCancelYet",
+   "msg": "Only the referee may cancel a room before it expires"
+  },
+  {
+   "code": 6022,
+   "name": "AlreadyPaid",
+   "msg": "Already paid out"
+  },
+  {
+   "code": 6023,
+   "name": "NothingToCollect",
+   "msg": "There is no cut to collect"
+  },
+  {
+   "code": 6024,
+   "name": "PayoutsOwed",
+   "msg": "Payouts are still owed"
+  },
+  {
+   "code": 6025,
+   "name": "WrongCurrencyAccounts",
+   "msg": "These token accounts do not match the room's currency"
+  },
+  {
+   "code": 6026,
+   "name": "WrongRecipient",
+   "msg": "That account is not the one owed"
+  },
+  {
+   "code": 6027,
+   "name": "Overflow",
+   "msg": "Arithmetic overflow"
+  }
+ ],
+ "types": [
+  {
+   "name": "Claimed",
+   "type": {
+    "kind": "struct",
+    "fields": [
+     {
+      "name": "room",
+      "type": "pubkey"
+     },
+     {
+      "name": "player",
+      "type": "pubkey"
+     },
+     {
+      "name": "amount",
+      "type": "u64"
+     }
+    ]
+   }
+  },
+  {
+   "name": "Config",
+   "type": {
+    "kind": "struct",
+    "fields": [
+     {
+      "name": "admin",
+      "type": "pubkey"
+     },
+     {
+      "name": "referee",
+      "type": "pubkey"
+     },
+     {
+      "name": "treasury",
+      "type": "pubkey"
+     },
+     {
+      "name": "max_cut_bps",
+      "type": "u16"
+     },
+     {
+      "name": "paused",
+      "type": "bool"
+     },
+     {
+      "name": "bump",
+      "type": "u8"
+     }
+    ]
+   }
+  },
+  {
+   "name": "ConfigUpdate",
+   "type": {
+    "kind": "struct",
+    "fields": [
+     {
+      "name": "admin",
+      "type": {
+       "option": "pubkey"
+      }
+     },
+     {
+      "name": "referee",
+      "type": {
+       "option": "pubkey"
+      }
+     },
+     {
+      "name": "treasury",
+      "type": {
+       "option": "pubkey"
+      }
+     },
+     {
+      "name": "max_cut_bps",
+      "type": {
+       "option": "u16"
+      }
+     },
+     {
+      "name": "paused",
+      "type": {
+       "option": "bool"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "CutCollected",
+   "type": {
+    "kind": "struct",
+    "fields": [
+     {
+      "name": "room",
+      "type": "pubkey"
+     },
+     {
+      "name": "amount",
+      "type": "u64"
+     }
+    ]
+   }
+  },
+  {
+   "name": "Entry",
+   "type": {
+    "kind": "struct",
+    "fields": [
+     {
+      "name": "player",
+      "type": "pubkey"
+     },
+     {
+      "name": "stake",
+      "type": "u64"
+     },
+     {
+      "name": "payout",
+      "type": "u64"
+     },
+     {
+      "name": "paid",
+      "type": "bool"
+     },
+     {
+      "name": "refund",
+      "type": "bool"
+     }
+    ]
+   }
+  },
+  {
+   "name": "Joined",
+   "type": {
+    "kind": "struct",
+    "fields": [
+     {
+      "name": "room",
+      "type": "pubkey"
+     },
+     {
+      "name": "player",
+      "type": "pubkey"
+     },
+     {
+      "name": "stake",
+      "type": "u64"
+     }
+    ]
+   }
+  },
+  {
+   "name": "Refunded",
+   "type": {
+    "kind": "struct",
+    "fields": [
+     {
+      "name": "room",
+      "type": "pubkey"
+     },
+     {
+      "name": "player",
+      "type": "pubkey"
+     },
+     {
+      "name": "amount",
+      "type": "u64"
+     }
+    ]
+   }
+  },
+  {
+   "name": "Room",
+   "type": {
+    "kind": "struct",
+    "fields": [
+     {
+      "name": "code",
+      "type": {
+       "array": [
+        "u8",
+        5
+       ]
+      }
+     },
+     {
+      "name": "round",
+      "type": "u32"
+     },
+     {
+      "name": "mint",
+      "type": {
+       "option": "pubkey"
+      }
+     },
+     {
+      "name": "min_stake",
+      "type": "u64"
+     },
+     {
+      "name": "max_stake",
+      "type": "u64"
+     },
+     {
+      "name": "stake_unit",
+      "type": "u64"
+     },
+     {
+      "name": "cut_bps",
+      "type": "u16"
+     },
+     {
+      "name": "max_players",
+      "type": "u8"
+     },
+     {
+      "name": "state",
+      "type": {
+       "defined": {
+        "name": "RoomState"
+       }
+      }
+     },
+     {
+      "name": "created_at",
+      "type": "i64"
+     },
+     {
+      "name": "expires_at",
+      "type": "i64"
+     },
+     {
+      "name": "payer",
+      "type": "pubkey"
+     },
+     {
+      "name": "treasury",
+      "type": "pubkey"
+     },
+     {
+      "name": "house_cut",
+      "type": "u64"
+     },
+     {
+      "name": "cut_paid",
+      "type": "bool"
+     },
+     {
+      "name": "bump",
+      "type": "u8"
+     },
+     {
+      "name": "entries",
+      "type": {
+       "vec": {
+        "defined": {
+         "name": "Entry"
+        }
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "RoomCancelled",
+   "type": {
+    "kind": "struct",
+    "fields": [
+     {
+      "name": "room",
+      "type": "pubkey"
+     },
+     {
+      "name": "by_referee",
+      "type": "bool"
+     }
+    ]
+   }
+  },
+  {
+   "name": "RoomClosed",
+   "type": {
+    "kind": "struct",
+    "fields": [
+     {
+      "name": "room",
+      "type": "pubkey"
+     }
+    ]
+   }
+  },
+  {
+   "name": "RoomCreated",
+   "type": {
+    "kind": "struct",
+    "fields": [
+     {
+      "name": "room",
+      "type": "pubkey"
+     },
+     {
+      "name": "code",
+      "type": {
+       "array": [
+        "u8",
+        5
+       ]
+      }
+     },
+     {
+      "name": "round",
+      "type": "u32"
+     },
+     {
+      "name": "mint",
+      "type": {
+       "option": "pubkey"
+      }
+     },
+     {
+      "name": "min_stake",
+      "type": "u64"
+     },
+     {
+      "name": "max_stake",
+      "type": "u64"
+     },
+     {
+      "name": "max_players",
+      "type": "u8"
+     },
+     {
+      "name": "cut_bps",
+      "type": "u16"
+     },
+     {
+      "name": "expires_at",
+      "type": "i64"
+     }
+    ]
+   }
+  },
+  {
+   "name": "RoomLocked",
+   "type": {
+    "kind": "struct",
+    "fields": [
+     {
+      "name": "room",
+      "type": "pubkey"
+     },
+     {
+      "name": "players",
+      "type": "u8"
+     },
+     {
+      "name": "pot",
+      "type": "u64"
+     }
+    ]
+   }
+  },
+  {
+   "name": "RoomParams",
+   "type": {
+    "kind": "struct",
+    "fields": [
+     {
+      "name": "min_stake",
+      "type": "u64"
+     },
+     {
+      "name": "max_stake",
+      "type": "u64"
+     },
+     {
+      "name": "stake_unit",
+      "type": "u64"
+     },
+     {
+      "name": "max_players",
+      "type": "u8"
+     },
+     {
+      "name": "cut_bps",
+      "type": "u16"
+     },
+     {
+      "name": "ttl_secs",
+      "type": "i64"
+     }
+    ]
+   }
+  },
+  {
+   "name": "RoomSettled",
+   "type": {
+    "kind": "struct",
+    "fields": [
+     {
+      "name": "room",
+      "type": "pubkey"
+     },
+     {
+      "name": "order",
+      "type": {
+       "vec": "pubkey"
+      }
+     },
+     {
+      "name": "payouts",
+      "type": {
+       "vec": "u64"
+      }
+     },
+     {
+      "name": "house_cut",
+      "type": "u64"
+     }
+    ]
+   }
+  },
+  {
+   "name": "RoomState",
+   "type": {
+    "kind": "enum",
+    "variants": [
+     {
+      "name": "Open"
+     },
+     {
+      "name": "Locked"
+     },
+     {
+      "name": "Settled"
+     },
+     {
+      "name": "Cancelled"
+     }
+    ]
+   }
+  }
+ ],
+ "constants": [
+  {
+   "name": "CONFIG_SEED",
+   "type": "bytes",
+   "value": "[99, 111, 110, 102, 105, 103]"
+  },
+  {
+   "name": "MAX_CUT_BPS",
+   "type": "u16",
+   "value": "2000"
+  },
+  {
+   "name": "MAX_PLAYERS",
+   "type": "u8",
+   "value": "6"
+  },
+  {
+   "name": "MAX_TTL_SECS",
+   "type": "i64",
+   "value": "86400"
+  },
+  {
+   "name": "MIN_TTL_SECS",
+   "type": "i64",
+   "value": "600"
+  },
+  {
+   "name": "ROOM_SEED",
+   "type": "bytes",
+   "value": "[114, 111, 111, 109]"
+  }
+ ]
+}

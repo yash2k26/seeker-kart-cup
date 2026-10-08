@@ -1,11 +1,11 @@
 // What is for sale and how a prize pool is split. One file, so the numbers a judge or an accountant asks about
-// live in one place. Prices are base units as strings (SOL: lamports, 1e9; SKR: 6 decimals, 1e6).
+// live in one place. Prices are base units as strings (SOL: lamports, 1e9; SKR: 6 decimals, 1e6; ORE: 11 decimals, 1e11).
 // PRICES_JSON (env) can override any sku's price without a redeploy: {"kart.race-future":{"SKR":"5000000"}}.
 
 import { baseUnits, type Rates } from './prices';
 
-export type Currency = 'SOL' | 'SKR';
-export const DECIMALS: Record<Currency, number> = { SOL: 9, SKR: 6 };
+export type Currency = 'SOL' | 'SKR' | 'ORE';
+export const DECIMALS: Record<Currency, number> = { SOL: 9, SKR: 6, ORE: 11 };
 
 export type Powers = { speed: number; turbo: number; grip: number; armor: number; attack: number };
 export type Sku = { sku: string; kind: 'kart' | 'paint' | 'bundle' | 'item'; name: string; blurb: string; sol: number; skrOnly?: boolean; grants?: string[]; until?: string;
@@ -25,7 +25,7 @@ const pack = (id: string, item: string, name: string, blurb: string, qty: number
   ({ sku: `item.${id}${qty}`, kind: 'item', name, blurb, item, qty, sol });
 
 // research/23: sell karts, paint and what you take into a race, never drivers (three are real people). Every price
-// is in SOL (1 Oct 2026: no dollars anywhere; SKR is derived from it in prices.ts). Karts by their powers: Street
+// is in SOL (1 Oct 2026: no dollars anywhere; SKR and ORE are derived from it in prices.ts). Karts by their powers: Street
 // 0.05, Hero 0.08, Legend 0.12 (8 Oct, research/26: Beach Buggy's US/EU car prices and what Solana players pay for
 // an item they cannot resell; were 0.10 / 0.15 / 0.25). Paint 0.03; packs of three race items 0.01; and two bundles:
 // the Founder's Pack (0.32 of contents for 0.18) is the intended purchase, the Full Garage (0.64 for 0.35) the anchor.
@@ -64,10 +64,10 @@ export const CATALOG: Sku[] = [
 export function quote(item: Sku, r: Rates, pricesJson?: string): Record<Currency, string> {
   let over: Record<string, Partial<Record<Currency, string>>> = {};
   try { over = pricesJson ? JSON.parse(pricesJson) : {}; } catch { /* keep computed */ }
-  const q: Record<Currency, string> = { SKR: baseUnits(item.sol, 'SKR', r).toString(), SOL: baseUnits(item.sol, 'SOL', r).toString() };
-  if (item.skrOnly) q.SOL = '';
+  const q: Record<Currency, string> = { SKR: baseUnits(item.sol, 'SKR', r).toString(), SOL: baseUnits(item.sol, 'SOL', r).toString(), ORE: baseUnits(item.sol, 'ORE', r).toString() };
+  if (item.skrOnly) q.SOL = q.ORE = '';
   const o = over[item.sku];
-  if (o && typeof o === 'object') for (const k of ['SKR', 'SOL'] as Currency[]) if (o[k]) q[k] = o[k]!;
+  if (o && typeof o === 'object') for (const k of ['SKR', 'SOL', 'ORE'] as Currency[]) if (o[k]) q[k] = o[k]!;
   return q;
 }
 
@@ -88,39 +88,22 @@ export function grantsOf(sku: string): string[] {
   return item ? [sku, ...(item.grants ?? [])] : [sku];
 }
 
-// ---- tournaments ----
+// ---- paid rooms ----
 
-// Entry fees a host may pick. A whitelist, not a free field: it keeps the pool maths and the UI chips in step and
-// caps how much a first-time host can accidentally put on the line.
-export const FEE_TIERS: Record<Currency, string[]> = {
-  SOL: ['0', '10000000', '50000000', '100000000', '150000000', '500000000'],     // free, 0.01, 0.05, 0.1, 0.15, 0.5 SOL
-  SKR: ['0', '5000000', '25000000', '100000000', '500000000'],      // free, 5, 25, 100, 500 SKR
+// Stakes, in base units. The host picks a room's minimum from these and each player stakes any of them from there
+// up (the escrow program itself takes any amount between the room's minimum and maximum). A whitelist, not a free
+// field: it keeps the lobby's chips in step and caps what a first-time player can put on the line.
+export const STAKE_TIERS: Record<Currency, string[]> = {
+  SOL: ['10000000', '50000000', '100000000', '150000000', '500000000'],   // 0.01, 0.05, 0.1, 0.15, 0.5 SOL
+  SKR: ['5000000', '25000000', '100000000', '500000000'],                  // 5, 25, 100, 500 SKR
+  ORE: [],   // ponytail: ORE buys from the shop only; no room stakes it (rooms.ts coerces a room to SOL/SKR)
 };
 
-// Places paid, by number of paying players (research/20: poker sit-and-go, Skillz, ZED Champions, Photo Finish).
-// Percentages of the pool AFTER the platform fee.
-export const SPLITS: Record<number, number[]> = { 2: [100], 3: [65, 35], 4: [65, 35], 5: [60, 25, 15], 6: [60, 25, 15] };
+// Every stake is a whole number of these (the program checks it). With 0.01 SOL the smallest possible SOL payout is a
+// few thousandths of a SOL, well over the rent minimum an empty wallet needs before it can receive anything.
+export const STAKE_UNIT: Record<Currency, string> = { SOL: '10000000', SKR: '5000000', ORE: '100000000000' };   // ORE: unreachable, no tiers
 
 export const MIN_PAID_PLAYERS = 2;
-export const HOST_SHARE_BPS = 2000;   // 20% of the platform fee goes back to whoever organised the room: inviting friends pays
-
-export type Split = { feeBps: number; gross: bigint; cut: bigint; hostReward: bigint; prizes: bigint[] };
-
-/** Pool → platform fee, host reward and prize per place (base units). Rounding dust goes to the winner so the sum is exact.
- *  Duels (2) and full grids (6) are fee-free: the first is the viral loop, the second is the "fill the grid" incentive. */
-export function splitPool(pool: bigint, paidPlayers: number, cutBps: number): Split {
-  if (paidPlayers < MIN_PAID_PLAYERS || pool <= 0n) return { feeBps: 0, gross: 0n, cut: 0n, hostReward: 0n, prizes: [] };
-  const feeBps = paidPlayers === 2 || paidPlayers >= 6 ? 0 : cutBps;
-  const gross = (pool * BigInt(feeBps)) / 10000n;
-  const hostReward = (gross * BigInt(HOST_SHARE_BPS)) / 10000n;
-  const cut = gross - hostReward;
-  const distributable = pool - gross;
-  const pct = SPLITS[Math.min(paidPlayers, 6)] ?? SPLITS[6];
-  const prizes = pct.map(p => (distributable * BigInt(p)) / 100n);
-  const dust = distributable - prizes.reduce((a, b) => a + b, 0n);
-  prizes[0] += dust;
-  return { feeBps, gross, cut, hostReward, prizes };
-}
 
 export function formatAmount(base: bigint | string, currency: Currency): string {
   const b = BigInt(base);

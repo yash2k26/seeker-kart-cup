@@ -8,7 +8,12 @@
     "typecheck": "tsc --noEmit",
     "db:local": "wrangler d1 migrations apply kartcup --local",
     "db:remote": "wrangler d1 migrations apply kartcup --remote",
-    "test:referee": "esbuild scripts/referee-test.ts --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/referee-test.mjs && node node_modules/.cache/referee-test.mjs"
+    "test:referee": "esbuild scripts/referee-test.ts --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/referee-test.mjs && node node_modules/.cache/referee-test.mjs",
+    "test:prices": "esbuild scripts/prices-test.ts --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/prices-test.mjs && node node_modules/.cache/prices-test.mjs",
+    "test:escrow": "node scripts/sync-idl.mjs --check && esbuild scripts/escrow-test.ts --bundle --packages=external --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/escrow-test.mjs && node node_modules/.cache/escrow-test.mjs",
+    "escrow:localnet": "esbuild scripts/escrow-localnet.ts --bundle --packages=external --platform=node --format=esm --log-level=warning --outfile=.cache/escrow-localnet.mjs && node .cache/escrow-localnet.mjs",
+    "smoke:escrow": "esbuild scripts/smoke-escrow.ts --bundle --packages=external --platform=node --format=esm --log-level=warning --outfile=.cache/smoke-escrow.mjs && node .cache/smoke-escrow.mjs",
+    "escrow:admin": "esbuild scripts/escrow-admin.ts --bundle --packages=external --platform=node --format=esm --log-level=warning --outfile=.cache/escrow-admin.mjs && node .cache/escrow-admin.mjs"
   },
   "dependencies": {
     "@onsol/tldparser": "0.6.7",

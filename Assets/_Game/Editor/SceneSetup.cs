@@ -128,7 +128,7 @@ public static class SceneSetup
         web3.solanaWalletAdapterOptions ??= new SolanaWalletAdapterOptions();
         web3.solanaWalletAdapterOptions.solanaMobileWalletAdapterOptions ??= new SolanaMobileWalletAdapterOptions();
         var mwa = web3.solanaWalletAdapterOptions.solanaMobileWalletAdapterOptions;
-        mwa.identityUri = "https://kartcup.bharadwaj465.workers.dev/"; mwa.iconUri = "/icon.png"; mwa.name = "Seeker Kart Cup"; mwa.keepConnectionAlive = true;
+        mwa.identityUri = "https://kartcup.bharadwaj465.workers.dev/"; mwa.iconUri = "/icon.png"; mwa.name = "Kartel"; mwa.keepConnectionAlive = true;
         var wallet = new GameObject("WalletFlow").AddComponent<KartCup.WalletFlow>();
 
         // ---- UI (legacy uGUI Text; TMP resources come with the real HUD) ----

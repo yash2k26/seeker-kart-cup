@@ -156,12 +156,12 @@ public static class RoomSmoke
             var f = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
             var sw = (System.Diagnostics.Stopwatch)typeof(RoomClient).GetField("clock", f).GetValue(client);
             double offset = (double)typeof(RoomClient).GetField("offsetMs", f).GetValue(client);
-            long bestRtt = (long)typeof(RoomClient).GetField("bestRtt", f).GetValue(client);
+            long bestRtt = client.PingMs;   // (RoomClient keeps a window of recent pings now, no single best)
             double trueOffset = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - sw.ElapsedMilliseconds;
             float err = (float)(NetRace.RaceSeconds - truth);
             maxClockErr = Mathf.Max(maxClockErr, err);
             if ((int)t % 10 == 0 || err > 0.5f)
-                Debug.Log($"[roomsmoke] clock: race clock {NetRace.RaceSeconds:F2} s vs truth {truth:F2} s (err {err:+0.00;-0.00}) · fit offset err {offset - trueOffset:+0;-0} ms · best rtt {bestRtt} ms · unscaled-vs-stopwatch {Time.unscaledTimeAsDouble * 1000 - sw.ElapsedMilliseconds:F0} ms");
+                Debug.Log($"[roomsmoke] clock: race clock {NetRace.RaceSeconds:F2} s vs truth {truth:F2} s (err {err:+0.00;-0.00}) · fit offset err {offset - trueOffset:+0;-0} ms · ping {bestRtt} ms · unscaled-vs-stopwatch {Time.unscaledTimeAsDouble * 1000 - sw.ElapsedMilliseconds:F0} ms");
         }
         int tenSeconds = (int)((t - stageAt) / 10);
         if (tenSeconds >= 2 && tenSeconds != lastLogged && race.Player != null)

@@ -17,6 +17,7 @@ APP_DOMAIN = "kartcup.bharadwaj465.workers.dev"          # TODO: your domain (al
 PACKAGE_NAME = "com.fensory.kartcup"      # TODO: must equal the APK package name
 CERT_SHA256 = "9E:EA:EE:E5:53:EF:C0:08:32:69:5E:7D:E7:2B:29:75:AA:AA:0B:88:15:EF:93:AB:4A:6C:44:88:C5:48:5C:07"                          # TODO: apksigner --print-certs SHA-256, colon-separated; comma-separate several
 SKR_MINT = "SKRbvo6Gf7GondiT3BbTfuRDPqLWei4j2Qy2NPGZhW3"
+ORE_MINT = "oreoU2P8bN6jkk3jbaiVxYnG1dCXcYxwhwyK9jSybcp"   # ORE (Regolith Labs); the shop takes it at the market rate. Remove the line to switch ORE off
 # TREASURY_OWNER (the wallet entries and purchases are paid to; its SKR associated account is derived) is a secret,
 # not a var, so no wallet address sits in this file. Unset, the payout key's own address is used.
 PRICES_JSON = "{}"                        # per-sku overrides of catalog.ts, e.g. {"paint.sunset":{"SKR":"1000000"}}

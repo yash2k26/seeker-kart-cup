@@ -12,8 +12,8 @@ using UnityEngine.Events;
 
 namespace KartCup
 {
-    /// Every wallet beat: Seed Vault sign-in (SIWS), a mainnet Memo on a personal best, and one payment path that
-    /// the shop and the tournament entry both use (SOL or SKR to the treasury, plus a memo the Worker verifies).
+    /// Every wallet beat: Seed Vault sign-in (SIWS), a mainnet Memo on a personal best, the shop's payment path (SOL or
+    /// SKR to the treasury, plus a memo the Worker verifies) and a paid room's stake (into the room's escrow account).
     /// Rules from research/14: one MWA op at a time, prompts only from menus, rent guard before any tx, mainnet from
     /// day one, silent reconnect via cached auth token + our HMAC session. Treasury addresses come from /v1/config,
     /// never from the APK.
@@ -129,9 +129,9 @@ namespace KartCup
 
         // ---- the one payment path ----
 
-        /// A transfer of `amount` base units of SOL or SKR to the treasury with `memo`, signed in the wallet.
+        /// A transfer of `amount` base units of SOL, SKR or ORE to the treasury with `memo`, signed in the wallet.
         /// Returns the signature, or null when nothing was sent (declined, no funds, offline). Signs the player in first if needed.
-        public async Awaitable<string> Pay(string memo, ulong amount, string currency, string what, Action beforeSigning = null)
+        public async Awaitable<string> Pay(string memo, ulong amount, string currency, string what)
         {
             if (Busy) return null;
             Busy = true;
@@ -149,14 +149,20 @@ namespace KartCup
                 }
                 else
                 {
+                    // SKR and ORE: the same token transfer with a different mint, destination and decimals
+                    bool ore = currency == "ORE";
+                    string mintStr = ore ? cfg.oreMint : cfg.skrMint, dest = ore ? cfg.treasuryOreAta : cfg.treasuryAta;
+                    if (string.IsNullOrEmpty(mintStr) || string.IsNullOrEmpty(dest)) { Status($"{currency} payments are offline right now"); return null; }
                     if (!await HasSol(0)) { Status("Add a little SOL for the network fee"); return null; }
-                    if (!await HasSkr(cfg.skrMint, amount)) { Status("Not enough SKR for this"); return null; }
-                    var mint = new PublicKey(cfg.skrMint);
+                    if (!await HasToken(mintStr, amount)) { Status($"Not enough {currency} for this"); return null; }
+                    var mint = new PublicKey(mintStr);
                     var src = AssociatedTokenAccountProgram.DeriveAssociatedTokenAccount(me, mint);
-                    tx.Add(TokenProgram.TransferChecked(src, new PublicKey(cfg.treasuryAta), amount, 6, me, mint));
+                    // The treasury's ORE account may not exist yet: create it if missing (a no-op once it does; the first buyer pays
+                    // its rent, ~0.002 SOL, once). SKR's account has existed since the shop opened.
+                    if (ore) tx.Add(CreateTokenAccountIdempotent(me, new PublicKey(cfg.treasuryOwner), mint));
+                    tx.Add(TokenProgram.TransferChecked(src, new PublicKey(dest), amount, ore ? 11 : 6, me, mint));
                 }
                 tx.Add(MemoProgram.NewMemoV2(memo, me));
-                beforeSigning?.Invoke();                    // the last moment before money may move
                 var sig = await SignAndSend(tx);
                 if (sig != null) KartApi.Event("pay", new { what, currency, amount, sig });
                 return sig;
@@ -213,30 +219,46 @@ namespace KartCup
             }
         }
 
-        /// Lobby: pay the room's entry fee and hand the signature to the room, which verifies it on-chain. The room is
-        /// told first that we are paying (it holds the seat while the wallet app is open), and the signature is written
-        /// down before it is sent, so it reaches the room however the socket or the seat fared meanwhile.
-        public async Awaitable<bool> PayEntry(RoomClient.RoomState room)
+        /// Lobby: stake `amount` (base units) into the room's escrow, the program's `join` signed in the wallet. The
+        /// stake goes to the room's own account on the escrow program, never to the treasury; the room reads it from the
+        /// chain (the signature it is sent only tells it to look now). The room holds the seat while the wallet is open.
+        public async Awaitable<bool> Stake(RoomClient.RoomState room, ulong amount)
         {
-            if (room == null || !room.IsPaid) return false;
-            string attempt = null;
-            var sig = await Pay($"kc:entry:{room.code}:{room.round}", ulong.Parse(room.fee), room.currency, "entry", () =>
+            if (Busy || room == null || !room.IsPaid || room.escrow == null) return false;
+            Busy = true;
+            bool holding = false;
+            try
             {
-                attempt = PendingEntries.Attempt(room.code, room.round, KartApi.SessionWallet);
+                var cfg = await KartApi.Config();
+                if (cfg == null || string.IsNullOrEmpty(cfg.escrowProgram)) { Status("Paid races are offline right now"); return false; }
+                if (!SignedIn && !await LoginAsync()) return false;
+                var program = new PublicKey(cfg.escrowProgram);
+                var roomKey = Escrow.RoomAddress(program, room.code, room.round);
+                // Only ever into the account derived here from the room's code and round, whatever an address elsewhere says.
+                if (roomKey.Key != room.escrow.address) { Status("This room's prize pool did not check out. Nothing was sent."); return false; }
+                var me = Web3.Wallet.Account.PublicKey;
+                PublicKey mint = room.currency == "SKR" ? new PublicKey(cfg.skrMint) : null;
+                if (mint == null && !await HasSol(amount)) { Status("Not enough SOL for this stake"); return false; }
+                if (mint != null && !await HasSol(0)) { Status("Add a little SOL for the network fee"); return false; }
+                if (mint != null && !await HasToken(cfg.skrMint, amount)) { Status("Not enough SKR for this stake"); return false; }
+                var tx = await BuildTx();
+                tx.Add(Escrow.Join(program, roomKey, me, mint, amount));
                 RoomClient.Instance?.Send(new { t = "paying" });
-            });
-            if (sig == null)
-            {
-                // nothing was sent (declined, no funds, offline): release the seat hold and forget the attempt
-                PendingEntries.Forget(attempt);
-                if (attempt != null) RoomClient.Instance?.Send(new { t = "paying", off = true });
-                return false;
+                holding = true;
+                var sig = await SignAndSend(tx);
+                if (sig == null) return false;
+                holding = false;
+                RoomClient.Instance?.Send(new { t = "pay", signature = sig });
+                KartApi.Event("stake", new { room = room.code, round = room.round, amount, currency = room.currency, sig });
+                Status("Stake sent · the room is reading it from the chain…");
+                return true;
             }
-            PendingEntries.Add(room.code, room.round, sig, KartApi.SessionWallet);
-            PendingEntries.Forget(attempt);
-            _ = PendingEntries.Deliver(sig);
-            Status("Entry sent · verifying on-chain…");
-            return true;
+            catch (Exception e) { Debug.LogWarning("[wallet] stake failed: " + e); Status("Stake failed. Nothing was taken unless the wallet showed success."); return false; }
+            finally
+            {
+                if (holding) RoomClient.Instance?.Send(new { t = "paying", off = true });   // declined or failed: let the seat go back to normal
+                Busy = false;
+            }
         }
 
         // ---- helpers ----
@@ -246,7 +268,7 @@ namespace KartCup
             return (long)(bal.Result?.Value ?? 0) >= minLamportsForTx + (long)extra;
         }
 
-        async Awaitable<bool> HasSkr(string mint, ulong amount)
+        async Awaitable<bool> HasToken(string mint, ulong amount)
         {
             try
             {
@@ -256,8 +278,24 @@ namespace KartCup
                     foreach (var a in accs.Result.Value) total += a.Account?.Data?.Parsed?.Info?.TokenAmount?.AmountUlong ?? 0;
                 return total >= amount;
             }
-            catch (Exception e) { Debug.LogWarning("[wallet] skr balance: " + e.Message); return true; }   // let the wallet be the judge
+            catch (Exception e) { Debug.LogWarning("[wallet] token balance: " + e.Message); return true; }   // let the wallet be the judge
         }
+
+        /// Associated Token Account program, CreateIdempotent (instruction 1); the SDK only wraps Create, which fails if it exists.
+        static TransactionInstruction CreateTokenAccountIdempotent(PublicKey payer, PublicKey owner, PublicKey mint) => new()
+        {
+            ProgramId = AssociatedTokenAccountProgram.ProgramIdKey.KeyBytes,
+            Keys = new List<AccountMeta>
+            {
+                AccountMeta.Writable(payer, true),
+                AccountMeta.Writable(AssociatedTokenAccountProgram.DeriveAssociatedTokenAccount(owner, mint), false),
+                AccountMeta.ReadOnly(owner, false),
+                AccountMeta.ReadOnly(mint, false),
+                AccountMeta.ReadOnly(SystemProgram.ProgramIdKey, false),
+                AccountMeta.ReadOnly(TokenProgram.ProgramIdKey, false),
+            },
+            Data = new byte[] { 1 },
+        };
 
         async Awaitable<Transaction> BuildTx()
         {
@@ -299,8 +337,8 @@ namespace KartCup
         public static string Amount(string baseUnits, string currency, bool withUsd = false)
         {
             if (!ulong.TryParse(baseUnits, out var b)) return "";
-            double v = currency == "SOL" ? b / 1e9 : b / 1e6;
-            return currency == "SOL" ? $"{v:0.###} SOL" : $"{v:0.##} SKR";
+            double v = currency == "SOL" ? b / 1e9 : currency == "ORE" ? b / 1e11 : b / 1e6;
+            return currency == "SOL" ? $"{v:0.###} SOL" : currency == "ORE" ? $"{v:0.###} ORE" : $"{v:0.##} SKR";
         }
     }
 }

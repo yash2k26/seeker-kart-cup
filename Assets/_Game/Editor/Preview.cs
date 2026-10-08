@@ -167,6 +167,23 @@ public static class KartPreview
 // Screenshots of the menu scene's UI, so the front end can be judged without a device.
 public static class MenuPreview
 {
+    /// The shop's buttons need a quote, and in edit mode there is no Worker: a sample config stands in. The prices are
+    /// not the real ones, only shaped like them (SKR 6 decimals, SOL 9, ORE 11), so the capture shows every rail.
+    static void SampleShopConfig()
+    {
+        var cfg = new KartApi.ConfigDto { treasuryOwner = "sample", treasuryAta = "sample", skrMint = "sample", oreMint = "sample", treasuryOreAta = "sample" };
+        var karts = AssetDatabase.LoadAssetAtPath<KartDatabase>("Assets/_Game/Data/Karts.asset");
+        var skus = (karts != null ? karts.karts.Where(k => k != null && !string.IsNullOrEmpty(k.sku)).Select(k => k.sku) : Enumerable.Empty<string>())
+                   .Concat(Paints.All.Where(p => !string.IsNullOrEmpty(p.sku)).Select(p => p.sku)).Concat(Inventory.Packs.Select(p => p.sku));
+        foreach (var sku in skus.Distinct())
+        {
+            bool skrOnly = sku == "paint.rally";
+            cfg.catalog.Add(new KartApi.ShopItem { sku = sku, kind = sku.Split('.')[0], name = sku, skrOnly = skrOnly,
+                price = new Dictionary<string, string> { ["SKR"] = "555000000", ["SOL"] = skrOnly ? "" : "50000000", ["ORE"] = skrOnly ? "" : "3100000000" } });
+        }
+        typeof(KartApi).GetProperty("Cfg").SetValue(null, cfg);
+    }
+
     [MenuItem("Build/Capture Menu")]
     public static void Capture()
     {
@@ -178,6 +195,7 @@ public static class MenuPreview
         canvas.worldCamera = cam;
         canvas.planeDistance = 1f;
 
+        SampleShopConfig();
         var carousel = Object.FindFirstObjectByType<CharacterCarousel>();
         int character = 0;                                   // -char N: the select screen on that character
         var cargs = System.Environment.GetCommandLineArgs();

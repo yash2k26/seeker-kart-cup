@@ -383,10 +383,9 @@ public static partial class MenuSetup
                            new Vector2(0, 1), new Vector2(120, -168), new Vector2(1240, 60));
         kicker.characterSpacing = 14f;                       // an eyebrow reads as a label, not a sentence
 
-        Label("Title1", plate, display, "SEEKER", 190, Paper, TextAlignmentOptions.Left,
-              new Vector2(0, 1), new Vector2(116, -216), new Vector2(1100, 210));
-        Label("Title2", plate, display, "KART CUP", 190, Paper, TextAlignmentOptions.Left,
-              new Vector2(0, 1), new Vector2(116, -380), new Vector2(1100, 210));
+        // One word, so one line: sized to fill the block the old two-line lockup held, between the kicker and the sub.
+        Label("Title1", plate, display, "KARTEL", 320, Paper, TextAlignmentOptions.Left,
+              new Vector2(0, 1), new Vector2(112, -216), new Vector2(1100, 366));
         Label("Sub", plate, body, "Race the island. Put your lap on-chain.", 38, Muted,
               TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(120, -576), new Vector2(1000, 60));
 
@@ -935,11 +934,11 @@ public static partial class MenuSetup
               new Vector2(0.5f, 1), new Vector2(lx, -134), new Vector2(560, 40)).characterSpacing = 8f;
         var trackChip = Chip("TrackChip", card, "GRAND PRIX", new Vector2(lx, -184), out var trackLabel);
         UnityEditor.Events.UnityEventTools.AddPersistentListener(trackChip.onClick, panel.NextTrack);
-        var feeChip = Chip("FeeChip", card, "FREE RACE", new Vector2(lx, -284), out var feeLabel);
-        UnityEditor.Events.UnityEventTools.AddPersistentListener(feeChip.onClick, panel.NextFee);
+        var stakeChip = Chip("StakeChip", card, "FREE RACE", new Vector2(lx, -284), out var stakeLabel);
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(stakeChip.onClick, panel.NextStake);
         var visChip = Chip("VisibilityChip", card, "PUBLIC  ·  ANYONE CAN JOIN", new Vector2(lx, -384), out var visLabel);
         UnityEditor.Events.UnityEventTools.AddPersistentListener(visChip.onClick, panel.ToggleVisibility);
-        Label("FeeHint", card, body, "Tap any to change · prizes are paid on-chain", 26, Muted, TextAlignmentOptions.Center,
+        Label("StakeHint", card, body, "Tap any to change · stakes are held on-chain", 26, Muted, TextAlignmentOptions.Center,
               new Vector2(0.5f, 1), new Vector2(lx, -484), new Vector2(560, 40));
         var create = Button("Create", card, "CREATE", Accent, Paper, 46,
                             new Vector2(0.5f, 1), new Vector2(lx, -536), new Vector2(560, 112));
@@ -981,7 +980,7 @@ public static partial class MenuSetup
         {
             so.FindProperty("codeField").objectReferenceValue = field;
             so.FindProperty("trackLabel").objectReferenceValue = trackLabel;
-            so.FindProperty("feeLabel").objectReferenceValue = feeLabel;
+            so.FindProperty("stakeLabel").objectReferenceValue = stakeLabel;
             so.FindProperty("visibilityLabel").objectReferenceValue = visLabel;
             so.FindProperty("status").objectReferenceValue = status;
             so.FindProperty("createButton").objectReferenceValue = create;
@@ -994,7 +993,7 @@ public static partial class MenuSetup
         return screen;
     }
 
-    /// The lobby: code, who is in and paid, the pool and the prizes, and one button that is always the next step.
+    /// The lobby: code, who is in and what each staked, the pot, the stake chips, and one button that is always the next step.
     static GameObject LobbyScreen(RectTransform parent)
     {
         var screen = Rect("Lobby", parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject;
@@ -1018,11 +1017,27 @@ public static partial class MenuSetup
                            new Vector2(0.5f, 1), new Vector2(0, -284), new Vector2(1360, 40));
         var players = Label("Players", card, body, "", 38, Paper, TextAlignmentOptions.TopLeft,
                             new Vector2(0, 1), new Vector2(120, -342), new Vector2(1260, 270));
+        // This seat's stake, picked before it pays: the room's stakes from its minimum up, on the prizes line (the
+        // panel blanks that line while the chips show). The picked one takes the accent.
+        var chips = new Button[5];
+        for (int i = 0; i < chips.Length; i++)
+        {
+            var rt = Rect("Stake" + i, card, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2((i - 2) * 236, -280), new Vector2(220, 60));
+            rt.pivot = new Vector2(0.5f, 1);
+            Design.AsRow(rt, Slate);
+            chips[i] = rt.gameObject.AddComponent<Button>();
+            chips[i].targetGraphic = rt.GetComponent<Image>();
+            rt.gameObject.AddComponent<PressFeel>();
+            Label("Stake" + i + "Label", rt, strong, "", 30, Paper, TextAlignmentOptions.Center,
+                  new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(210, 50));
+            rt.gameObject.SetActive(false);
+        }
 
         var status = Label("Status", card, body, "", 30, Muted, TextAlignmentOptions.Center,
                            new Vector2(0.5f, 0), new Vector2(0, 198), new Vector2(1300, 44));
 
         var panel = screen.AddComponent<LobbyPanel>();
+        for (int i = 0; i < chips.Length; i++) UnityEditor.Events.UnityEventTools.AddIntPersistentListener(chips[i].onClick, panel.PickStake, i);
         var share = Button("Share", card, "SHARE INVITE", Slate, Paper, 38,
                            new Vector2(0.5f, 0), new Vector2(-440, 64), new Vector2(380, 116));
         UnityEditor.Events.UnityEventTools.AddPersistentListener(share.onClick, panel.ShareInvite);
@@ -1043,6 +1058,11 @@ public static partial class MenuSetup
             so.FindProperty("statusLabel").objectReferenceValue = status;
             so.FindProperty("primaryLabel").objectReferenceValue = primary.GetComponentInChildren<TMP_Text>();
             so.FindProperty("primaryButton").objectReferenceValue = primary;
+            Fill(so.FindProperty("stakeChips"), chips.Cast<Object>().ToArray());
+            so.FindProperty("chipIdle").colorValue = Slate;
+            so.FindProperty("chipPicked").colorValue = Design.Ink600;
+            so.FindProperty("chipText").colorValue = Muted;
+            so.FindProperty("chipPickedText").colorValue = Paper;
         });
         return screen;
     }
@@ -1099,6 +1119,10 @@ public static partial class MenuSetup
         var secondary = Button("Secondary", card, "TEST DRIVE", Slate, Paper, 36,
                                new Vector2(0.5f, 0), new Vector2(0, 168), new Vector2(584, 96));
         UnityEditor.Events.UnityEventTools.AddPersistentListener(secondary.onClick, garage.Secondary);
+        var tertiary = Button("Tertiary", card, "PAY ORE", Slate, Paper, 36,
+                              new Vector2(0.5f, 0), new Vector2(150, 168), new Vector2(284, 96));   // right half of the SOL row; the panel narrows SOL while this shows
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(tertiary.onClick, garage.Tertiary);
+        tertiary.gameObject.SetActive(false);
         var primary = Button("Primary", card, "UNLOCK", Accent, Paper, 46,
                              new Vector2(0.5f, 0), new Vector2(0, 48), new Vector2(584, 112));
         UnityEditor.Events.UnityEventTools.AddPersistentListener(primary.onClick, garage.Primary);
@@ -1123,6 +1147,8 @@ public static partial class MenuSetup
         so.FindProperty("secondaryLabel").objectReferenceValue = secondary.GetComponentInChildren<TMP_Text>();
         so.FindProperty("primaryButton").objectReferenceValue = primary;
         so.FindProperty("secondaryButton").objectReferenceValue = secondary;
+        so.FindProperty("tertiaryLabel").objectReferenceValue = tertiary.GetComponentInChildren<TMP_Text>();
+        so.FindProperty("tertiaryButton").objectReferenceValue = tertiary;
         Fill(so.FindProperty("swatches"), swatches.Cast<Object>().ToArray());
         Fill(so.FindProperty("powerBars"), powerBars.Cast<Object>().ToArray());
         so.ApplyModifiedPropertiesWithoutUndo();
@@ -1165,6 +1191,10 @@ public static partial class MenuSetup
 
         var secondary = Button("Secondary", card, "PAY", Slate, Paper, 36, new Vector2(0.5f, 0), new Vector2(0, 168), new Vector2(584, 96));
         UnityEditor.Events.UnityEventTools.AddPersistentListener(secondary.onClick, panel.Secondary);
+        var tertiary = Button("Tertiary", card, "PAY ORE", Slate, Paper, 36,
+                              new Vector2(0.5f, 0), new Vector2(150, 168), new Vector2(284, 96));   // right half of the SOL row; the panel narrows SOL while this shows
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(tertiary.onClick, panel.Tertiary);
+        tertiary.gameObject.SetActive(false);
         var primary = Button("Primary", card, "UNLOCK", Accent, Paper, 46, new Vector2(0.5f, 0), new Vector2(0, 48), new Vector2(584, 112));
         UnityEditor.Events.UnityEventTools.AddPersistentListener(primary.onClick, panel.Primary);
 
@@ -1178,6 +1208,8 @@ public static partial class MenuSetup
         so.FindProperty("secondaryLabel").objectReferenceValue = secondary.GetComponentInChildren<TMP_Text>();
         so.FindProperty("primaryButton").objectReferenceValue = primary;
         so.FindProperty("secondaryButton").objectReferenceValue = secondary;
+        so.FindProperty("tertiaryLabel").objectReferenceValue = tertiary.GetComponentInChildren<TMP_Text>();
+        so.FindProperty("tertiaryButton").objectReferenceValue = tertiary;
         so.FindProperty("rowIdle").colorValue = Design.Ink700;
         so.FindProperty("rowFocus").colorValue = Design.Ink600;
         so.ApplyModifiedPropertiesWithoutUndo();

@@ -14,6 +14,17 @@ public static class MenuPlay
     static double start;
     static int stage;
 
+    // Just turn the game on: the menu in play mode, sound on, nothing scripted.
+    //     Unity -projectPath . -executeMethod MenuPlay.Play      (GUI editor, no -batchmode)
+    [MenuItem("Build/Play Menu")]
+    public static void Play()
+    {
+        EditorUtility.audioMasterMute = false;   // MenuPlay.Run leaves the editor muted; this is for a person
+        EditorSceneManager.OpenScene("Assets/_Game/Scenes/Menu.unity", OpenSceneMode.Single);
+        Debug.Log("[play] entering play mode on Menu");
+        EditorApplication.EnterPlaymode();
+    }
+
     [MenuItem("Build/Menu Play Test")]
     public static void Run()
     {

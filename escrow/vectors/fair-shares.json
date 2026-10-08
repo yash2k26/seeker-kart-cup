@@ -1,0 +1,62 @@
+[
+  { "name": "two equal stakes: winner takes the pot less the cut",
+    "stakes": ["100", "100"], "rank": [0, 1], "cutBps": 1000,
+    "payouts": ["180", "0"], "house": "20" },
+
+  { "name": "three equal stakes: 50/30/20",
+    "stakes": ["100", "100", "100"], "rank": [1, 0, 2], "cutBps": 1000,
+    "payouts": ["81", "135", "54"], "house": "30" },
+
+  { "name": "the A/B/C example, A wins (lamports)",
+    "stakes": ["1000000000", "100000000", "100000000"], "rank": [0, 1, 2], "cutBps": 1000,
+    "payouts": ["1035000000", "81000000", "54000000"], "house": "30000000" },
+
+  { "name": "the A/B/C example, C wins (lamports)",
+    "stakes": ["1000000000", "100000000", "100000000"], "rank": [2, 1, 0], "cutBps": 1000,
+    "payouts": ["954000000", "81000000", "135000000"], "house": "30000000" },
+
+  { "name": "rounding dust goes to the best of the layer",
+    "stakes": ["10", "10", "10"], "rank": [0, 1, 2], "cutBps": 1000,
+    "payouts": ["14", "8", "5"], "house": "3" },
+
+  { "name": "four players, three levels",
+    "stakes": ["50", "200", "100", "200"], "rank": [3, 0, 1, 2], "cutBps": 1000,
+    "payouts": ["0", "338", "94", "63"], "house": "55" },
+
+  { "name": "two players, the bigger stake loses: its unmatched part comes back uncut",
+    "stakes": ["300", "100"], "rank": [1, 0], "cutBps": 1000,
+    "payouts": ["200", "180"], "house": "20" },
+
+  { "name": "no cut",
+    "stakes": ["7", "7"], "rank": [0, 1], "cutBps": 0,
+    "payouts": ["14", "0"], "house": "0" },
+
+  { "name": "six players, all different, the smallest stake wins, maximum cut",
+    "stakes": ["10", "20", "30", "40", "50", "60"], "rank": [0, 1, 2, 3, 4, 5], "cutBps": 2000,
+    "payouts": ["25", "34", "38", "30", "29", "14"], "house": "40" },
+
+  { "name": "six players, all different, the biggest stake wins",
+    "stakes": ["10", "20", "30", "40", "50", "60"], "rank": [5, 4, 3, 2, 1, 0], "cutBps": 1000,
+    "payouts": ["0", "0", "0", "31", "47", "112"], "house": "20" },
+
+  { "name": "a ranking that repeats a place",
+    "stakes": ["10", "10"], "rank": [0, 0], "cutBps": 1000, "error": "ranking" },
+
+  { "name": "a ranking past the seats",
+    "stakes": ["10", "10"], "rank": [0, 2], "cutBps": 1000, "error": "ranking" },
+
+  { "name": "one seat is not a race",
+    "stakes": ["10"], "rank": [0], "cutBps": 1000, "error": "seats" },
+
+  { "name": "seven seats is over the cap",
+    "stakes": ["1", "1", "1", "1", "1", "1", "1"], "rank": [0, 1, 2, 3, 4, 5, 6], "cutBps": 1000, "error": "seats" },
+
+  { "name": "a ranking of the wrong length",
+    "stakes": ["10", "10", "10"], "rank": [0, 1], "cutBps": 1000, "error": "seats" },
+
+  { "name": "a cut over 100%",
+    "stakes": ["10", "10"], "rank": [0, 1], "cutBps": 10001, "error": "cut" },
+
+  { "name": "stakes that overflow a u64 when summed",
+    "stakes": ["18446744073709551615", "1"], "rank": [0, 1], "cutBps": 1000, "error": "overflow" }
+]

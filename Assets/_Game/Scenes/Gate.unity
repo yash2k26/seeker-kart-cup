@@ -5516,7 +5516,7 @@ MonoBehaviour:
     solanaMobileWalletAdapterOptions:
       identityUri: https://kartcup.bharadwaj465.workers.dev/
       iconUri: /icon.png
-      name: Seeker Kart Cup
+      name: Kartel
       keepConnectionAlive: 1
     solanaWalletAdapterWebGLOptions:
       walletAdapterButtonPrefab: {fileID: 0}

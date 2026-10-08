@@ -12,8 +12,8 @@ namespace KartCup
     {
         [SerializeField] Button[] rows = System.Array.Empty<Button>();
         [SerializeField] TMP_Text[] rowLabels = System.Array.Empty<TMP_Text>(), rowPrices = System.Array.Empty<TMP_Text>();
-        [SerializeField] TMP_Text blurbLabel, loadoutLabel, primaryLabel, secondaryLabel;
-        [SerializeField] Button primaryButton, secondaryButton;
+        [SerializeField] TMP_Text blurbLabel, loadoutLabel, primaryLabel, secondaryLabel, tertiaryLabel;
+        [SerializeField] Button primaryButton, secondaryButton, tertiaryButton;   // tertiary: PAY in ORE, the right half of the SOL row
         [SerializeField] Color rowIdle = new(0.13f, 0.17f, 0.22f), rowFocus = new(0.2f, 0.26f, 0.33f);
 
         int focus;
@@ -52,6 +52,7 @@ namespace KartCup
 
         public void Primary() { if (!busy) _ = Buy("SKR"); }
         public void Secondary() { if (!busy) _ = Buy("SOL"); }
+        public void Tertiary() { if (!busy) _ = Buy("ORE"); }
 
         async Awaitable Buy(string currency)
         {
@@ -95,6 +96,8 @@ namespace KartCup
                 loadoutLabel.text = l == null || Inventory.Count(l.id) <= 0 ? "START WITH:  NOTHING" : $"START WITH:  {l.item.ToUpperInvariant()}   ({Inventory.Count(l.id)} LEFT)";
             Set(primaryLabel, primaryButton, fi != null ? $"UNLOCK  ·  {Skr(fi)}" : KartApi.Cfg == null ? "CONNECT TO BUY" : "…", fi != null && !busy);
             Set(secondaryLabel, secondaryButton, fi != null && !string.IsNullOrEmpty(fi.price.GetValueOrDefault("SOL")) ? $"PAY {Sol(fi)}" : "", fi != null && !busy);
+            Set(tertiaryLabel, tertiaryButton, Ore(fi) != "" ? $"PAY {Ore(fi)}" : "", fi != null && !busy);
+            Beside(secondaryButton, tertiaryButton);
         }
 
         static void Set(TMP_Text label, Button button, string text, bool interactable)
@@ -103,7 +106,16 @@ namespace KartCup
             if (button != null) { button.gameObject.SetActive(!string.IsNullOrEmpty(text)); button.interactable = interactable; }
         }
 
+        /// The SOL button shares its row with the ORE one when both show, and has the row to itself otherwise.
+        static void Beside(Button left, Button right)
+        {
+            if (left == null) return;
+            var rt = (RectTransform)left.transform; bool both = right != null && right.gameObject.activeSelf;
+            rt.sizeDelta = new Vector2(both ? 284 : 584, rt.sizeDelta.y); rt.anchoredPosition = new Vector2(both ? -150 : 0, rt.anchoredPosition.y);
+        }
+
         static string Skr(KartApi.ShopItem i) => WalletFlow.Amount(i.price.GetValueOrDefault("SKR"), "SKR");
         static string Sol(KartApi.ShopItem i) => WalletFlow.Amount(i.price.GetValueOrDefault("SOL"), "SOL");
+        static string Ore(KartApi.ShopItem i) => i == null || KartApi.Cfg == null || !KartApi.Cfg.TakesOre ? "" : WalletFlow.Amount(i.price.GetValueOrDefault("ORE"), "ORE");
     }
 }

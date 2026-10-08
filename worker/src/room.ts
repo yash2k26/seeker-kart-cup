@@ -1,23 +1,29 @@
-// One Durable Object per room: the lobby, the entry fees, the 15 Hz state relay, the server-timed countdown, the
-// finish order, cup points across races, and the prize settlement. It is the only place that decides who won and who
-// gets paid, which is why it is one object and not a table plus a race condition.
+// One Durable Object per room: the lobby, the 15 Hz state relay, the server-timed countdown, the finish order, cup
+// points across races, and for a paid room its escrow on-chain. It is the only place that decides who won, which is
+// why it is one object and not a table plus a race condition. It never holds anyone's money: a paid room's stakes sit
+// in the escrow program (escrow/programs/kartel_escrow), and this object only drives that account through its life
+// (open, refund a seat, lock, settle or cancel, deliver every payout, close) with the referee key.
 //
 // Protocol (JSON text frames). Client → room:
-//   hello {device, session?, character, kart}   ready {ready}   start   paying   pay {signature, round}   loaded
+//   hello {device, session?, character, kart}   ready {ready}   start   paying {off?}   pay {signature}   loaded
 //   s {p,r,v,st,lap,cp,sc,tm}  (relayed to everyone else with the sender's id)   fin
 //   ping {c}   spr {s} (echo of the room's sp)   next   again   leave   kick {id}
 // Room → client:
 //   welcome {id, serverNow, room}   room {…snapshot}   load {track, race, races}   countdown {startAt}
 //   s {id,…}   finished {id, ms}   results {…}   payouts [...]   pong {c, s}   sp {s} (the room timing a round trip)   error {msg}   closed {reason}
-// HTTP from the Worker: POST /init, GET /state, POST /entry {wallet, signature, round} (an entry payment by any route).
+// HTTP from the Worker: POST /init, GET /state.
 import { DurableObject } from 'cloudflare:workers';
 import type { Env } from './index';
-import { readSession, isSignature } from './auth';
-import { FEE_TIERS, MIN_PAID_PLAYERS, splitPool, CATALOG, type Currency, type Split } from './catalog';
-import { verifyPayment, buildBatch, sendRaw, txStatus, landedAny, findEntrySignatures, type EntryCheck } from './payout';
+import { readSession } from './auth';
+import { MIN_PAID_PLAYERS, CATALOG, STAKE_UNIT, type Currency } from './catalog';
 import { geoOf, newRef, push, finishT, finished, crossingsToFinish, type RefState } from './referee';
+import { Referee, readRoom, type ChainRoom, type EscrowState } from './escrow';
+import { sendRaw, txStatus } from './rpc';
+import { ifWin } from './fairshares';
 
 const POINTS = [10, 8, 6, 4, 3, 2];
+/** Seats per room: every track has six grid slots (TrackSetup.StartGrid) and the phone is measured racing six karts.
+ *  The escrow program enforces the same number on-chain (MAX_PLAYERS). */
 export const MAX_PLAYERS = 6;
 const MAX_SOCKETS = 24;                // sockets per room; when full, the oldest that never said hello is closed
 const HELLO_WAIT_MS = 10_000;          // a socket that has not said hello by then is closed
@@ -44,29 +50,33 @@ const CLOCK_LAG_SLACK_S = 1.0, RTT_CAP_MS = 2000;
 const LAG_BUCKET_MS = 5_000, LAG_SPAN_MS = 20_000;
 const SP_EVERY_MS = 2000;
 const MIN_SAMPLE_S = 0.02;             // the referee skips a state less than this after the last (phones send 15 Hz)
-// Entry payments: asked about every few seconds while the chain has not seen them (a transfer that has not landed in
-// ENTRY_TIMEOUT_MS never will: its blockhash has expired), and for up to a day with backoff while the RPC is failing,
-// which says nothing about the payment.
-const ENTRY_RETRY_MS = 4_000, ENTRY_TIMEOUT_MS = 120_000, ENTRY_GIVE_UP_MS = 24 * 3_600_000;
-// A seat is held (no kick, no drop) while its phone is in the wallet app, and while a payment for it is being checked:
-// this many times per wallet per round, then a payment no longer holds the seat (it is still verified and refunded).
+// A seat is held (no drop, no kick) while its phone is in the wallet app staking: this many times per wallet per round.
 const PAYING_HOLD_MS = 120_000, PAYING_HOLDS = 3;
-const MAX_ORPHANS = 64, MAX_ORPHANS_PER_WALLET = 4;
-const MAX_REFUNDS = 2;                 // pay, leave for a refund: this many times per wallet per round; a third pay is refunded, not seated
-// Payouts: one recipient per transaction, saved as 'sent' with its signature before it goes out. A few quick tries,
-// then back off (an RPC outage, an empty fee balance) for about half a day; only then is a row 'failed' for a person.
-const SETTLE_RETRY_MS = 3_000, QUICK_SENDS = 4, MAX_BACKOFF_MS = 30 * 60_000, PAYOUT_GIVE_UP_MS = 12 * 3_600_000;
+// Stake, get it back, stake again: each refund is a transaction the referee pays for. Two per wallet per round.
+const MAX_REFUNDS = 2;
+// The escrow: one transaction at a time per round, its status asked every CHAIN_TX_POLL_MS. A failed step is tried
+// again after CHAIN_RETRY_MS, doubling to CHAIN_MAX_BACKOFF_MS. While a lobby takes stakes the account is read every
+// CHAIN_POLL_PAYING_MS if someone is in their wallet app, else every CHAIN_POLL_LOBBY_MS (a stake made while the game
+// was closed is still found).
+const CHAIN_TX_POLL_MS = 1_000, CHAIN_RETRY_MS = 2_000, CHAIN_MAX_BACKOFF_MS = 5 * 60_000;
+// A refund or payout that cannot land yet (a closed token account) waits on its own clock, up to this: it may take a
+// player days to have an account again, and the escrow goes on without it.
+const STUCK_MAX_BACKOFF_MS = 6 * 3600_000;
+const CHAIN_POLL_PAYING_MS = 2_000, CHAIN_POLL_LOBBY_MS = 15_000;
+const LOCK_TIMEOUT_MS = 45_000;        // the stakes not locked by then: the room is cancelled and every stake goes back
+const ESCROW_TTL_S = 3 * 3600;         // after this anyone may cancel the escrow on-chain: stakes never depend on us
+// The longest a race of a cup can take, load to results: the escrow must have this much left per race (and a margin)
+// when it is locked, or a loser could cancel it after expiry while the cup is still on.
+const RACE_BOUND_MS = LOAD_TIMEOUT_MS + COUNTDOWN_LEAD_MS + RACE_CAP_MS + RESULTS_MS, LOCK_MARGIN_MS = 10 * 60_000;
 
 type State = 'lobby' | 'loading' | 'countdown' | 'racing' | 'results' | 'finished' | 'cancelled';
-
-/** An entry payment the room has been told about, being verified: a seat's (Player.pending) or an orphan's. */
-type Entry = { wallet: string; sig: string; round: number; since: number; nullSince?: number; nextTry?: number; tries?: number; claiming?: boolean };
 
 type Player = {
   id: string; wallet: string | null; device: string; name: string;
   character: number; kart: string;
   joinedAt: number; host: boolean; connected: boolean; ready: boolean; left?: boolean;
-  paid: boolean; paidSig?: string; pending?: Entry; payingUntil?: number;
+  /** A stake in this round's escrow, as last read from the chain (always true in a free room). */
+  paid: boolean; stake?: string; payingUntil?: number;
   loaded: boolean; racing: boolean;
   finishMs?: number; dnf: boolean; lastState?: number;
   ref?: RefState; flagged?: string;      // the referee's view of this race, and why it stopped believing the drive
@@ -77,54 +87,66 @@ type Player = {
   place?: number; points: number; totalMs: number; wins: number;
 };
 
-type Payout = {
-  id: string; wallet: string; kind: 'prize' | 'refund' | 'host'; place?: number;
-  amount: string; currency: Currency; status: 'pending' | 'sent' | 'confirmed' | 'failed';
-  signature?: string; attempts: number; nextTry?: number; lastValidBlockHeight?: number; round: number; batch: string; created: number;
-  sigs?: string[];                       // every transaction ever sent for this row: none may have landed before another is sent
-};
-
 type Order = { id: string; name: string; ms: number | null; place: number; points: number; dnf: boolean };
 type RaceResult = { race: number; races: number; track: string; final: boolean; order: Order[] };
 type Standing = { id: string; name: string; points: number; wins: number; totalMs: number; place: number };
 
+/** The escrow account as last read: amounts as decimal strings, so the record survives storage as JSON. */
+type Seen = {
+  state: EscrowState; mint: string | null; expiresAt: number; payer: string; treasury: string; houseCut: string; cutPaid: boolean;
+  entries: { player: string; stake: string; payout: string; paid: boolean; refund: boolean }[];
+};
+
+/** One round's escrow and where this room is driving it. */
+type Escrow = {
+  round: number; address: string;
+  want: 'open' | 'locked' | 'settled' | 'cancelled';
+  field?: string[];                      // want 'locked': the wallets that may keep a stake (the loaded paid seats)
+  order?: string[];                      // want 'settled': every staked wallet, the winner first
+  seen?: Seen;                           // the account as last read; kept after it closes, for the results card
+  created?: boolean;                     // known to exist on-chain (its create landed, or it was read)
+  gone?: boolean;                        // closed on-chain, or never created and no longer wanted: nothing left to do
+  tx?: { op: string; sig: string; lastValid: number; at: number };   // the one transaction in flight
+  failures: number; nextTry?: number; error?: string; readAt?: number;
+  claims: Record<string, string>;        // wallet → the transaction that delivered its payout
+  // A refund or payout that cannot land yet (a closed token account) waits on its own, so it never holds up anyone
+  // else's, the lock or the cut: its op ("remove:<wallet>", "claim:<wallet>") → when to try again, and how often.
+  stuck?: Record<string, { until: number; tries: number }>;
+};
+
 type Room = {
   code: string; createdAt: number; round: number;
   hostId: string; organiser?: string; tracks: string[]; raceIndex: number;
-  fee: string; currency: Currency; cutBps: number; isPublic: boolean;
+  /** Base units; '0' for a free room. Each player stakes from minStake to maxStake. */
+  minStake: string; maxStake: string; currency: Currency; cutBps: number; isPublic: boolean;
   state: State; players: Record<string, Player>;
   startAt?: number; loadDeadline?: number; finishDeadline?: number; emptySince?: number; nextAt?: number;
+  lockDeadline?: number;                 // race one of a paid room waits for the stakes to lock until then
   lastResults?: RaceResult; standings?: Standing[];
-  payouts: Payout[];
-  entrySigs?: string[];                  // every entry signature this round accepted: one payment, one seat, once
-  // Entry payments that cannot buy a seat (their payer left, was kicked or removed while paying, the room moved on,
-  // or the seat is paid already): verified on, and refunded if they landed. The money is never kept for nothing.
-  orphans?: Entry[];
+  escrows: Escrow[];                     // this round's, and any earlier round's still paying out
   kicked?: string[];                     // removed by the host this round: they may not come back until the rematch
-  refunds?: Record<string, number>;      // entry refunds per wallet this round
-  holds?: Record<string, number>;        // seat holds (paying, or a payment being checked) per wallet this round
-  members?: string[];                    // every wallet ever seated here: only they can leave a payment with the room
-  // Wallets that said they were paying: when the hold ends with no payment delivered (the game was killed while the
-  // wallet app was open), the room looks for the transfer on-chain itself, by its memo.
-  watch?: { wallet: string; round: number; at: number }[];
+  refunds?: Record<string, number>;      // stakes handed back per wallet this round
+  holds?: Record<string, number>;        // seat holds (paying) per wallet this round
 };
 
 const nowMs = () => Date.now();
 const short = (w: string) => `${w.slice(0, 4)}…${w.slice(-4)}`;
 const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 const nums = (v: unknown, n: number) => Array.isArray(v) && v.length >= n ? v.slice(0, n).map(num) : undefined;
+const sum = (xs: (string | bigint)[]) => xs.reduce<bigint>((a, b) => a + BigInt(b), 0n);
 
 export class RoomDO extends DurableObject<Env> {
   room: Room | null = null;
   // In memory only: gone with the object, which also ends anything they guard.
-  verifying = new Set<string>();         // entry signatures being checked right now: never twice at once
   greeting = new WeakSet<WebSocket>();   // a hello in flight on this socket
   gone = new WeakSet<WebSocket>();       // closed: a hello still in flight on it must not seat anyone
   frames = new WeakMap<WebSocket, { n: number; at: number }>();
   buckets = new WeakMap<WebSocket, { n: number; at: number }>();
   starting = false;                      // start() is between its first await and the load going out
+  stepping = new Set<number>();          // escrow rounds with a chain step under way: never two at once
+  referee?: Referee;
 
-  // ---------- HTTP: init/state/entry from the Worker, WebSocket upgrade from the phones ----------
+  // ---------- HTTP: init/state from the Worker, WebSocket upgrade from the phones ----------
   async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
     await this.load();
@@ -143,30 +165,36 @@ export class RoomDO extends DurableObject<Env> {
       const b = await req.json<any>();
       this.room = {
         code: b.code, createdAt: nowMs(), round: 1, hostId: b.host, organiser: b.host, tracks: b.tracks, raceIndex: 0,
-        fee: b.fee, currency: b.currency, cutBps: b.cutBps, isPublic: !!b.isPublic, state: 'lobby', players: {}, payouts: [],
+        minStake: b.minStake, maxStake: b.maxStake, currency: b.currency, cutBps: b.cutBps, isPublic: !!b.isPublic,
+        state: 'lobby', players: {}, escrows: [],
       };
+      if (this.paidRoom()) this.openEscrow();
       await this.save();
       await this.schedule();
       return Response.json(this.snapshot());
     }
-    if (url.pathname === '/entry' && req.method === 'POST') {
-      if (!this.room) return Response.json({ error: 'no such room' }, { status: 404 });
-      const b = await req.json<any>().catch(() => ({}));
-      // scan: the phone paid (or may have) but never learned the signature (killed while the wallet app was open)
-      const out = b.scan ? await this.scan(String(b.wallet ?? ''), Number(b.round)) : await this.intake(String(b.wallet ?? ''), String(b.signature ?? ''), Number(b.round));
-      await this.save(); this.broadcastRoom(); await this.schedule();
-      return Response.json({ entry: out }, { status: out === 'refused' ? 400 : out === 'busy' ? 429 : 200 });
-    }
     if (url.pathname === '/state') {
       if (!this.room) return Response.json({ error: 'no such room' }, { status: 404 });
-      if (this.owes()) await this.schedule();              // a room nobody visits still pays what it owes
+      if (this.owes()) await this.schedule();              // a room nobody visits still pays out what it owes
       return Response.json(this.snapshot());
     }
     return new Response('not found', { status: 404 });
   }
 
-  async load() { if (!this.room) this.room = (await this.ctx.storage.get<Room>('room')) ?? null; }
+  async load() {
+    if (this.room) return;
+    const stored = await this.ctx.storage.get<any>('room');
+    if (stored && !('minStake' in stored)) {
+      // Written before the escrow (paid rooms were off then): a single fee becomes the stake range.
+      stored.minStake = stored.maxStake = stored.fee ?? '0';
+      stored.escrows = [];
+      delete stored.fee; delete stored.payouts;
+    }
+    this.room = stored ?? null;
+  }
   async save() { if (this.room) await this.ctx.storage.put('room', this.room); }
+
+  paidRoom() { return this.room!.minStake !== '0'; }
 
   /** Close sockets that never said hello (older than HELLO_WAIT_MS, or the oldest if the room is full). */
   makeRoomForSocket(): boolean {
@@ -224,13 +252,18 @@ export class RoomDO extends DurableObject<Env> {
       case 'ready': if (room.state !== 'lobby' || p.ready === !!m.ready) return; p.ready = !!m.ready; break;
       case 'paying': {
         if (m.off) { if (!p.payingUntil) return; p.payingUntil = undefined; break; }   // declined, or not enough funds
-        // the phone is about to open the wallet app: hold the seat until the payment arrives (or two minutes pass)
-        if (room.state !== 'lobby' || room.fee === '0' || p.paid || !p.wallet || !this.takeHold(p.wallet)) return;
+        // the phone is about to open the wallet app: hold the seat until the stake lands (or two minutes pass)
+        if (!this.canStake(p) || !this.takeHold(p.wallet!)) return;
         p.payingUntil = nowMs() + PAYING_HOLD_MS;
-        room.watch = [...(room.watch ?? []).filter(w => !(w.wallet === p.wallet && w.round === room.round)), { wallet: p.wallet, round: room.round, at: p.payingUntil }];
         break;
       }
-      case 'pay': if (!p.wallet) return; await this.intake(p.wallet, String(m.signature ?? ''), Number(m.round ?? room.round), ws); break;
+      case 'pay': {
+        // The wallet sent a stake: read the escrow now rather than at the next poll. The chain, not this message,
+        // decides whether the seat is paid.
+        const e = this.escrowFor(room.round);
+        if (e) e.nextTry = undefined;
+        break;
+      }
       case 'start': if (!(await this.start(ws, p))) return; break;
       case 'loaded': await this.loaded(p); break;
       case 'fin': if (!(await this.finish(ws, p))) return; break;
@@ -283,7 +316,15 @@ export class RoomDO extends DurableObject<Env> {
   async webSocketClose(ws: WebSocket) { this.gone.add(ws); await this.dropped(ws); }
   async webSocketError(ws: WebSocket) { this.gone.add(ws); await this.dropped(ws); }
 
-  paying(p: Player) { return !!p.pending || (p.payingUntil ?? 0) > nowMs(); }
+  paying(p: Player) { return (p.payingUntil ?? 0) > nowMs(); }
+
+  /** May this seat put a stake in now: a signed-in seat of a paid room's lobby, with no stake yet, whose escrow is
+   *  open, and that has not already had its stake handed back MAX_REFUNDS times this round. */
+  canStake(p: Player): boolean {
+    const room = this.room!;
+    return room.state === 'lobby' && this.paidRoom() && !p.paid && !!p.wallet
+      && this.escrowFor(room.round)?.seen?.state === 'open' && (room.refunds?.[p.wallet] ?? 0) < MAX_REFUNDS;
+  }
 
   async dropped(ws: WebSocket) {
     await this.load();
@@ -293,13 +334,13 @@ export class RoomDO extends DurableObject<Env> {
     // A replaced socket (same player reconnected) must not mark the live one as gone.
     if (this.socketsFor(id).some(s => s !== ws)) return;
     p.connected = false;
-    // In the lobby a seat nobody paid for (or any seat of a free room) is given up. A paid one waits for its owner
-    // (start() refunds it if they are still away at the flag), and so does one whose owner is paying right now.
-    if (room.state === 'lobby' && (!p.paid || room.fee === '0') && !this.paying(p)) await this.remove(p, 'left');
+    // In the lobby a seat nobody staked for (or any seat of a free room) is given up. A staked one waits for its owner
+    // (start() hands the stake back if they are still away at the flag), and so does one whose owner is staking now.
+    if (room.state === 'lobby' && (!p.paid || !this.paidRoom()) && !this.paying(p)) await this.remove(p, 'left');
     else if (p.host) this.migrateHost();      // a crashed host must not freeze a cup: whoever is still here runs it
     if (!Object.values(room.players).some(x => x.connected)) room.emptySince = nowMs();
     if ((room.state === 'racing' || room.state === 'countdown') && this.raceDone()) await this.finishRace();
-    if (room.state === 'loading' && this.loadWaitsFor().length && this.loadWaitsFor().every(x => x.loaded)) await this.beginCountdown();
+    if (room.state === 'loading' && !room.lockDeadline && this.loadWaitsFor().length && this.loadWaitsFor().every(x => x.loaded)) await this.beginCountdown();
     await this.save();
     this.broadcastRoom();
     await this.schedule();
@@ -349,7 +390,7 @@ export class RoomDO extends DurableObject<Env> {
     const wallet = m.session ? await readSession(this.env, 'Bearer ' + m.session).catch(() => null) : null;
     const device = String(m.device ?? '').slice(0, 64);
     if (!wallet && !device) return this.refuse(ws, 'Could not identify this phone');
-    if (!wallet && room.fee !== '0') return this.refuse(ws, 'Sign in with your wallet to join a paid room');
+    if (!wallet && this.paidRoom()) return this.refuse(ws, 'Sign in with your wallet to join a paid room');
     const geo: string = ws.deserializeAttachment()?.geo ?? '';
     const id = wallet ?? await guestId(device);
     const away = () => this.gone.has(ws) || ws.readyState !== WebSocket.OPEN;   // the socket closed during an await
@@ -357,28 +398,28 @@ export class RoomDO extends DurableObject<Env> {
     const prev = ws.deserializeAttachment()?.id;
     if (prev && prev !== id) { this.send(ws, { t: 'error', msg: 'This connection already joined as someone else' }); return; }
     // Only a new seat is checked against the region: a seated paid racer whose reconnect comes from an address placed
-    // elsewhere (a Wi-Fi to cellular handover) is let back in to the race it paid for.
+    // elsewhere (a Wi-Fi to cellular handover) is let back in to the race it staked on.
     const closed = () => room.kicked?.includes(id) ? 'The host removed you from this room'
       : room.state !== 'lobby' || this.starting ? 'This race has already started'
       : Object.keys(room.players).length >= MAX_PLAYERS ? 'Room is full'
-      : room.fee !== '0' && geoBlocked(this.env, geo) ? 'Paid races are not available in your region' : null;
+      : this.paidRoom() && geoBlocked(this.env, geo) ? 'Paid races are not available in your region' : null;
     let p = room.players[id];
     if (!p) {
       const no = closed(); if (no) return this.refuse(ws, no);
       const fresh: Player = {
         id, wallet, device, name: await this.displayName(wallet, device),
         character: 0, kart: 'oodi', joinedAt: nowMs(), host: false, connected: true, ready: false,
-        paid: room.fee === '0', loaded: false, racing: false, dnf: false, points: 0, totalMs: 0, wins: 0,
+        paid: !this.paidRoom(), loaded: false, racing: false, dnf: false, points: 0, totalMs: 0, wins: 0,
       };
       if (away()) return;                                     // gone during that await: no seat for nobody
       p = room.players[id];                                   // the same player may have joined on another socket meanwhile
       if (!p) {
         const again = closed(); if (again) return this.refuse(ws, again);   // ...and the room may have moved on meanwhile
         p = room.players[id] = fresh;
+        this.applySeats();                                    // a stake made before this seat existed (a rejoin) counts at once
       }
     }
     if (away()) return;
-    if (wallet && !(room.members ?? []).includes(wallet)) room.members = [...(room.members ?? []), wallet].slice(-64);
     for (const other of this.socketsFor(id)) if (other !== ws) { try { other.close(1000, 'replaced'); } catch { /* gone */ } }
     ws.serializeAttachment({ id, geo, at: nowMs() });
     p.connected = true;
@@ -418,174 +459,22 @@ export class RoomDO extends DurableObject<Env> {
     return name || short(wallet);
   }
 
-  // ---------- entry payments ----------
-  entryMemo(round: number) { return `kc:entry:${this.room!.code}:${round}`; }
-
-  /** An entry payment, by socket or by HTTP. It is never dropped: it buys the seat it was made for, or it becomes an
-   *  orphan the alarm verifies and refunds. 'busy': too many orphans already (the phone keeps it and tries later). */
-  async intake(wallet: string, sig: string, round: number, ws?: WebSocket): Promise<'checking' | 'refunding' | 'known' | 'refused' | 'busy'> {
-    const room = this.room!;
-    const say = (msg: string) => { if (ws) this.send(ws, { t: 'error', msg }); };
-    const sigOk = isSignature(sig) || (this.env.MOCK_CHAIN === '1' && sig.startsWith('mock') && sig.length <= 128);
-    if (!wallet || room.fee === '0') return 'refused';
-    if (!sigOk) { say('Entry payment rejected: not a transaction signature'); return 'refused'; }
-    if (!Number.isInteger(round) || round < 1 || round > room.round) round = room.round;
-    // Already known from this wallet: nothing new to do. Refused only by a VERIFIED holder (claimed here, or a paid
-    // seat's): another wallet merely claiming the same signature (someone who saw it on-chain first) must not stop
-    // its payer; verification decides whose it is.
-    const mine = Object.values(room.players).some(x => x.wallet === wallet && (x.paidSig === sig || x.pending?.sig === sig))
-      || (room.orphans ?? []).some(o => o.sig === sig && o.wallet === wallet);
-    if (mine) return 'known';
-    const taken = (room.entrySigs ?? []).includes(sig) || Object.values(room.players).some(x => x.paidSig === sig);
-    if (taken) { say('Entry payment rejected: that payment was already used'); return 'refused'; }
-    // Only a wallet that has sat in this room can leave a payment with it: every real case (paid, then kicked, dropped,
-    // started without, rematched) has, and strangers cannot fill the room's list or its RPC budget.
-    if (!(room.members ?? []).includes(wallet)) return 'refused';
-    room.watch = room.watch?.filter(w => !(w.wallet === wallet && w.round === round));
-    const entry: Entry = { wallet, sig, round, since: nowMs() };
-    const p = Object.values(room.players).find(x => x.wallet === wallet);
-    if (p && room.state === 'lobby' && round === room.round && !p.paid && !p.pending && (room.refunds?.[wallet] ?? 0) < MAX_REFUNDS
-      && (p.payingUntil || this.takeHold(wallet))) {           // (the 'paying' that preceded it already took this hold)
-      p.pending = entry; p.payingUntil = undefined;
-      await this.checkEntry(p);
-      return 'checking';
-    }
-    // It cannot buy a seat: none to buy (gone, kicked, the room has moved on), paid already, one being checked, or the
-    // refund limit reached. It is verified all the same and, if it landed, refunded.
-    const orphans = room.orphans ?? [];
-    if (orphans.length >= MAX_ORPHANS || orphans.filter(o => o.wallet === wallet).length >= MAX_ORPHANS_PER_WALLET) return 'busy';
-    room.orphans = [...orphans, entry];
-    if (p) say(p.paid ? 'You had already paid: that payment will be refunded' : 'That payment cannot buy a seat now: it will be refunded');
-    await this.checkOrphan(entry);                     // at once; the alarm asks again if the chain has not shown it yet
-    return 'refunding';
-  }
-
-  /** The phone may have paid but never got the signature back (killed while the wallet app was open), or said it was
-   *  paying and then nothing came: look for the transfer on-chain by its memo and take in whatever is found. */
-  async scan(wallet: string, round: number): Promise<'checking' | 'refunding' | 'known' | 'refused' | 'busy'> {
-    const room = this.room!;
-    if (!wallet || room.fee === '0' || !(room.members ?? []).includes(wallet)) return 'refused';
-    if (!Number.isInteger(round) || round < 1 || round > room.round) round = room.round;
-    let out: 'checking' | 'refunding' | 'known' | 'refused' | 'busy' = 'known';
-    for (const sig of await findEntrySignatures(this.env, wallet, this.entryMemo(round))) out = await this.intake(wallet, sig, round);
-    return out;
-  }
-
-  /** verifyPayment, once at a time per signature. */
-  async verifyEntry(e: Entry): Promise<EntryCheck | null> {
-    const room = this.room!;
-    if (this.verifying.has(e.sig)) return null;
-    this.verifying.add(e.sig);
-    try { return await verifyPayment(this.env, e.sig, e.wallet, this.entryMemo(e.round), BigInt(room.fee), room.currency, 'entry'); }
-    catch (err: any) { return { ok: false, pending: true, rpcError: true, why: String(err?.message ?? err) }; }
-    finally { this.verifying.delete(e.sig); }
-  }
-
-  /** Ask again later? While the chain may still show it (not seen yet, for ENTRY_TIMEOUT_MS), and for as long as the RPC
-   *  is failing (up to a day, backing off). Not once the chain has shown a transaction that does not pay the entry. */
-  keepChecking(e: Entry, r: EntryCheck): boolean {
-    if (r.ok) return false;
-    const t = nowMs();
-    e.tries = (e.tries ?? 0) + 1;
-    if (r.rpcError) {
-      console.warn('entry check: rpc', this.room?.code, e.sig.slice(0, 12), r.why);
-      e.nullSince = undefined;                           // only consecutive 'not seen' answers count toward giving up
-      e.nextTry = t + Math.min(10 * 60_000, ENTRY_RETRY_MS * 2 ** Math.min(e.tries, 10));
-      return t - e.since < ENTRY_GIVE_UP_MS;
-    }
-    if (!r.pending) return false;
-    e.nullSince ??= t;
-    e.nextTry = t + Math.min(30_000, ENTRY_RETRY_MS * 2 ** Math.min(e.tries - 1, 3));   // 4, 8, 16, 30 s
-    return t - e.nullSince < ENTRY_TIMEOUT_MS;
-  }
-
-  /** A verified payment's seat, once: room_entries.signature is UNIQUE and never deleted, so a payment that ever bought
-   *  a seat anywhere cannot buy another, even if tx_log lost its row. The room's own list answers before D1 is asked. */
-  async claimEntry(e: Entry): Promise<boolean> {
-    const room = this.room!;
-    if ((room.entrySigs ?? []).includes(e.sig)) return false;
-    // D1 and the room's own storage are two writes. The entry is marked (and saved) before the insert, so if the room
-    // restarts between them, the retry of THIS entry finds its own row and carries on; a fresh delivery of the same
-    // signature has no mark and is refused.
-    const retry = e.claiming === true;
-    e.claiming = true;
-    await this.save();
-    const row = await this.env.DB.prepare('INSERT OR IGNORE INTO room_entries (code, round, wallet, signature, amount, currency, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7)')
-      .bind(room.code, e.round, e.wallet, e.sig, room.fee, room.currency, Math.floor(nowMs() / 1000)).run();
-    if (!row.meta.changes) {
-      const had = retry ? await this.env.DB.prepare('SELECT code, round, wallet FROM room_entries WHERE signature = ?1').bind(e.sig).first<any>() : null;
-      if (!had || had.code !== room.code || had.round !== e.round || had.wallet !== e.wallet) return false;
-    }
-    if ((room.entrySigs ?? []).includes(e.sig)) return false;
-    room.entrySigs = [...(room.entrySigs ?? []), e.sig];
-    return true;
-  }
-
-  async checkEntry(p: Player) {
-    const room = this.room!, e = p.pending;
-    if (!e || (e.nextTry && e.nextTry > nowMs())) return;
-    const r = await this.verifyEntry(e);
-    if (!r) return;                                      // being checked already
-    if (r.ok) {
-      // The entry stays where it is until its claim has resolved: a D1 error here leaves it for the next alarm.
-      let claimed: boolean;
-      try { claimed = await this.claimEntry(e); }
-      catch (err: any) { console.error('entry claim', room.code, err?.message ?? err); e.nextTry = nowMs() + ENTRY_RETRY_MS; return; }
-      if (p.pending === e) p.pending = undefined;
-      room.orphans = room.orphans?.filter(o => o !== e);
-      if (!claimed) {
-        for (const s of this.socketsFor(p.id)) this.send(s, { t: 'error', msg: 'Entry payment rejected: that payment was already used' });
-        return;
-      }
-      // Paid already (a second payment verified meanwhile), gone (left, kicked or dropped while the chain was asked),
-      // or the room has moved on: a payment that bought no seat goes back.
-      if (p.paid || room.players[p.id] !== p || room.state !== 'lobby') { await this.refundTo(e.wallet, e.round); return; }
-      p.paid = true; p.paidSig = e.sig; p.payingUntil = undefined;
-      return;
-    }
-    if (this.keepChecking(e, r)) return;                 // alarm asks again
-    if (p.pending === e) p.pending = undefined;
-    for (const s of this.socketsFor(p.id)) this.send(s, { t: 'error', msg: r.pending ? 'Payment not seen on-chain. Try again.' : 'Entry payment rejected: ' + r.why });
-  }
-
-  async checkOrphan(o: Entry) {
-    const room = this.room!;
-    if (o.nextTry && o.nextTry > nowMs()) return;
-    const r = await this.verifyEntry(o);
-    if (!r) return;
-    const drop = () => { room.orphans = room.orphans?.filter(x => x !== o); };   // this entry, not another wallet's with the same signature
-    if (r.ok) {
-      try { if (await this.claimEntry(o)) await this.refundTo(o.wallet, o.round); }
-      catch (err: any) { console.error('orphan claim', room.code, err?.message ?? err); o.nextTry = nowMs() + ENTRY_RETRY_MS; return; }
-      drop();
-      return;
-    }
-    if (!this.keepChecking(o, r)) { drop(); if (r.rpcError) console.error('entry given up after a day of RPC errors', room.code, o.wallet, o.sig); }
-  }
-
-  orphan(p: Player) {
-    const room = this.room!;
-    const e = p.pending;
-    if (e && !(room.orphans ?? []).some(o => o.sig === e.sig && o.wallet === e.wallet)) room.orphans = [...(room.orphans ?? []), e];
-    p.pending = undefined;
-  }
-
   // ---------- starting ----------
   async start(ws: WebSocket, p: Player): Promise<boolean> {
     const room = this.room!;
     if (!p.host || room.state !== 'lobby') return false;
     const here = Object.values(room.players).filter(x => x.connected);
     if (here.length < 2) { this.send(ws, { t: 'error', msg: 'You need at least 2 racers' }); return false; }
-    if (room.fee !== '0') {
+    if (this.paidRoom()) {
       if (this.env.PAID_ROOMS !== '1') { this.send(ws, { t: 'error', msg: 'Paid rooms are switched off right now' }); return false; }
       const waiting = Object.values(room.players).filter(x => this.paying(x) || (x.connected && !x.paid));
-      if (waiting.length) { this.send(ws, { t: 'error', msg: `Waiting for ${waiting.map(x => x.name).join(', ')} to pay in` }); return false; }
+      if (waiting.length) { this.send(ws, { t: 'error', msg: `Waiting for ${waiting.map(x => x.name).join(', ')} to stake` }); return false; }
       if (here.length < MIN_PAID_PLAYERS) { this.send(ws, { t: 'error', msg: `A paid race needs ${MIN_PAID_PLAYERS} racers` }); return false; }
     }
     // From here the lobby is closed: nobody new may join while the awaits below run.
     this.starting = true;
     try {
-      // Anyone away when the flag drops is out of this round: a paid seat they hold is refunded.
+      // Anyone away when the flag drops is out of this round: a stake they hold is handed back.
       for (const x of Object.values(room.players)) if (!x.connected) await this.remove(x, 'away');
       for (const x of Object.values(room.players)) { x.points = 0; x.totalMs = 0; x.wins = 0; x.place = undefined; x.left = false; }
       room.standings = undefined; room.lastResults = undefined;
@@ -599,56 +488,75 @@ export class RoomDO extends DurableObject<Env> {
     const room = this.room!;
     room.raceIndex = raceIndex;
     room.state = 'loading';
-    room.startAt = undefined; room.finishDeadline = undefined;
+    room.startAt = undefined; room.finishDeadline = undefined; room.lockDeadline = undefined;
     room.loadDeadline = nowMs() + LOAD_TIMEOUT_MS;
     room.nextAt = undefined;
     for (const x of Object.values(room.players)) { x.loaded = false; x.racing = false; x.finishMs = undefined; x.dnf = false; x.ready = false; x.ref = undefined; x.flagged = undefined; x.flagAt = undefined; x.finLag = undefined; }
     this.broadcast({ t: 'load', track: room.tracks[raceIndex], race: raceIndex + 1, races: room.tracks.length });
   }
 
-  /** Who the track load waits for: everyone here, and in a paid room every paid seat whose phone may be reconnecting. */
+  /** Who the track load waits for: everyone here, and in a paid room every staked seat whose phone may be reconnecting. */
   loadWaitsFor(): Player[] {
     const room = this.room!;
-    return Object.values(room.players).filter(x => !x.left && (x.connected || (room.fee !== '0' && x.paid)));
+    return Object.values(room.players).filter(x => !x.left && (x.connected || (this.paidRoom() && x.paid)));
   }
 
   async loaded(p: Player) {
     const room = this.room!;
-    if (room.state !== 'loading') return;
+    if (room.state !== 'loading' || room.lockDeadline) return;
     p.loaded = true;
     if (this.loadWaitsFor().every(x => x.loaded)) await this.beginCountdown();
   }
 
   async beginCountdown() {
     const room = this.room!;
-    const paying = room.fee !== '0';
-    if (paying && room.raceIndex === 0) {
-      // Race one of a paid room: a paid seat whose phone never loaded the track has not raced. Its entry goes back and
-      // it is out of the cup (it would otherwise race later rounds for points it paid nothing to be in).
+    if (this.paidRoom() && room.raceIndex === 0) {
+      // Race one of a paid room: a staked seat whose phone never loaded the track has not raced. It is out of the
+      // cup, and its stake goes back (the escrow step hands back any stake whose seat is gone).
       for (const x of Object.values(room.players)) {
         if (x.loaded && !x.left && x.paid) continue;
-        this.orphan(x);
-        await this.refund(x);
         delete room.players[x.id];
-        for (const s of this.socketsFor(x.id)) { this.send(s, { t: 'closed', reason: 'You were not on the grid in time: your entry is refunded' }); try { s.close(1000, 'missed the start'); } catch { /* gone */ } }
+        for (const s of this.socketsFor(x.id)) { this.send(s, { t: 'closed', reason: 'You were not on the grid in time: your stake is going back to you' }); try { s.close(1000, 'missed the start'); } catch { /* gone */ } }
       }
       if (!room.players[room.hostId]?.host) this.migrateHost();
-      if (Object.values(room.players).filter(x => x.paid).length < MIN_PAID_PLAYERS) {
-        // Not enough of a field for a paid race: back to the lobby, the seats still here and their entries kept.
-        room.state = 'lobby'; room.loadDeadline = undefined; room.createdAt = nowMs();
-        for (const x of Object.values(room.players)) x.loaded = false;
-        this.broadcast({ t: 'error', msg: 'Not enough racers made it to the grid: back to the lobby' });
-        await this.env.DB.prepare("UPDATE rooms SET state = 'lobby' WHERE code = ?1").bind(room.code).run();
+      const field = Object.values(room.players).filter(x => x.paid && x.wallet);
+      if (field.length < MIN_PAID_PLAYERS) { await this.backToLobby('Not enough racers made it to the grid: back to the lobby'); return; }
+      // The stakes are locked on-chain before anyone races for them: the countdown starts when the lock lands. Never
+      // into an escrow that could expire before the cup is over (anyone may cancel an expired one).
+      const e = this.escrowFor(room.round)!;
+      if (!e.seen || e.seen.expiresAt * 1000 - nowMs() < room.tracks.length * RACE_BOUND_MS + LOCK_MARGIN_MS) {
+        await this.cancel('This room is too old to race for stakes: every stake is going back');
         return;
       }
+      e.want = 'locked'; e.field = field.map(x => x.wallet!); e.nextTry = undefined;
+      room.lockDeadline = nowMs() + LOCK_TIMEOUT_MS; room.loadDeadline = undefined;
+      return;
     }
+    this.startCountdown();
+  }
+
+  /** Back to the lobby before the first race: the seats still here keep their stakes and the escrow stays open. */
+  async backToLobby(msg: string) {
+    const room = this.room!;
+    // (The lobby keeps its original deadline: failing starts must not keep a room alive while its escrow ages.)
+    room.state = 'lobby'; room.loadDeadline = undefined; room.lockDeadline = undefined;
+    const e = this.escrowFor(room.round);
+    if (e && e.want === 'locked') { e.want = 'open'; e.field = undefined; }
+    for (const x of Object.values(room.players)) x.loaded = false;
+    this.broadcast({ t: 'error', msg });
+    await this.env.DB.prepare("UPDATE rooms SET state = 'lobby' WHERE code = ?1").bind(room.code).run();
+  }
+
+  startCountdown() {
+    const room = this.room!;
+    const paying = this.paidRoom();
     room.state = 'countdown';
-    room.loadDeadline = undefined;
+    room.loadDeadline = undefined; room.lockDeadline = undefined;
     room.startAt = nowMs() + COUNTDOWN_LEAD_MS;
     room.finishDeadline = room.startAt + RACE_CAP_MS;
     for (const x of Object.values(room.players)) {
       // A loaded phone races, connected or not this instant (a blip on the grid is a reconnect, not a withdrawal);
-      // in a paid room only a paid seat does.
+      // in a paid room only a staked seat does.
       x.racing = x.loaded && !x.left && (!paying || x.paid);
       x.ref = x.racing ? newRef() : undefined; x.flagged = undefined; x.flagAt = undefined; x.finLag = undefined;
       // Each race is judged on its own round trips: the network in race one says nothing about race two's.
@@ -785,48 +693,27 @@ export class RoomDO extends DurableObject<Env> {
     room.state = final ? 'finished' : 'results';
     room.nextAt = final ? undefined : nowMs() + RESULTS_MS;
     if (final) await this.settleFinal();
-    this.broadcast({ t: 'results', results: room.lastResults, standings: room.standings, payouts: this.publicPayouts(), pool: this.pool().toString(), cut: this.cut().toString(), room: this.snapshot() });
+    this.broadcast({ t: 'results', results: room.lastResults, standings: room.standings, payouts: this.publicPayouts(), pool: this.pool().toString(), room: this.snapshot() });
     await this.save();
     await this.schedule();
   }
 
-  /** Every entry paid into this round leaves it as a prize, the house's cut, the organiser's share, or a refund. All
-   *  the rows are made before anything is awaited, so nothing arriving meanwhile (a rematch, a leave) can skip one. */
+  /** The cup is over: tell the escrow the finishing order of every staked wallet (the cup's standings, then anyone
+   *  staked who scored nothing, by join order). The program alone works out what that order pays. With fewer than two
+   *  stakes, or a cup in which nobody scored, there was no contest: every stake goes back. */
   async settleFinal() {
     const room = this.room!;
-    const now = Math.floor(nowMs() / 1000);
-    const paying = room.fee !== '0';
-    const rows: Payout[] = [];
-    const inCup = new Set((room.standings ?? []).map(s => s.id));
-    // A paid seat that never raced (it left or dropped before its first race) was never in the contest: refunded.
-    if (paying) for (const x of Object.values(room.players)) if (x.paid && x.wallet && !inCup.has(x.id)) { const r = this.refundRow(x); if (r) rows.push(r); }
-    let paid = (room.standings ?? []).map(s => room.players[s.id]).filter(x => x && x.paid && x.wallet && paying);
-    // Fewer than two paid racers, or a cup in which nobody scored: there was no contest, so everyone's entry goes back.
-    if (paid.length < MIN_PAID_PLAYERS || !(room.standings ?? []).some(s => s.points > 0)) {
-      for (const x of paid) { const r = this.refundRow(x); if (r) rows.push(r); }
-      paid = [];
-    }
-    const pool = paying ? BigInt(room.fee) * BigInt(paid.length) : 0n;
-    const { cut, hostReward, prizes } = splitPool(pool, paid.length, room.cutBps);
-    const payRow = (wallet: string, kind: Payout['kind'], amount: bigint, place?: number): Payout => {
-      const id = crypto.randomUUID();
-      return { id, wallet, kind, place, amount: amount.toString(), currency: room.currency, status: 'pending', attempts: 0, round: room.round, batch: id, created: nowMs() };
-    };
-    const prizeRows = prizes.map((amt, i) => payRow(paid[i].wallet!, 'prize', amt, i + 1));
-    // The organiser's share goes to whoever set the room up, if they raced in it; else to the racer holding the room at
-    // the end (the organiser left); else the house keeps it. Every row is its own transaction, so a share too small for
-    // an emptied SOL account (below the rent floor) fails alone, without holding up a winner's prize.
-    const org = room.players[room.organiser ?? room.hostId];
-    const host = org && paid.includes(org) ? org : paid.find(x => x.id === room.hostId);
-    const hostRow = hostReward > 0n && host?.wallet ? payRow(host.wallet, 'host', hostReward) : null;
-    const kept = hostRow ? cut : cut + hostReward;
-    room.payouts.push(...prizeRows, ...(hostRow ? [hostRow] : []));
-    rows.push(...prizeRows, ...(hostRow ? [hostRow] : []));
-    await this.env.DB.batch([
-      this.env.DB.prepare("UPDATE rooms SET state = 'finished', pool = ?2, cut = ?3, finished_at = ?4 WHERE code = ?1")
-        .bind(room.code, pool.toString(), kept.toString(), now),
-      ...this.payoutInserts(rows),
-    ]);
+    const e = this.escrowFor(room.round);
+    if (!e) return;
+    const staked = (e.seen?.entries ?? []).filter(x => !x.refund).map(x => x.player);   // those left out at the lock are refunded
+    const ranked = (room.standings ?? []).map(s => room.players[s.id]?.wallet).filter((w): w is string => !!w && staked.includes(w));
+    const order = [...new Set([...ranked, ...staked])];
+    const contest = (room.standings ?? []).some(s => s.points > 0);
+    if (e.seen?.state === 'locked' && order.length >= MIN_PAID_PLAYERS && contest) { e.want = 'settled'; e.order = order; }
+    else e.want = 'cancelled';
+    e.nextTry = undefined;
+    await this.env.DB.prepare("UPDATE rooms SET state = 'finished', pool = ?2, finished_at = ?3 WHERE code = ?1")
+      .bind(room.code, this.pool().toString(), Math.floor(nowMs() / 1000)).run();
   }
 
   /** A cup nobody can carry on (everyone left, nobody loaded the next track): the races already run decide it and it
@@ -834,26 +721,29 @@ export class RoomDO extends DurableObject<Env> {
   async abandonCup(reason: string) {
     const room = this.room!;
     if (!room.standings?.length) { await this.cancel(reason); return; }
-    room.state = 'finished'; room.nextAt = undefined; room.loadDeadline = undefined;
+    room.state = 'finished'; room.nextAt = undefined; room.loadDeadline = undefined; room.lockDeadline = undefined;
     if (room.lastResults) room.lastResults.final = true;
     await this.settleFinal();
-    this.broadcast({ t: 'results', results: room.lastResults, standings: room.standings, payouts: this.publicPayouts(), pool: this.pool().toString(), cut: this.cut().toString(), room: this.snapshot() });
+    this.broadcast({ t: 'results', results: room.lastResults, standings: room.standings, payouts: this.publicPayouts(), pool: this.pool().toString(), room: this.snapshot() });
   }
 
-  // ---------- leaving, refunds, reset ----------
+  // ---------- leaving, cancelling, the rematch ----------
   async remove(p: Player, reason: string) {
     const room = this.room!;
-    this.orphan(p);                          // a payment still being checked goes on being checked, and is refunded
     if (room.state === 'lobby' || room.state === 'finished' || room.state === 'cancelled') {
-      if (p.paid && p.wallet && room.fee !== '0' && room.state === 'lobby') await this.refund(p);
+      // In the lobby its stake goes back: the escrow step hands back every stake whose seat is gone.
+      if (room.state === 'lobby' && p.paid && p.wallet && this.paidRoom()) room.refunds = { ...(room.refunds ?? {}), [p.wallet]: (room.refunds?.[p.wallet] ?? 0) + 1 };
       delete room.players[p.id];
     } else {
       p.connected = false; p.left = true; p.dnf = p.finishMs === undefined;   // mid-race: they are still in the standings, as a DNF
+      // Gone before the lock was sent: out of the field, so the lock leaves the stake out and it goes straight back.
+      const e = this.escrowFor(room.round);
+      if (room.lockDeadline && e?.want === 'locked' && e.tx?.op !== 'lock' && p.wallet) e.field = e.field?.filter(w => w !== p.wallet);
     }
     for (const s of this.socketsFor(p.id)) { this.send(s, { t: 'closed', reason }); try { s.close(1000, reason); } catch { /* gone */ } }
     if (p.host) this.migrateHost();
     if ((room.state === 'racing' || room.state === 'countdown') && this.raceDone()) await this.finishRace();
-    if (room.state === 'loading' && this.loadWaitsFor().length && this.loadWaitsFor().every(x => x.loaded)) await this.beginCountdown();
+    if (room.state === 'loading' && !room.lockDeadline && this.loadWaitsFor().length && this.loadWaitsFor().every(x => x.loaded)) await this.beginCountdown();
   }
 
   migrateHost() {
@@ -863,140 +753,209 @@ export class RoomDO extends DurableObject<Env> {
     if (next) { next.host = true; room.hostId = next.id; }
   }
 
-  /** A refund row for a paid seat, made at once (no await), and the seat unpaid. */
-  refundRow(p: Player): Payout | null {
-    if (!p.paid || !p.paidSig || !p.wallet) return null;   // (a payment that bought a seat can never buy another: intake refuses it)
-    p.paid = false; p.paidSig = undefined;
-    return this.refundRowTo(p.wallet, this.room!.round);
-  }
-
-  refundRowTo(wallet: string, round: number): Payout {
-    const room = this.room!;
-    const id = crypto.randomUUID();
-    const row: Payout = { id, wallet, kind: 'refund', amount: room.fee, currency: room.currency, status: 'pending', attempts: 0, round, batch: id, created: nowMs() };
-    room.payouts.push(row);
-    if (round === room.round) room.refunds = { ...(room.refunds ?? {}), [wallet]: (room.refunds?.[wallet] ?? 0) + 1 };
-    return row;
-  }
-
-  async refund(p: Player) { const r = this.refundRow(p); if (r) await this.env.DB.batch(this.payoutInserts([r])); }
-  async refundTo(wallet: string, round: number) { await this.env.DB.batch(this.payoutInserts([this.refundRowTo(wallet, round)])); }
-
-  payoutInserts(rows: Payout[]) {
-    const room = this.room!, now = Math.floor(nowMs() / 1000);
-    return rows.map(r => this.env.DB.prepare('INSERT INTO payouts (id, code, round, wallet, kind, place, amount, currency, status, attempts, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,0,?10,?10)')
-      .bind(r.id, room.code, r.round, r.wallet, r.kind, r.place ?? null, r.amount, r.currency, r.status, now));
-  }
-
   async cancel(reason: string) {
     const room = this.room!;
-    const rows = Object.values(room.players).map(p => room.fee !== '0' ? this.refundRow(p) : null).filter((r): r is Payout => !!r);
-    room.state = 'cancelled';
-    await this.env.DB.batch([this.env.DB.prepare("UPDATE rooms SET state = 'cancelled' WHERE code = ?1").bind(room.code), ...this.payoutInserts(rows)]);
+    room.state = 'cancelled'; room.lockDeadline = undefined;
+    const e = this.escrowFor(room.round);
+    if (e && e.want !== 'settled') { e.want = 'cancelled'; e.nextTry = undefined; }
+    await this.env.DB.prepare("UPDATE rooms SET state = 'cancelled' WHERE code = ?1").bind(room.code).run();
     this.broadcast({ t: 'closed', reason, payouts: this.publicPayouts() });
   }
 
-  /** Same code, same people, new round: the group stays together for a rematch. */
+  /** Same code, same people, new round: the group stays together for a rematch, with a new escrow for the new
+   *  round's stakes. The old round's escrow goes on paying out until it closes. */
   reset() {
     const room = this.room!;
     room.round += 1; room.raceIndex = 0; room.state = 'lobby';
-    room.startAt = room.loadDeadline = room.finishDeadline = room.nextAt = undefined;
+    room.startAt = room.loadDeadline = room.finishDeadline = room.nextAt = room.lockDeadline = undefined;
     room.standings = undefined; room.lastResults = undefined; room.createdAt = nowMs();
-    // A new round's entries carry the new round in their memo, so the old signatures cannot buy a seat in it anyway;
-    // paid-out rows are history (D1 keeps them). What is still owed stays until it is paid, and a payment still being
-    // checked is checked on and refunded.
-    room.entrySigs = undefined; room.kicked = undefined; room.refunds = undefined; room.holds = undefined;
-    room.payouts = room.payouts.filter(x => x.status !== 'confirmed');
+    room.kicked = undefined; room.refunds = undefined; room.holds = undefined;
     for (const p of Object.values(room.players)) {
-      this.orphan(p);
-      p.paid = room.fee === '0'; p.paidSig = undefined; p.payingUntil = undefined; p.ready = false; p.left = false;
+      p.paid = !this.paidRoom(); p.stake = undefined; p.payingUntil = undefined; p.ready = false; p.left = false;
       p.loaded = false; p.racing = false; p.finishMs = undefined; p.dnf = false; p.place = undefined; p.points = 0; p.totalMs = 0;
       if (!p.connected) delete room.players[p.id];
     }
+    if (this.paidRoom()) this.openEscrow();
     void this.env.DB.prepare("UPDATE rooms SET state = 'lobby', round = ?2 WHERE code = ?1").bind(room.code, room.round).run();
   }
 
-  // ---------- money ----------
-  pool(): bigint {
-    const room = this.room!;
-    if (room.fee === '0') return 0n;
-    return BigInt(room.fee) * BigInt(Object.values(room.players).filter(p => p.paid && p.wallet).length);
-  }
-  split(): Split { const room = this.room!; return splitPool(this.pool(), Object.values(room.players).filter(p => p.paid && p.wallet).length, room.cutBps); }
-  cut(): bigint { return this.split().cut; }
+  // ---------- the escrow ----------
+  ref(): Referee { return this.referee ??= new Referee(this.env); }
+  mint(): string | null { return this.room!.currency === 'SKR' ? this.env.SKR_MINT : null; }
+  escrowFor(round: number): Escrow | undefined { return this.room!.escrows.find(e => e.round === round); }
 
-  /** This round's rows, and any earlier round's not yet paid (a rematch must not hide a prize still owed). */
+  openEscrow() {
+    const room = this.room!;
+    room.escrows.push({ round: room.round, address: this.ref().room(room.code, room.round).toBase58(), want: 'open', failures: 0, claims: {} });
+  }
+
+  /** The pot of this round: every stake in its escrow that races (not those left out at the lock). */
+  pool(): bigint { return sum((this.escrowFor(this.room!.round)?.seen?.entries ?? []).filter(x => !x.refund).map(x => x.stake)); }
+
+  /** Who may keep a stake in this open escrow: every seat still in the lobby (that has not used up its refunds).
+   *  Anyone else's stake is handed back. (At the lock, stakes outside the field are left out by the lock itself.) */
+  allowed(e: Escrow): Set<string> {
+    const room = this.room!;
+    if (e.round !== room.round || e.want !== 'open') return new Set();
+    return new Set(Object.values(room.players)
+      .filter(p => p.wallet && !p.left && (p.paid || (room.refunds?.[p.wallet] ?? 0) < MAX_REFUNDS))
+      .map(p => p.wallet!));
+  }
+
+  /** The next transaction this escrow needs, from what the chain holds and where the room wants it; null when there
+   *  is nothing to do now. Each step is safe to repeat: the program refuses one that no longer applies. */
+  nextStep(e: Escrow): { op: string; build: () => ReturnType<Referee['createRoom']>; cu: number } | null {
+    const room = this.room!, r = this.ref(), s = e.seen, mint = this.mint(), address = this.ref().room(room.code, e.round);
+    const token = !!mint;
+    const ready = (op: string) => (e.stuck?.[op]?.until ?? 0) <= nowMs();
+    const claim = (player: string) => ({ op: `claim:${player}`, cu: token ? 60_000 : 30_000, build: () => [r.claim(address, mint, player)] });
+    if (e.gone) return null;
+    if (!s) {
+      if (!e.created && (e.want === 'open' || e.want === 'locked')) {
+        return { op: 'create', cu: token ? 90_000 : 40_000, build: () => r.createRoom({
+          code: room.code, round: e.round, mint, minStake: BigInt(room.minStake), maxStake: BigInt(room.maxStake),
+          stakeUnit: BigInt(STAKE_UNIT[room.currency]), maxPlayers: MAX_PLAYERS, cutBps: room.cutBps, ttlSecs: ESCROW_TTL_S,
+        }) };
+      }
+      return null;
+    }
+    switch (s.state) {
+      case 'open': {
+        // Cancelling makes every stake claimable at once: no seat-by-seat refunds first.
+        if (e.want === 'cancelled' || e.want === 'settled') return { op: 'cancel', cu: 20_000, build: () => [r.cancel(address)] };
+        if (e.want === 'locked') {
+          // The field, as far as it is staked. Any other stake is left out by the lock and paid straight back, so no
+          // stake arriving on the way can hold the lock up.
+          const players = (e.field ?? []).filter(w => s.entries.some(x => x.player === w));
+          return players.length >= MIN_PAID_PLAYERS ? { op: 'lock', cu: 30_000, build: () => [r.lock(address, players)] } : null;
+        }
+        const allowed = this.allowed(e);
+        const stray = s.entries.find(x => !allowed.has(x.player) && ready(`remove:${x.player}`));
+        if (stray) return { op: `remove:${stray.player}`, cu: token ? 60_000 : 30_000, build: () => [r.removeEntry(address, mint, stray.player)] };
+        return null;
+      }
+      case 'locked': {
+        const left = s.entries.find(x => x.refund && !x.paid && ready(`claim:${x.player}`));
+        if (left) return claim(left.player);   // a stake left out of the race goes back before the race is run
+        if (e.want === 'settled' && e.order) { const order = e.order; return { op: 'settle', cu: 60_000, build: () => [r.settle(address, order)] }; }
+        if (e.want === 'cancelled') return { op: 'cancel', cu: 20_000, build: () => [r.cancel(address)] };
+        return null;
+      }
+      default: {   // settled or cancelled: deliver every payout, the cut, then close
+        const owed = s.entries.filter(x => !x.paid && BigInt(x.payout) > 0n);
+        const next = owed.find(x => ready(`claim:${x.player}`));
+        if (next) return claim(next.player);
+        if (s.state === 'settled' && BigInt(s.houseCut) > 0n && !s.cutPaid) return { op: 'collect', cu: token ? 60_000 : 30_000, build: () => [r.collectCut(address, mint, s.treasury)] };
+        if (owed.length) return null;    // only payouts that cannot land yet: each is tried again on its own clock
+        return { op: 'close', cu: token ? 60_000 : 30_000, build: () => [r.closeRoom(address, mint, s.payer, s.treasury)] };
+      }
+    }
+  }
+
+  /** One turn of an escrow: settle the transaction in flight, read the account, act on what it holds. One transaction
+   *  at a time per escrow, its signature saved BEFORE it is sent: a restart or a lost answer looks it up instead of
+   *  sending another. */
+  async chainStep(e: Escrow) {
+    if (e.gone || this.stepping.has(e.round)) return;
+    this.stepping.add(e.round);
+    const room = this.room!;
+    try {
+      if (e.tx) {
+        const st = await txStatus(this.env, e.tx.sig, e.tx.lastValid);
+        if (st === 'pending') return;
+        if (st === 'confirmed') {
+          if (e.tx.op.startsWith('claim:')) e.claims[e.tx.op.slice(6)] = e.tx.sig;
+          if (e.tx.op === 'create') e.created = true;
+          if (e.stuck) delete e.stuck[e.tx.op];
+          e.failures = 0; e.error = undefined;
+        } else this.failed(e, `${e.tx.op} ${st}`, e.tx.op);
+        e.tx = undefined;
+      }
+      if (e.nextTry && e.nextTry > nowMs()) return;
+      const chain = await readRoom(this.env, e.address);
+      e.readAt = nowMs();
+      if (chain) { e.seen = seenOf(chain); e.created = true; }
+      else if (!e.created) {
+        if (e.want !== 'open' && e.want !== 'locked') { e.gone = true; return; }   // never created, no longer wanted
+      } else {
+        // Closed, if nothing was owed when last read (or it is long expired): only then. A node a few slots behind the
+        // others also answers "no account", and giving up on a live escrow would strand its stakes.
+        const last = e.seen;
+        if (last && (((last.state === 'settled' || last.state === 'cancelled') && !owedOn(last)) || nowMs() > last.expiresAt * 1000 + 3600_000)) { e.gone = true; return; }
+        throw new Error('the escrow account was not found (a node behind the others?)');
+      }
+      if (e.seen) await this.onSeen(e);
+      const step = this.nextStep(e);
+      if (!step) return;
+      const built = await this.ref().sign(step.build(), step.cu);
+      e.tx = { op: step.op, sig: built.signature, lastValid: built.lastValidBlockHeight, at: nowMs() };
+      await this.save();
+      let sent: Awaited<ReturnType<typeof sendRaw>>;
+      try { sent = await sendRaw(this.env, built.raw); }
+      catch (err: any) { console.error('escrow send', room.code, e.round, step.op, err?.message ?? err); return; }   // it may still land: the status decides
+      if (sent !== 'sent') { e.tx = undefined; this.failed(e, `${step.op} refused: ${sent.rejected}`, step.op); }
+    } catch (err: any) {
+      this.failed(e, String(err?.message ?? err));
+    } finally {
+      this.stepping.delete(e.round);
+    }
+  }
+
+  /** A step that did not land: one wallet's refund or payout backs off on its own (the escrow goes on with the rest),
+   *  anything else backs the whole escrow off. */
+  failed(e: Escrow, why: string, op?: string) {
+    const backoff = (tries: number, cap: number) => Math.min(cap, CHAIN_RETRY_MS * 2 ** Math.min(tries - 1, 20));
+    console.error('escrow', this.room?.code, e.round, why);
+    if (op?.startsWith('claim:') || op?.startsWith('remove:')) {
+      const tries = (e.stuck?.[op]?.tries ?? 0) + 1;
+      e.stuck = { ...(e.stuck ?? {}), [op]: { until: nowMs() + backoff(tries, STUCK_MAX_BACKOFF_MS), tries } };
+      return;
+    }
+    e.failures += 1; e.error = why.slice(0, 300);
+    e.nextTry = nowMs() + backoff(e.failures, CHAIN_MAX_BACKOFF_MS);
+  }
+
+  /** What the room does with a fresh read of its escrow: the seats' stakes, the lock landing, a field too small. */
+  async onSeen(e: Escrow) {
+    const room = this.room!, s = e.seen!;
+    if (e.round === room.round) this.applySeats();
+    if (e.round !== room.round || room.state !== 'loading' || !room.lockDeadline) return;
+    if (s.state === 'locked') {
+      this.startCountdown();   // the race is on the locked stakes (applySeats: a seat left out of the lock does not race)
+    } else if (s.state === 'open' && e.want === 'locked' && (e.field ?? []).filter(w => s.entries.some(x => x.player === w)).length < MIN_PAID_PLAYERS) {
+      await this.backToLobby('Not enough stakes to race: back to the lobby');
+    }
+  }
+
+  /** Each seat's stake, from the current round's escrow as last read. */
+  applySeats() {
+    const room = this.room!;
+    if (!this.paidRoom()) return;
+    const entries = this.escrowFor(room.round)?.seen?.entries ?? [];
+    for (const p of Object.values(room.players)) {
+      const x = p.wallet ? entries.find(y => y.player === p.wallet && !y.refund) : undefined;
+      p.paid = !!x; p.stake = x?.stake;
+      if (x) p.payingUntil = undefined;
+    }
+  }
+
+  /** Every payout of this round, and of any earlier round still paying out, as the results card shows them. */
   publicPayouts() {
     const room = this.room!;
-    return room.payouts.filter(p => p.round === room.round || p.status !== 'confirmed').map(p => ({
-      id: p.id, wallet: p.wallet, kind: p.kind, place: p.place ?? null, amount: p.amount, currency: p.currency, status: p.status, signature: p.signature ?? null, round: p.round,
-    }));
+    return room.escrows.filter(e => e.round === room.round || !e.gone).flatMap(e => {
+      const s = e.seen;
+      if (!s || s.state === 'open') return [];
+      return s.entries.filter(x => BigInt(x.payout) > 0n && (x.refund || s.state !== 'locked')).map(x => ({
+        wallet: x.player, kind: s.state === 'settled' && !x.refund ? 'prize' : 'refund',
+        place: s.state === 'settled' && e.order ? e.order.indexOf(x.player) + 1 || null : null,
+        amount: x.payout, currency: room.currency,
+        status: x.paid ? 'confirmed' : e.tx?.op === `claim:${x.player}` ? 'sent' : 'pending',
+        signature: e.claims[x.player] ?? null, round: e.round,
+      }));
+    });
   }
 
-  owes(): boolean {
-    const room = this.room!;
-    return room.payouts.some(p => p.status === 'pending' || p.status === 'sent') || !!room.orphans?.length || Object.values(room.players).some(p => p.pending);
-  }
-
-  /** A send that failed, or a transaction that expired unseen: try again at once a few times, then less and less often. */
-  retryLater(rows: Payout[]) {
-    for (const r of rows) {
-      r.attempts++;
-      r.nextTry = r.attempts >= QUICK_SENDS ? nowMs() + Math.min(MAX_BACKOFF_MS, 30_000 * 2 ** (r.attempts - QUICK_SENDS)) : undefined;
-    }
-  }
-
-  /** Alarm work: send what is pending, confirm what was sent. A transaction is built and signed first and the rows are
-   *  SAVED as 'sent' under its signature before it goes out, so a restart or a lost response finds that signature and
-   *  waits on it; a new transaction is sent only after the old one's blockhash has expired without it landing. */
-  async settle() {
-    const room = this.room!;
-    const t = nowMs();
-    const pending = room.payouts.filter(p => p.status === 'pending');
-    const batches = new Map<string, Payout[]>();
-    for (const p of pending) batches.set(p.batch, [...(batches.get(p.batch) ?? []), p]);
-    for (const [batch, rows] of batches) {
-      if (rows[0].nextTry && rows[0].nextTry > t) continue;
-      if (t - (rows[0].created ?? t) > PAYOUT_GIVE_UP_MS) {
-        for (const r of rows) r.status = 'failed';
-        console.error('payout failed for good', room.code, batch, rows.map(r => `${r.kind} ${r.wallet} ${r.amount}`).join(', '));
-        await this.mirror(rows).catch(() => {});
-        continue;
-      }
-      const memo = `kc:${rows[0].kind}:${room.code}:${rows[0].round}:${batch.slice(0, 8)}`;
-      try {
-        // Before paying again, every transaction ever sent for these rows must be known not to have landed.
-        const landed = rows[0].sigs?.length ? await landedAny(this.env, rows[0].sigs) : null;
-        if (landed) { for (const r of rows) { r.status = 'confirmed'; r.signature = landed; } await this.mirror(rows).catch(() => {}); continue; }
-        const built = await buildBatch(this.env, rows, memo);
-        for (const r of rows) { r.status = 'sent'; r.signature = built.signature; r.sigs = [...(r.sigs ?? []), built.signature]; r.lastValidBlockHeight = built.lastValidBlockHeight; r.attempts++; r.nextTry = undefined; }
-        await this.save();
-        try { await sendRaw(this.env, built.raw); } catch (e: any) { console.error('payout send', room.code, batch, e?.message ?? e); }   // it may still land: txStatus decides
-        await this.mirror(rows).catch(() => {});
-      } catch (e: any) {
-        console.error('payout build failed', room.code, batch, e?.message ?? e);
-        if (rows[0].status === 'pending') this.retryLater(rows);
-      }
-    }
-    const sent = room.payouts.filter(p => p.status === 'sent' && p.signature);
-    const bySig = new Map<string, Payout[]>();
-    for (const p of sent) bySig.set(p.signature!, [...(bySig.get(p.signature!) ?? []), p]);
-    for (const [sig, rows] of bySig) {
-      try {
-        const st = await txStatus(this.env, sig, rows[0].lastValidBlockHeight ?? 0);
-        if (st === 'confirmed') for (const r of rows) r.status = 'confirmed';
-        else if (st === 'expired' || st === 'failed') { for (const r of rows) { r.status = 'pending'; r.signature = undefined; } this.retryLater(rows); }
-        if (st !== 'pending') await this.mirror(rows).catch(() => {});
-      } catch (e: any) { console.error('payout status failed', sig, e?.message ?? e); }
-    }
-    if (pending.length || sent.length) this.broadcast({ t: 'payouts', payouts: this.publicPayouts() });
-  }
-
-  async mirror(rows: Payout[]) {
-    const now = Math.floor(nowMs() / 1000);
-    await this.env.DB.batch(rows.map(r => this.env.DB.prepare('UPDATE payouts SET status = ?2, signature = ?3, attempts = ?4, updated_at = ?5 WHERE id = ?1')
-      .bind(r.id, r.status, r.signature ?? null, r.attempts, now)));
-  }
+  owes(): boolean { return this.room!.escrows.some(e => !e.gone); }
 
   // ---------- deadlines ----------
   async alarm() {
@@ -1007,25 +966,25 @@ export class RoomDO extends DurableObject<Env> {
     // books its next alarm (a throwing alarm is retried only a few times, and money is waiting on it).
     const step = async (name: string, f: () => Promise<unknown>) => { try { await f(); } catch (e: any) { console.error('alarm', name, room.code, e?.message ?? e); } };
     try {
-      await step('entries', async () => {
-        for (const p of Object.values(room.players)) if (p.pending) await this.checkEntry(p);
-        for (const o of [...(room.orphans ?? [])]) await this.checkOrphan(o);
-        // a 'paying' hold that ended with no payment delivered: look for the transfer on-chain by its memo
-        for (const w of (room.watch ?? []).filter(w => w.at <= t)) {
-          room.watch = room.watch?.filter(x => x !== w);
-          const p = Object.values(room.players).find(x => x.wallet === w.wallet);
-          if (!(p?.paid && w.round === room.round)) await this.scan(w.wallet, w.round);
-        }
+      await step('escrow', async () => {
+        const before = JSON.stringify(this.publicPayouts());
+        for (const e of room.escrows) await this.chainStep(e);
+        room.escrows = room.escrows.filter(e => !e.gone || e.round === room.round);   // a closed earlier round is history
+        const payouts = this.publicPayouts();
+        if (JSON.stringify(payouts) !== before) this.broadcast({ t: 'payouts', payouts });   // the results card follows each claim
+      });
+      await step('lock', async () => {
+        if (room.state === 'loading' && room.lockDeadline && t >= room.lockDeadline) await this.cancel('The stakes could not be locked in time: every stake is going back');
       });
       await step('lobby', async () => {
         if (room.state === 'lobby' && (t - room.createdAt > LOBBY_TTL_MS || (room.emptySince && t - room.emptySince > EMPTY_TTL_MS))) await this.cancel('Room expired');
       });
       await step('loading', async () => {
-        if (room.state !== 'loading' || !room.loadDeadline || t < room.loadDeadline) return;
+        if (room.state !== 'loading' || room.lockDeadline || !room.loadDeadline || t < room.loadDeadline) return;
         const here = Object.values(room.players).filter(x => x.loaded && !x.left);
         if (here.length >= 1) await this.beginCountdown();
         else if (room.standings?.length) await this.abandonCup('Nobody loaded the next track');   // mid-cup: settle what was raced
-        else { room.state = 'lobby'; room.loadDeadline = undefined; }                             // before the first race: back to the lobby, seats and entries kept
+        else await this.backToLobby('Nobody loaded the track: back to the lobby');               // before the first race: seats and stakes kept
       });
       await step('results', async () => {
         if (room.state === 'results' && room.nextAt && t >= room.nextAt) {
@@ -1037,10 +996,7 @@ export class RoomDO extends DurableObject<Env> {
         if ((room.state === 'racing' || room.state === 'countdown') && room.finishDeadline && t >= room.finishDeadline) await this.finishRace();
       });
       await step('empty', async () => {
-        if (room.state === 'results' && room.emptySince && t - room.emptySince > EMPTY_TTL_MS) await this.abandonCup('Everyone left the cup');   // the races run decide it; the pool is paid, not kept
-      });
-      await step('settle', async () => {
-        if (room.payouts.some(p => (p.status === 'pending' && !(p.nextTry && p.nextTry > t)) || p.status === 'sent')) await this.settle();
+        if (room.state === 'results' && room.emptySince && t - room.emptySince > EMPTY_TTL_MS) await this.abandonCup('Everyone left the cup');   // the races run decide it; the pot is paid, not kept
       });
     } finally {
       await this.save().catch(e => console.error('alarm save', room.code, e?.message ?? e));
@@ -1055,19 +1011,25 @@ export class RoomDO extends DurableObject<Env> {
     const times: number[] = [];
     if (room.state === 'lobby') times.push(room.createdAt + LOBBY_TTL_MS, ...(room.emptySince ? [room.emptySince + EMPTY_TTL_MS] : []));
     if (room.state === 'loading' && room.loadDeadline) times.push(room.loadDeadline);
+    if (room.state === 'loading' && room.lockDeadline) times.push(room.lockDeadline);
     if ((room.state === 'racing' || room.state === 'countdown') && room.finishDeadline) times.push(room.finishDeadline);
     if (room.state === 'results' && room.emptySince) times.push(room.emptySince + EMPTY_TTL_MS);
     if (room.state === 'results' && room.nextAt) times.push(room.nextAt);
-    for (const e of [...Object.values(room.players).map(p => p.pending), ...(room.orphans ?? [])]) if (e) times.push(e.nextTry ?? t + ENTRY_RETRY_MS);
     for (const p of Object.values(room.players)) if ((p.payingUntil ?? 0) > t) times.push(p.payingUntil!);   // its end is broadcast
-    for (const w of room.watch ?? []) times.push(w.at);
-    for (const p of room.payouts) {
-      if (p.status === 'sent') times.push(t + SETTLE_RETRY_MS);
-      else if (p.status === 'pending') times.push(p.nextTry ?? t + SETTLE_RETRY_MS);
+    for (const e of room.escrows) {
+      if (e.gone) continue;
+      if (e.tx) { times.push(e.tx.at + CHAIN_TX_POLL_MS); continue; }
+      if (e.nextTry && e.nextTry > t) { times.push(e.nextTry); continue; }
+      if ((!e.seen && (e.created || e.want === 'open' || e.want === 'locked')) || this.nextStep(e)) { times.push(t); continue; }
+      times.push(...Object.values(e.stuck ?? {}).map(x => x.until).filter(u => u > t));   // a refund or payout waiting to try again
+      if (e.round === room.round && room.state === 'lobby' && e.seen?.state === 'open') {
+        const someonePaying = Object.values(room.players).some(p => this.paying(p));
+        times.push((e.readAt ?? t) + (someonePaying ? CHAIN_POLL_PAYING_MS : CHAIN_POLL_LOBBY_MS));
+      }
     }
     if (!times.length) { await this.ctx.storage.deleteAlarm(); return; }
     // Never later than an alarm already booked: anyone who can read the room (GET /state is public) would otherwise
-    // keep pushing a payout's alarm into the future by asking often enough.
+    // keep pushing the escrow's alarm into the future by asking often enough.
     const next = Math.max(t + 250, Math.min(...times)), cur = await this.ctx.storage.getAlarm();
     if (cur !== null && cur > t && cur <= next) return;
     await this.ctx.storage.setAlarm(next);
@@ -1076,26 +1038,48 @@ export class RoomDO extends DurableObject<Env> {
   // ---------- what everyone sees ----------
   snapshot() {
     const room = this.room!;
-    const sp = this.split();
-    const lobbyPaid = room.state === 'lobby' && room.fee !== '0';
+    const e = this.escrowFor(room.round);
+    const entries = (e?.seen?.entries ?? []).filter(x => !x.refund);   // the stakes racing (not those left out at the lock)
+    const stakes = entries.map(x => BigInt(x.stake));
+    const lobbyPaid = room.state === 'lobby' && this.paidRoom();
     return {
       code: room.code, state: room.state, round: room.round, tracks: room.tracks, raceIndex: room.raceIndex,
-      fee: room.fee, currency: room.currency, cutBps: room.cutBps, feeBps: sp.feeBps, hostReward: sp.hostReward.toString(), isPublic: room.isPublic,
-      hostId: room.hostId, startAt: room.startAt ?? null, nextAt: room.nextAt ?? null,
-      serverNow: nowMs(), pool: this.pool().toString(), prizes: sp.prizes.map(p => p.toString()),
-      players: Object.values(room.players).sort((a, b) => a.joinedAt - b.joinedAt).map(p => ({
-        id: p.id, name: p.name, wallet: p.wallet, character: p.character, kart: p.kart, host: p.host, connected: p.connected,
-        ready: p.ready, paid: p.paid, paying: this.paying(p), loaded: p.loaded, racing: p.racing,
-        // whether this seat may pay in now: the phone shows PAY only then, so no transfer is made that cannot buy it
-        canPay: lobbyPaid && !p.paid && !p.pending && !!p.wallet && (room.refunds?.[p.wallet] ?? 0) < MAX_REFUNDS,
-        finishMs: p.finishMs ?? null, dnf: p.dnf, place: p.place ?? null, points: p.points,
-      })),
+      minStake: room.minStake, maxStake: room.maxStake, currency: room.currency, cutBps: room.cutBps, isPublic: room.isPublic,
+      hostId: room.hostId, startAt: room.startAt ?? null, nextAt: room.nextAt ?? null, locking: !!room.lockDeadline,
+      serverNow: nowMs(), pool: this.pool().toString(),
+      escrow: e ? { address: e.address, state: e.seen?.state ?? (e.gone ? 'closed' : 'opening'), error: e.failures >= 3 ? e.error ?? null : null } : null,
+      players: Object.values(room.players).sort((a, b) => a.joinedAt - b.joinedAt).map(p => {
+        const seat = p.wallet ? entries.findIndex(x => x.player === p.wallet) : -1;
+        return {
+          id: p.id, name: p.name, wallet: p.wallet, character: p.character, kart: p.kart, host: p.host, connected: p.connected,
+          ready: p.ready, paid: p.paid, stake: p.stake ?? null, paying: this.paying(p), loaded: p.loaded, racing: p.racing,
+          // what this seat takes if it wins, with the stakes in now (fair shares: the same whatever the order behind it)
+          ifWin: seat >= 0 && stakes.length >= MIN_PAID_PLAYERS ? ifWin(stakes, seat, room.cutBps).toString() : null,
+          // whether this seat may stake now: the phone shows the stake button only then
+          canPay: lobbyPaid && this.canStake(p),
+          finishMs: p.finishMs ?? null, dnf: p.dnf, place: p.place ?? null, points: p.points,
+        };
+      }),
       standings: room.standings ?? null, lastResults: room.lastResults ?? null, payouts: this.publicPayouts(),
     };
   }
 }
 
-export function validFee(fee: string, currency: Currency) { return FEE_TIERS[currency]?.includes(fee) ?? false; }
+/** The account as stored on the escrow record: amounts as decimal strings. */
+function seenOf(c: ChainRoom): Seen {
+  return {
+    state: c.state, mint: c.mint, expiresAt: c.expiresAt, payer: c.payer, treasury: c.treasury,
+    houseCut: c.houseCut.toString(), cutPaid: c.cutPaid,
+    entries: c.entries.map(x => ({ player: x.player, stake: x.stake.toString(), payout: x.payout.toString(), paid: x.paid, refund: x.refund })),
+  };
+}
+
+/** Anything still to hand out from a finished escrow: an unpaid payout or the cut (the program's own `owes`). */
+function owedOn(s: Seen): boolean {
+  return s.entries.some(x => !x.paid && BigInt(x.payout) > 0n) || (BigInt(s.houseCut) > 0n && !s.cutPaid);
+}
+
+export function validStake(stake: string, currency: Currency, tiers: Record<Currency, string[]>) { return tiers[currency]?.includes(stake) ?? false; }
 
 // The five karts every racer has (Assets/_Game/Data/Kart_*.asset with no sku); every other kart is a shop sku.
 const FREE_KARTS = new Set(['oodi', 'ooli', 'oobi', 'oopi', 'oozi']);

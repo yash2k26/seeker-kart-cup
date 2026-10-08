@@ -1,9 +1,9 @@
-// Seeker Kart Cup backend — one Worker, one D1. See research/14 for the reasoning behind every route.
+// Kartel backend — one Worker, one D1. See research/14 for the reasoning behind every route.
 import { challenge, verify, readSession } from './auth';
 import { raceStart, raceFinish, raceClaim, leaderboard, me, deleteMe, event, demoUnlock } from './race';
 import { weekly } from './weekly';
 import { rpcProxy, txConfirm, purchaseVerify } from './chain';
-import { roomsCreate, roomsInfo, roomsSocket, roomsPublic, roomsEntry, invitePage, config } from './rooms';
+import { roomsCreate, roomsInfo, roomsSocket, roomsPublic, invitePage, config } from './rooms';
 export { RoomDO } from './room';
 
 export interface Env {
@@ -13,6 +13,7 @@ export interface Env {
   PACKAGE_NAME: string;
   CERT_SHA256: string;
   SKR_MINT: string;
+  ORE_MINT?: string;                 // ORE (Regolith Labs): a third shop rail at the market rate. Unset = ORE off
   TREASURY_OWNER?: string;           // secret; see wrangler.toml
   TREASURY_ATA?: string;
   PRICES_JSON: string;
@@ -21,13 +22,16 @@ export interface Env {
   DEMO_CODE?: string;   // secret; reviewer/demo unlock of the SGT cosmetics (no Seeker on hand)
   // ---- rooms & tournaments ----
   ROOMS: DurableObjectNamespace<import('./room').RoomDO>;
-  TREASURY_SECRET?: string;          // secret; the payout hot wallet (base58 or JSON byte array). Its pubkey = TREASURY_OWNER
+  TREASURY_SECRET?: string;          // optional secret; only to derive TREASURY_OWNER when that is unset. Nothing pays out from it any more
+  ESCROW_PROGRAM?: string;           // the prize escrow program (escrow/): paid rooms need it and REFEREE_SECRET
+  REFEREE_SECRET?: string;           // secret; the escrow referee key (base58 or JSON byte array). It opens, locks and settles rooms,
+                                     // and holds only fees and rent: stakes live in the program, never with this key
   HOUSE_CUT_BPS?: string;            // "1000" = 10% of every prize pool
   PAID_ROOMS?: string;               // "1" enables entry fees; anything else = free rooms only (kill switch)
   PAID_BLOCK?: string;               // jurisdictions where paid rooms are refused: "IN,BE,JP,KR,US-AR,US-CT,US-DE,US-LA,US-SD"
   PRIORITY_FEE_MICROLAMPORTS?: string;
   APK_URL?: string;                  // where the invite page sends people without the app
-  MOCK_CHAIN?: string;               // "1" in .dev.vars only: fake payments and payouts for the local smoke test
+  MOCK_CHAIN?: string;               // "1" in .dev.vars only: fake shop payments and the geo header for the local smoke test
   RATES_JSON?: string;               // optional pin: {"SKR":0.0196,"SOL":121} instead of the live price feed
   RL?: RateLimit;                    // per-IP limit on the routes anyone can call without signing in
   RL_STRICT?: RateLimit;             // per-wallet limit on guessing the demo code
@@ -103,16 +107,6 @@ export default {
       if (await limited(req, env, 'GET /v1/rooms/*', env.RL_WIDE)) return slowDown();   // and across codes, per address
       try { return room[2] ? await roomsSocket(req, env, room[1]) : await roomsInfo(req, env, room[1]); }
       catch (e: any) { console.error('rooms', e?.stack ?? e); return Response.json({ error: 'internal' }, { status: 500, headers: CORS }); }
-    }
-    // An entry payment for a room, by HTTP: it reaches the room whatever state the room or the phone's socket is in.
-    const entry = url.pathname.match(/^\/v1\/rooms\/([A-Za-z0-9]{5})\/entry$/);
-    if (entry && req.method === 'POST') {
-      if (await limited(req, env, 'POST /v1/rooms/entry')) return slowDown();
-      try {
-        const res = await roomsEntry(req, env, entry[1], await readSession(env, req.headers.get('authorization')));
-        Object.entries(CORS).forEach(([k, v]) => res.headers.set(k, v));
-        return res;
-      } catch (e: any) { console.error('rooms entry', e?.stack ?? e); return Response.json({ error: 'internal' }, { status: 500, headers: CORS }); }
     }
     const invite = url.pathname.match(/^\/r\/([A-Za-z0-9]{5})\/?$/);
     if (invite && req.method === 'GET') {

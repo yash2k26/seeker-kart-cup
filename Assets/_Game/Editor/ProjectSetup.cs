@@ -22,7 +22,7 @@ public static class ProjectSetup
 
         // ---- identity ----
         PlayerSettings.companyName = "Fensory";
-        PlayerSettings.productName = "Seeker Kart Cup";
+        PlayerSettings.productName = "Kartel";
         PlayerSettings.SetApplicationIdentifier(a, PackageName);
         if (string.IsNullOrEmpty(PlayerSettings.bundleVersion) || PlayerSettings.bundleVersion == "0.1") PlayerSettings.bundleVersion = "0.1.0";
 

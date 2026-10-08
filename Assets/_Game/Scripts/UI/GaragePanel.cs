@@ -16,8 +16,8 @@ namespace KartCup
         [SerializeField] Transform podium;
         [SerializeField] GameObject[] kartPrefabs, driverPrefabs;
         [SerializeField] CharacterCarousel characters;     // shares the podium; hidden while the garage is open
-        [SerializeField] TMP_Text nameLabel, blurbLabel, priceLabel, statusLabel, primaryLabel, secondaryLabel;
-        [SerializeField] Button primaryButton, secondaryButton;
+        [SerializeField] TMP_Text nameLabel, blurbLabel, priceLabel, statusLabel, primaryLabel, secondaryLabel, tertiaryLabel;
+        [SerializeField] Button primaryButton, secondaryButton, tertiaryButton;   // tertiary: PAY in ORE, the right half of the SOL row
         [SerializeField] Image[] swatches = System.Array.Empty<Image>();   // 0 = driver colour, then Paints.All
         [SerializeField] StatBar[] powerBars = System.Array.Empty<StatBar>();   // SPEED, TURBO, GRIP, ARMOR, ATTACK
         [SerializeField] float baseYaw = 65f, spin = 14f;   // same turntable as CharacterCarousel
@@ -138,7 +138,7 @@ namespace KartCup
                     // a Tour prize: shown, never sold
                     if (blurbLabel != null) blurbLabel.text = $"Beat {paint.boss} in KARTEL TOUR to win it.";
                     if (priceLabel != null) priceLabel.text = "TOUR PRIZE";
-                    SetButton(primaryLabel, primaryButton, "", false); SetButton(secondaryLabel, secondaryButton, "", false);
+                    SetButton(primaryLabel, primaryButton, "", false); SetButton(secondaryLabel, secondaryButton, "", false); SetButton(tertiaryLabel, tertiaryButton, "", false);
                 }
                 else
                 {
@@ -146,6 +146,7 @@ namespace KartCup
                     if (priceLabel != null) priceLabel.text = pOwned ? "UNLOCKED" : Price(pItem);
                     SetButton(primaryLabel, primaryButton, pOwned ? "SELECTED" : pItem != null ? $"UNLOCK  ·  {Skr(pItem)}" : "…", !pOwned && pItem != null);
                     SetButton(secondaryLabel, secondaryButton, !pOwned && pItem != null && !paint.skrOnly ? $"PAY {Sol(pItem)}" : paint.skrOnly && !pOwned ? "SKR ONLY" : "", !pOwned && pItem != null && !paint.skrOnly);
+                    SetButton(tertiaryLabel, tertiaryButton, !pOwned && Ore(pItem) != "" ? $"PAY {Ore(pItem)}" : "", !pOwned);
                 }
             }
             else
@@ -160,7 +161,9 @@ namespace KartCup
                 SetButton(secondaryLabel, secondaryButton,
                     owned ? "" : trial ? "TEST DRIVE" : item != null && !string.IsNullOrEmpty(item.price.GetValueOrDefault("SOL")) ? $"PAY {Sol(item)}" : "",
                     !owned && (trial || item != null));
+                SetButton(tertiaryLabel, tertiaryButton, !owned && Ore(item) != "" ? $"PAY {Ore(item)}" : "", !owned);
             }
+            Beside(secondaryButton, tertiaryButton);
 
             for (int i = 0; i < powerBars.Length; i++)
                 if (powerBars[i] != null) powerBars[i].SetCount(i switch { 0 => def.speed, 1 => def.turbo, 2 => def.grip, 3 => def.armor, _ => def.attack });
@@ -192,8 +195,17 @@ namespace KartCup
             if (button != null) { button.gameObject.SetActive(!string.IsNullOrEmpty(text)); button.interactable = interactable; }
         }
 
+        /// The SOL button shares its row with the ORE one when both show, and has the row to itself otherwise.
+        static void Beside(Button left, Button right)
+        {
+            if (left == null) return;
+            var rt = (RectTransform)left.transform; bool both = right != null && right.gameObject.activeSelf;
+            rt.sizeDelta = new Vector2(both ? 284 : 584, rt.sizeDelta.y); rt.anchoredPosition = new Vector2(both ? -150 : 0, rt.anchoredPosition.y);
+        }
+
         static string Skr(KartApi.ShopItem i) => WalletFlow.Amount(i.price.GetValueOrDefault("SKR"), "SKR");
         static string Sol(KartApi.ShopItem i) => WalletFlow.Amount(i.price.GetValueOrDefault("SOL"), "SOL");
+        static string Ore(KartApi.ShopItem i) => i == null || KartApi.Cfg == null || !KartApi.Cfg.TakesOre ? "" : WalletFlow.Amount(i.price.GetValueOrDefault("ORE"), "ORE");
         static string Price(KartApi.ShopItem i) => i == null ? (KartApi.Cfg == null ? "PRICES LOADING…" : "NOT FOR SALE") : $"{Skr(i)}" + (string.IsNullOrEmpty(i.price.GetValueOrDefault("SOL")) ? "  ·  SKR ONLY" : $"   or {Sol(i)}");
         /// A kart's price reads offline too: the powers say what it costs before the Worker quotes it in SKR and SOL.
         static string KartPrice(KartApi.ShopItem i, KartDef def) => i == null ? (KartApi.Cfg == null ? $"{def.Sol:0.##} SOL  ·  {def.Tier}" : "NOT FOR SALE") : $"{Skr(i)}  or  {Sol(i)}  ·  {def.Tier}";
@@ -223,6 +235,15 @@ namespace KartCup
                 return;
             }
             _ = Buy(def.sku, "SOL", () => KartDatabase.SelectedId = def.id);
+        }
+
+        /// ORE: the same purchase, paid on the third rail.
+        public void Tertiary()
+        {
+            var def = Kart; if (def == null || busy) return;
+            var paint = FocusedPaint;
+            if (paint != null) { _ = Buy(paint.sku, "ORE", () => { Paints.SelectedId = paint.id; paintFocus = -1; }); return; }
+            if (!KartDatabase.Owned(def)) _ = Buy(def.sku, "ORE", () => KartDatabase.SelectedId = def.id);
         }
 
         async Awaitable Buy(string sku, string currency, System.Action onDone)

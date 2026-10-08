@@ -81,11 +81,14 @@ namespace KartCup
         {
             var room = client.Room;
             if (intro == null || room == null) return;
+            // Fair shares: each place takes its share of every stake it matched, so what a place pays depends on who
+            // takes it. The cards show the shares (winner takes all with two stakes); the pot is the money on the race.
+            var shares = FairShares.Places(room.players.Count(p => p.paid));
             var places = new List<string>();
             for (int i = 0; i < 3; i++)
             {
                 var label = RaceHud.Ordinal(i + 1).ToUpperInvariant();
-                places.Add(!room.IsPaid ? label : i < room.prizes.Count ? label + "\n" + WalletFlow.Amount(room.prizes[i], room.currency) : label + "\n—");
+                places.Add(!room.IsPaid ? label : i >= shares.Length ? label + "\n—" : label + "\n" + (shares.Length == 1 ? "ALL" : shares[i] + "%"));
             }
             intro.Prizes(room.IsPaid ? "PRIZE POOL" : "RACE FOR GOLD", room.IsPaid ? WalletFlow.Amount(room.pool, room.currency, true) : "BRAGGING RIGHTS", places);
         }

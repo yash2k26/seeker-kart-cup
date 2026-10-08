@@ -1,36 +1,22 @@
-// End-to-end check of rooms, payments and the leaderboard against a local `wrangler dev` (MOCK_CHAIN=1 in .dev.vars).
-// Every racer here DRIVES the real circuit (drive.mjs): the room's referee checks each state, so a finish only counts
-// if the drive behind it was possible. Fails loudly on the first wrong number. Takes about six minutes.
+// End-to-end check of free rooms, the referee and the leaderboard against a local `wrangler dev` (MOCK_CHAIN=1 in
+// .dev.vars). Every racer here DRIVES the real circuit (drive.mjs): the room's referee checks each state, so a finish
+// only counts if the drive behind it was possible. Fails loudly on the first wrong number. Paid rooms and their escrow
+// are checked on a local chain by smoke-escrow.ts.
 //   cd worker && npx wrangler dev --port 8787   (other terminal)    node scripts/smoke-room.mjs
-import { createHmac, createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import { drive, race as driveRace } from './drive.mjs';
 
 const BASE = process.env.BASE ?? 'http://127.0.0.1:8787';
 const WS = BASE.replace(/^http/, 'ws');
-const HMAC = Object.fromEntries(readFileSync(new URL('../.dev.vars', import.meta.url), 'utf8').split('\n').filter(l => l.includes('=')).map(l => l.split('=', 2))).SESSION_HMAC_KEY;
-const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-const session = w => { const body = b64u(JSON.stringify({ w, e: Math.floor(Date.now() / 1000) + 3600 })); return `${body}.${b64u(createHmac('sha256', HMAC).update(body).digest())}`; };
-// Test wallets: base58 of a hash of a name, so they look like addresses and belong to nobody (no key exists for them).
-// Payments are mocked (MOCK_CHAIN); nothing touches a chain.
-const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-const b58 = bytes => { let n = BigInt('0x' + Buffer.from(bytes).toString('hex')), out = ''; while (n > 0n) { out = B58[Number(n % 58n)] + out; n /= 58n; } return out; };
-const testWallet = name => b58(createHash('sha256').update('kartcup-smoke-wallet:' + name).digest());
-const [WALLET_A, WALLET_B, WALLET_C, WALLET_D, WALLET_E, WALLET_F, WALLET_G] = ['A', 'B', 'C', 'D', 'E', 'F', 'G'].map(testWallet);
-const RESULTS_MS = 25_000;   // room.ts: between races of a cup, the room goes on by itself after this
-// Mock payment signatures are single-use forever (room_entries/tx_log keep them), so every run needs fresh ones.
-const RUN = Date.now().toString(36);
-const sig = name => `mock-${RUN}-${name}`;
 
 let failures = 0;
 const check = (what, ok, extra = '') => { console.log(`${ok ? 'pass' : 'FAIL'}  ${what}${ok ? '' : '  ' + extra}`); if (!ok) failures++; };
 const post = async (path, body, token, extra = {}) => { const r = await fetch(BASE + path, { method: 'POST', headers: { 'content-type': 'application/json', ...(token ? { authorization: 'Bearer ' + token } : {}), ...extra }, body: JSON.stringify(body) }); return { status: r.status, body: await r.json().catch(() => ({})) }; };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// ---------- 0. config: live prices, catalog, fee tiers ----------
+// ---------- 0. config: live prices, catalog, stake tiers ----------
 {
   const cfg = await (await fetch(`${BASE}/v1/config`)).json();
-  check('config carries treasury fields and fee tiers', 'treasuryOwner' in cfg && cfg.fees.SOL.length === 6 && cfg.fees.SKR.length === 5);
+  check('config carries the treasury, the escrow program and the stake tiers', 'treasuryOwner' in cfg && 'escrowProgram' in cfg && cfg.stakes.SOL.length === 5 && cfg.stakes.SKR.length === 4);
   check('catalog is priced in SOL and quoted in both currencies', cfg.catalog.length >= 14 && cfg.catalog.every(i => typeof i.sol === 'number' && !('usd' in i) && /^\d+$/.test(i.price.SKR)));
   const rally = cfg.catalog.find(i => i.sku === 'paint.rally'), hero = cfg.catalog.find(i => i.sku === 'kart.firetruck');
   check('the SKR-only paint has no SOL price', rally && rally.price.SOL === '' && rally.skrOnly === true);
@@ -99,8 +85,8 @@ async function race(clients, speeds, opts = []) {
 
 // ---------- 0b. public rooms: listed while open, gone once started ----------
 {
-  const pub = await post('/v1/rooms', { tracks: ['speedway'], fee: '0', currency: 'SOL', device: 'devPUB00000', isPublic: true });
-  const priv = await post('/v1/rooms', { tracks: ['beach'], fee: '0', currency: 'SOL', device: 'devPRV00000' });
+  const pub = await post('/v1/rooms', { tracks: ['speedway'], minStake: '0', currency: 'SOL', device: 'devPUB00000', isPublic: true });
+  const priv = await post('/v1/rooms', { tracks: ['beach'], minStake: '0', currency: 'SOL', device: 'devPRV00000' });
   check('public and private rooms are created', pub.status === 200 && priv.status === 200);
   const before = await (await fetch(`${BASE}/v1/rooms/public`)).json();
   check('an empty public room is not listed yet', !before.rooms.some(r => r.code === pub.body.code));
@@ -128,7 +114,7 @@ async function race(clients, speeds, opts = []) {
 
 // ---------- 1. free room, three guests: one drives, one teleports once, one forges its finish ----------
 {
-  const created = await post('/v1/rooms', { tracks: ['forest'], fee: '0', currency: 'SOL', device: 'devA000000' });
+  const created = await post('/v1/rooms', { tracks: ['forest'], minStake: '0', currency: 'SOL', device: 'devA000000' });
   check('create a free room as a guest', created.status === 200 && /^[A-Z2-9]{5}$/.test(created.body.code ?? ''), JSON.stringify(created));
   const code = created.body.code;
   const info = await (await fetch(`${BASE}/v1/rooms/${code}`)).json();
@@ -175,7 +161,7 @@ async function race(clients, speeds, opts = []) {
 
 // ---------- 1b. a phone whose race clock runs 5 s late: an honest drive, every time it reports 5 s short ----------
 {
-  const created = await post('/v1/rooms', { tracks: ['forest'], fee: '0', currency: 'SOL', device: 'devL000000' });
+  const created = await post('/v1/rooms', { tracks: ['forest'], minStake: '0', currency: 'SOL', device: 'devL000000' });
   const code = created.body.code;
   const a = await new Client('honest').connect(code), l = await new Client('late clock').connect(code);
   a.send({ t: 'hello', device: 'devL000000' }); l.send({ t: 'hello', device: 'devM000000' });
@@ -189,7 +175,7 @@ async function race(clients, speeds, opts = []) {
 
 // ---------- 2. the host drops out of a cup: the room hands the cup to someone still there ----------
 {
-  const created = await post('/v1/rooms', { tracks: ['forest', 'forest'], fee: '0', currency: 'SOL', device: 'devH000000' });
+  const created = await post('/v1/rooms', { tracks: ['forest', 'forest'], minStake: '0', currency: 'SOL', device: 'devH000000' });
   const code = created.body.code;
   const h = await new Client('host').connect(code), x = await new Client('X').connect(code), y = await new Client('Y').connect(code);
   h.send({ t: 'hello', device: 'devH000000' }); x.send({ t: 'hello', device: 'devX000000' }); y.send({ t: 'hello', device: 'devY000000' });
@@ -210,142 +196,6 @@ async function race(clients, speeds, opts = []) {
   x.close(); y.close();
 }
 
-// ---------- 3. paid tournament: 4 wallets in, one refunded, 3 race a 2-track cup ----------
-{
-  const tokA = session(WALLET_A), tokB = session(WALLET_B), tokC = session(WALLET_C), tokD = session(WALLET_D);
-  const denied = await post('/v1/rooms', { tracks: ['forest', 'alpine'], fee: '10000000', currency: 'SOL', device: 'x' });
-  check('paid room needs a wallet session', denied.status === 401);
-  const badFee = await post('/v1/rooms', { tracks: ['forest'], fee: '12345', currency: 'SOL' }, tokA);
-  check('fee must be one of the offered tiers', badFee.status === 400);
-  const blockedGeo = await post('/v1/rooms', { tracks: ['forest'], fee: '10000000', currency: 'SOL' }, tokA, { 'x-kc-geo': 'IN' });
-  check('paid rooms are refused from a blocked jurisdiction (451)', blockedGeo.status === 451, JSON.stringify(blockedGeo));
-  const blockedState = await post('/v1/rooms', { tracks: ['forest'], fee: '10000000', currency: 'SOL' }, tokA, { 'x-kc-geo': 'US-AR' });
-  check('…and from a blocked US state', blockedState.status === 451);
-  const okGeo = await post('/v1/rooms', { tracks: ['forest'], fee: '10000000', currency: 'SOL' }, tokA, { 'x-kc-geo': 'US-CA' });
-  check('…but not from an allowed one', okGeo.status === 200);
-  const created = await post('/v1/rooms', { tracks: ['forest', 'alpine'], fee: '10000000', currency: 'SOL' }, tokA);
-  check('create a paid 2-track room', created.status === 200, JSON.stringify(created));
-  const code = created.body.code;
-
-  const g = await new Client('guest').connect(code);
-  g.send({ t: 'hello', device: 'devG000000' });
-  const ge = await g.wait(m => m.t === 'error', 5000, 'guest refused');
-  check('guests cannot join a paid room', /sign in/i.test(ge.msg));
-  g.close();
-
-  const a = await new Client('A').connect(code), b = await new Client('B').connect(code), c = await new Client('C').connect(code), d = await new Client('D').connect(code);
-  a.send({ t: 'hello', session: tokA, device: 'devA', character: 0, kart: 'oodi' });
-  b.send({ t: 'hello', session: tokB, device: 'devB', character: 1, kart: 'ooli' });
-  c.send({ t: 'hello', session: tokC, device: 'devC', character: 3, kart: 'oopi' });
-  d.send({ t: 'hello', session: tokD, device: 'devD', character: 4, kart: 'race-future' });   // a shop kart this wallet never bought
-  await Promise.all([a, b, c, d].map(x => x.wait(m => m.t === 'welcome', 5000, 'welcome')));
-  const four = await a.roomWhere(r => r.players.length === 4, 5000, 'four players');
-  check('nobody has paid yet', four.players.every(p => !p.paid) && four.pool === '0');
-  check('a wallet cannot race a shop kart it does not own', four.players.find(p => p.id === WALLET_D)?.kart === 'oodi');
-
-  a.send({ t: 'start' });
-  const blocked = await a.wait(m => m.t === 'error', 5000, 'start blocked');
-  check('start is blocked until everyone paid', /Waiting for/.test(blocked.msg));
-
-  a.send({ t: 'pay', signature: sig('a') });
-  b.send({ t: 'pay', signature: sig('b') });
-  c.send({ t: 'pay', signature: 'nope-c' });
-  const rej = await c.wait(m => m.t === 'error', 5000, 'bad payment rejected');
-  check('a payment that does not verify is rejected', /rejected/i.test(rej.msg));
-  c.send({ t: 'pay', signature: sig('a') });
-  const reused = await c.wait(m => m.t === 'error', 5000, "someone else's payment");
-  check("someone else's payment cannot buy a seat", /already used/i.test(reused.msg), reused.msg);
-  c.send({ t: 'pay', signature: sig('c') });
-  d.send({ t: 'pay', signature: sig('d') });
-  const paid4 = await a.roomWhere(r => r.players.filter(p => p.paid).length === 4, 8000, 'all paid');
-  check('pool = 4 × fee', paid4.pool === '40000000');
-  check('4 players: 10% fee, 65/35 of the rest', paid4.feeBps === 1000 && paid4.prizes.join(',') === '23400000,12600000', paid4.prizes.join(','));
-  check('host reward is 20% of the fee', paid4.hostReward === '800000');
-
-  a.drain();
-  d.send({ t: 'leave' });
-  const afterLeave = await a.roomWhere(r => r.players.length === 3, 5000, 'D left');
-  check('pool shrinks when a paid player leaves', afterLeave.pool === '30000000' && afterLeave.prizes.join(',') === '17550000,9450000', afterLeave.prizes.join(','));
-  const refund = afterLeave.payouts.find(p => p.kind === 'refund' && p.wallet === WALLET_D);
-  check('a refund row exists for the leaver', !!refund && refund.amount === '10000000');
-
-  a.send({ t: 'start' });
-  const [r1] = await race([a, b, c], [55, 53, 51]);
-  check('race 1 of 2 is not final', r1.results.final === false && r1.results.race === 1 && r1.results.races === 2);
-  check('standings after race 1: A 10, B 8, C 6', r1.standings.map(s => s.points).join(',') === '10,8,6' && r1.standings[0].id === WALLET_A);
-  check('no payouts before the final race', !r1.payouts.some(p => p.kind === 'prize'));
-
-  b.send({ t: 'next' });
-  await sleep(300);
-  check('only the host advances the cup', !a.inbox.some(m => m.t === 'load'));
-  a.send({ t: 'next' });
-  const [r2] = await race([b, c, a], [55, 53, 51]);
-  check('race 2 is final', r2.results.final === true && r2.results.race === 2 && r2.results.track === 'alpine');
-  check('cup standings B 18, A 16, C 14', r2.standings.map(s => `${s.id}:${s.points}`).join(',') === `${WALLET_B}:18,${WALLET_A}:16,${WALLET_C}:14`, JSON.stringify(r2.standings.map(s => [s.id.slice(0, 4), s.points])));
-  const prizes = r2.payouts.filter(p => p.kind === 'prize').sort((x, y) => x.place - y.place);
-  check('two prize rows: 65% to B, 35% to A', prizes.length === 2 && prizes[0].wallet === WALLET_B && prizes[0].amount === '17550000' && prizes[1].wallet === WALLET_A && prizes[1].amount === '9450000', JSON.stringify(prizes));
-  const hostRow = r2.payouts.find(p => p.kind === 'host');
-  check('the host earns 20% of the fee', hostRow && hostRow.wallet === WALLET_A && hostRow.amount === '600000');
-  check('house keeps the other 80% of the fee', r2.cut === '2400000' && r2.pool === '30000000');
-  const settled = await a.wait(m => m.t === 'payouts' && m.payouts.some(p => p.kind === 'prize' && p.status === 'confirmed'), 12000, 'payout confirmed');
-  const prize = settled.payouts.find(p => p.kind === 'prize');
-  check('payout is sent and confirmed with a signature (mock chain)', prize.status === 'confirmed' && /^mock-/.test(prize.signature));
-  check('the refund settled too', settled.payouts.find(p => p.kind === 'refund')?.status === 'confirmed');
-  a.close(); b.close(); c.close(); d.close();
-}
-
-// ---------- 4. one payment, one seat: pay, leave for a refund, delete the account, pay again with the same payment ----------
-{
-  const tokA = session(WALLET_A), tokB = session(WALLET_B);
-  const created = await post('/v1/rooms', { tracks: ['forest'], fee: '10000000', currency: 'SOL' }, tokB);
-  const code = created.body.code;
-  let a = await new Client('A').connect(code);
-  const b = await new Client('B').connect(code);
-  b.send({ t: 'hello', session: tokB, device: 'devB' });
-  a.send({ t: 'hello', session: tokA, device: 'devA' });
-  await Promise.all([a, b].map(x => x.wait(m => m.t === 'welcome', 5000, 'welcome')));
-  a.send({ t: 'pay', signature: sig('replay-1') });
-  await b.roomWhere(r => r.players.find(p => p.id === WALLET_A)?.paid, 8000, 'A paid');
-  b.drain();
-  a.send({ t: 'leave' });
-  const refunded = await b.roomWhere(r => r.players.length === 1, 5000, 'A left');
-  check('leaving a paid lobby refunds the entry', refunded.payouts.some(p => p.kind === 'refund' && p.wallet === WALLET_A));
-  const del = await fetch(`${BASE}/v1/me`, { method: 'DELETE', headers: { authorization: 'Bearer ' + tokA } });
-  check('the account can be deleted', del.status === 200);
-  a = await new Client('A again').connect(code);
-  a.send({ t: 'hello', session: tokA, device: 'devA' });
-  await a.wait(m => m.t === 'welcome', 5000, 'welcome again');
-  a.send({ t: 'pay', signature: sig('replay-1') });
-  const replay = await a.wait(m => m.t === 'error', 5000, 'replay refused');
-  check('the refunded payment cannot buy the seat again, even after deleting the account', /already used/i.test(replay.msg), replay.msg);
-  b.drain();
-  a.send({ t: 'pay', signature: sig('replay-2') });
-  const paidAgain = await b.roomWhere(r => r.players.find(p => p.id === WALLET_A)?.paid, 8000, 'A paid again');
-  check('a new payment does', !!paidAgain);
-  a.close(); b.close();
-}
-
-// ---------- 5. a paid cup everyone walks away from mid-way pays out on the races run; the house keeps nothing extra ----------
-{
-  const tokC = session(WALLET_C), tokD = session(WALLET_D);
-  const created = await post('/v1/rooms', { tracks: ['forest', 'forest'], fee: '10000000', currency: 'SOL' }, tokC);
-  const code = created.body.code;
-  const c = await new Client('C').connect(code), d = await new Client('D').connect(code);
-  c.send({ t: 'hello', session: tokC, device: 'devC' }); d.send({ t: 'hello', session: tokD, device: 'devD' });
-  await Promise.all([c, d].map(x => x.wait(m => m.t === 'welcome', 5000, 'welcome')));
-  c.send({ t: 'pay', signature: sig('ab-c') }); d.send({ t: 'pay', signature: sig('ab-d') });
-  await c.roomWhere(r => r.players.filter(p => p.paid).length === 2, 8000, 'both paid');
-  c.send({ t: 'start' });
-  const [r1] = await race([c, d], [55, 52]);
-  check('race 1 of the abandoned cup ran', r1.results.final === false && r1.standings[0].id === WALLET_C);
-  c.close(); d.close();
-  console.log(`   (waiting ${Math.round((RESULTS_MS + 5000) / 1000)} s for the room to give up on the cup)`);
-  await sleep(RESULTS_MS + 5000);
-  const st = await (await fetch(`${BASE}/v1/rooms/${code}`)).json();
-  const prize = st.payouts.find(p => p.kind === 'prize');
-  check('the abandoned cup is settled, not kept', st.state === 'finished' && prize?.wallet === WALLET_C && prize?.amount === '20000000', JSON.stringify({ state: st.state, payouts: st.payouts }));
-}
-
 // ---------- 6. the leaderboard: a result needs the drive behind it ----------
 {
   const d = drive('forest', 50);
@@ -363,98 +213,9 @@ async function race(clients, speeds, opts = []) {
 }
 
 
-// ---------- 8. paid seats that never reach the grid are refunded, and a field too small to race goes back to the lobby ----------
-{
-  const tokE = session(WALLET_E), tokF = session(WALLET_F), tokG = session(WALLET_G);
-  // a duel: F leaves while the track loads, so E alone is not a paid race; F's entry goes back, E keeps its seat
-  const duel = (await post('/v1/rooms', { tracks: ['forest'], fee: '10000000', currency: 'SOL' }, tokE)).body.code;
-  const e = await new Client('E').connect(duel), f = await new Client('F').connect(duel);
-  e.send({ t: 'hello', session: tokE, device: 'devE' }); f.send({ t: 'hello', session: tokF, device: 'devF' });
-  await Promise.all([e, f].map(x => x.wait(m => m.t === 'welcome', 5000, 'welcome')));
-  e.send({ t: 'pay', signature: sig('duel-e') }); f.send({ t: 'pay', signature: sig('duel-f') });
-  await e.roomWhere(r => r.players.filter(p => p.paid).length === 2, 8000, 'both paid');
-  e.send({ t: 'start' });
-  await Promise.all([e, f].map(x => x.wait(m => m.t === 'load', 8000, 'load')));
-  e.drain();
-  f.send({ t: 'leave' }); e.send({ t: 'loaded' });
-  const back = await e.roomWhere(r => r.state === 'lobby', 8000, 'back to the lobby');
-  check('a paid duel whose rival leaves during the load goes back to the lobby', back.players.length === 1 && back.players[0].paid, JSON.stringify(back.players));
-  check('…and the leaver is refunded, not kept', back.payouts.some(p => p.kind === 'refund' && p.wallet === WALLET_F && p.amount === '10000000'));
-  e.close(); f.close();
-
-  // three paid, G's phone dies on the load screen and never comes back: the other two race at the load deadline,
-  // G is refunded, and the winner takes the pot of the two who raced (not G's stake, and not nothing)
-  const trio = (await post('/v1/rooms', { tracks: ['forest'], fee: '10000000', currency: 'SOL' }, tokE)).body.code;
-  const e2 = await new Client('E').connect(trio), f2 = await new Client('F').connect(trio), g2 = await new Client('G').connect(trio);
-  e2.send({ t: 'hello', session: tokE, device: 'devE' }); f2.send({ t: 'hello', session: tokF, device: 'devF' }); g2.send({ t: 'hello', session: tokG, device: 'devG' });
-  await Promise.all([e2, f2, g2].map(x => x.wait(m => m.t === 'welcome', 5000, 'welcome')));
-  e2.send({ t: 'pay', signature: sig('trio-e') }); f2.send({ t: 'pay', signature: sig('trio-f') }); g2.send({ t: 'pay', signature: sig('trio-g') });
-  await e2.roomWhere(r => r.players.filter(p => p.paid).length === 3, 8000, 'all three paid');
-  e2.send({ t: 'start' });
-  const trioLoads = await Promise.all([e2, f2, g2].map(x => x.wait(m => m.t === 'load', 8000, 'load')));
-  g2.close();
-  e2.send({ t: 'loaded' }); f2.send({ t: 'loaded' });
-  console.log('   (waiting for the 30 s load deadline)');
-  const trioCd = await Promise.all([e2, f2].map(x => x.wait(m => m.t === 'countdown', 40000, 'countdown at the load deadline')));
-  await Promise.all([driveRace(o => e2.send(o), trioCd[0].startAt, drive(trioLoads[0].track, 55)), driveRace(o => f2.send(o), trioCd[1].startAt, drive(trioLoads[0].track, 50))]);
-  const [rt] = await Promise.all([e2, f2].map(x => x.wait(m => m.t === 'results', 20000, 'results')));
-  check('two paid racers race when the third never loads', rt.results.order.length === 2 && rt.results.order[0].id === WALLET_E);
-  const prizesT = rt.payouts.filter(p => p.kind === 'prize');
-  check('the winner is paid the pot of the two who raced', prizesT.length === 1 && prizesT[0].wallet === WALLET_E && prizesT[0].amount === '20000000' && rt.pool === '20000000', JSON.stringify(rt.payouts));
-  check('the one who never loaded is refunded', rt.payouts.some(p => p.kind === 'refund' && p.wallet === WALLET_G && p.amount === '10000000'), JSON.stringify(rt.payouts));
-  e2.close(); f2.close();
-}
-
-// ---------- 9. an entry payment is never kept for nothing: leaving mid-check, a seat that is gone, a room that started ----------
-{
-  const tokE = session(WALLET_E), tokF = session(WALLET_F), tokG = session(WALLET_G);
-  const code = (await post('/v1/rooms', { tracks: ['forest'], fee: '10000000', currency: 'SOL' }, tokE)).body.code;
-  const entry = (tok, signature, round = 1) => post(`/v1/rooms/${code}/entry`, { signature, round }, tok);
-  const refundsFor = async w => (await (await fetch(`${BASE}/v1/rooms/${code}`)).json()).payouts.filter(p => p.kind === 'refund' && p.wallet === w).length;
-  const e = await new Client('E').connect(code);
-  e.send({ t: 'hello', session: tokE, device: 'devE' });
-  await e.wait(m => m.t === 'welcome', 5000, 'welcome');
-  // F pays and leaves in the same breath: the payment is still being checked when the seat goes
-  let f = await new Client('F').connect(code);
-  f.send({ t: 'hello', session: tokF, device: 'devF' });
-  await f.wait(m => m.t === 'welcome', 5000, 'welcome F');
-  f.send({ t: 'pay', signature: sig('inflight-leave') }); f.send({ t: 'leave' });
-  await sleep(1500);
-  check('a payment still being checked when its payer leaves is refunded', await refundsFor(WALLET_F) === 1);
-  f.close();
-  // F comes back and opens the wallet: while it is paying, the host cannot kick it
-  f = await new Client('F again').connect(code);
-  f.send({ t: 'hello', session: tokF, device: 'devF' });
-  await f.wait(m => m.t === 'welcome', 5000, 'welcome F again');
-  f.send({ t: 'paying' });
-  await sleep(300);
-  e.drain(); e.send({ t: 'kick', id: WALLET_F });
-  const noKick = await e.wait(m => m.t === 'error', 5000, 'kick refused');
-  check('the host cannot kick a player who is paying', /paying right now/.test(noKick.msg), noKick.msg);
-  // a payment that reaches the room after its payer was kicked (it was in the wallet app) is refunded, not kept
-  f.close();
-  const g = await new Client('G').connect(code);
-  g.send({ t: 'hello', session: tokG, device: 'devG' });
-  await g.wait(m => m.t === 'welcome', 5000, 'welcome G');
-  e.send({ t: 'kick', id: WALLET_G });
-  await g.wait(m => m.t === 'closed', 5000, 'G kicked');
-  const late = await entry(tokG, sig('after-kick'));
-  await sleep(1500);
-  check('a payment that arrives after its payer was kicked is refunded', late.status === 200 && late.body.entry === 'refunding' && await refundsFor(WALLET_G) === 1, JSON.stringify(late));
-  const g2 = await new Client('G kicked').connect(code);
-  g2.send({ t: 'hello', session: tokG, device: 'devG' });
-  const refused = await g2.wait(m => m.t === 'error' || m.t === 'welcome', 5000, 'kicked rejoin');
-  check('a kicked player cannot walk straight back in', refused.t === 'error' && /removed/.test(refused.msg), JSON.stringify(refused));
-  // the same payment sent twice (the phone retrying) is one refund, not two
-  await entry(tokG, sig('after-kick'));
-  await sleep(1000);
-  check('a payment delivered twice is refunded once', await refundsFor(WALLET_G) === 1);
-  g2.close(); e.close();
-}
-
 // ---------- 10. lobby: one player per socket, the organiser keeps the room, names are plain text ----------
 {
-  const code = (await post('/v1/rooms', { tracks: ['forest'], fee: '0', currency: 'SOL', device: 'devORG00000' })).body.code;
+  const code = (await post('/v1/rooms', { tracks: ['forest'], minStake: '0', currency: 'SOL', device: 'devORG00000' })).body.code;
   const o = await new Client('organiser').connect(code), j = await new Client('joiner').connect(code);
   o.send({ t: 'hello', device: 'devORG00000' });
   await o.wait(m => m.t === 'welcome', 5000, 'welcome');
@@ -480,7 +241,7 @@ async function race(clients, speeds, opts = []) {
 
 // ---------- 11. a bogus finish, a DNF's states and padded frames: none of them reach the other racers ----------
 {
-  const code = (await post('/v1/rooms', { tracks: ['forest'], fee: '0', currency: 'SOL', device: 'devSLOW0000' })).body.code;
+  const code = (await post('/v1/rooms', { tracks: ['forest'], minStake: '0', currency: 'SOL', device: 'devSLOW0000' })).body.code;
   const slow = await new Client('slow').connect(code), griefer = await new Client('griefer').connect(code), fast = await new Client('fast').connect(code);
   slow.send({ t: 'hello', device: 'devSLOW0000' }); griefer.send({ t: 'hello', device: 'devGRIEF000' }); fast.send({ t: 'hello', device: 'devFAST0000' });
   await Promise.all([slow, griefer, fast].map(x => x.wait(m => m.t === 'welcome', 5000, 'welcome')));
@@ -509,7 +270,7 @@ async function race(clients, speeds, opts = []) {
 
 // ---------- 12. the fin lost with a socket at the line: the room followed the drive over it, so that is the finish ----------
 {
-  const code = (await post('/v1/rooms', { tracks: ['forest'], fee: '0', currency: 'SOL', device: 'devLOST000' })).body.code;
+  const code = (await post('/v1/rooms', { tracks: ['forest'], minStake: '0', currency: 'SOL', device: 'devLOST000' })).body.code;
   const lost = await new Client('lost fin').connect(code), other = await new Client('other').connect(code);
   lost.send({ t: 'hello', device: 'devLOST000' }); other.send({ t: 'hello', device: 'devOTHER00' });
   await Promise.all([lost, other].map(x => x.wait(m => m.t === 'welcome', 5000, 'welcome')));
@@ -530,7 +291,7 @@ async function race(clients, speeds, opts = []) {
 
 // ---------- 12b. a network stall across the line: the states and the fin arrive in one burst, and the win stands ----------
 {
-  const code = (await post('/v1/rooms', { tracks: ['forest'], fee: '0', currency: 'SOL', device: 'devSTALL00' })).body.code;
+  const code = (await post('/v1/rooms', { tracks: ['forest'], minStake: '0', currency: 'SOL', device: 'devSTALL00' })).body.code;
   const st = await new Client('stalled').connect(code), other = await new Client('other').connect(code);
   st.send({ t: 'hello', device: 'devSTALL00' }); other.send({ t: 'hello', device: 'devOTHER01' });
   await Promise.all([st, other].map(x => x.wait(m => m.t === 'welcome', 5000, 'welcome')));
@@ -551,7 +312,7 @@ async function race(clients, speeds, opts = []) {
 
 // ---------- 12c. a slow driver whose race clock runs slow, with a forged round trip to widen the allowance: a DNF ----------
 {
-  const code = (await post('/v1/rooms', { tracks: ['forest'], fee: '0', currency: 'SOL', device: 'devSTRETCH' })).body.code;
+  const code = (await post('/v1/rooms', { tracks: ['forest'], minStake: '0', currency: 'SOL', device: 'devSTRETCH' })).body.code;
   const cheat = await new Client('stretch').connect(code), honest = await new Client('honest').connect(code);
   cheat.send({ t: 'hello', device: 'devSTRETCH' }); honest.send({ t: 'hello', device: 'devHONEST2' });
   await Promise.all([cheat, honest].map(x => x.wait(m => m.t === 'welcome', 5000, 'welcome')));
@@ -572,7 +333,7 @@ async function race(clients, speeds, opts = []) {
 
 // ---------- 13. input hygiene on the open routes ----------
 {
-  const proto = await post('/v1/rooms', { tracks: ['constructor'], fee: '0', currency: 'SOL', device: 'devPROTO00' });
+  const proto = await post('/v1/rooms', { tracks: ['constructor'], minStake: '0', currency: 'SOL', device: 'devPROTO00' });
   check("'constructor' is not a track", proto.status === 400);
   const protoRace = await post('/v1/race/start', { deviceId: 'devPROTO00', trackId: '__proto__' });
   check("'__proto__' is not a track to race", protoRace.status === 400);

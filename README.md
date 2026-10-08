@@ -1,4 +1,4 @@
-# Seeker Kart Cup
+# Kartel
 
 A Beach Buggy Racing–style kart racer for the Solana Seeker, built for the CLOCK IN hackathon (Sep 8 – Oct 8, 2026).
 Unofficial parody. Not affiliated with or endorsed by any person or company depicted.

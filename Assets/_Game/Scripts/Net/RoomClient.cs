@@ -71,23 +71,28 @@ namespace KartCup
         int helloCharacter; string helloKart;
 
         // ---- DTOs ----
-        [Serializable] public class PlayerState { public string id, name, wallet, kart; public int character, points; public bool host, connected, ready, paid, paying, loaded, racing, dnf; public bool canPay = true; public long? finishMs; public int? place; }
+        /// `stake` and `ifWin` are base units: the seat's stake in this round's escrow, and what it takes if it wins.
+        [Serializable] public class PlayerState { public string id, name, wallet, kart, stake, ifWin; public int character, points; public bool host, connected, ready, paid, paying, loaded, racing, dnf, canPay; public long? finishMs; public int? place; }
         [Serializable] public class Standing { public string id, name; public int points, place; public long totalMs; }
         [Serializable] public class OrderRow { public string id, name; public long? ms; public int place, points; public bool dnf; }
         [Serializable] public class RaceResult { public int race, races; public string track; public bool final; public List<OrderRow> order = new(); }
-        [Serializable] public class Payout { public string id, wallet, kind, amount, currency, status, signature; public int? place; }
+        /// A payout from the room's escrow: kind "prize" (a settled room) or "refund" (a cancelled one).
+        [Serializable] public class Payout { public string wallet, kind, amount, currency, status, signature; public int? place; public int round; }
+        /// The room's account on the escrow program: "opening", "open", "locked", "settled", "cancelled" or "closed".
+        [Serializable] public class EscrowInfo { public string address, state, error; }
         [Serializable] public class RoomState
         {
-            public string code, state, currency, fee = "0", hostId, pool = "0", hostReward = "0";
-            public int round, raceIndex, cutBps, feeBps;
-            public bool isPublic;
-            public List<string> tracks = new(), prizes = new();
+            public string code, state, currency, hostId, pool = "0", minStake = "0", maxStake = "0";
+            public int round, raceIndex, cutBps;
+            public bool isPublic, locking;
+            public List<string> tracks = new();
             public long? startAt; public long serverNow;
+            public EscrowInfo escrow;
             public List<PlayerState> players = new();
             public List<Standing> standings; public RaceResult lastResults; public List<Payout> payouts = new();
-            public bool IsPaid => fee != "0";
+            public bool IsPaid => minStake != "0";
         }
-        [Serializable] public class ResultsMsg { public RaceResult results; public List<Standing> standings; public List<Payout> payouts; public string pool, cut; public RoomState room; }
+        [Serializable] public class ResultsMsg { public RaceResult results; public List<Standing> standings; public List<Payout> payouts; public string pool; public RoomState room; }
 
         // ---- lifecycle ----
         public static RoomClient Get()
@@ -191,7 +196,6 @@ namespace KartCup
                     NoteServerTime((long)m["serverNow"], at, -1);
                     SetRoom(m["room"]);
                     welcomed = true;
-                    _ = PendingEntries.Flush();          // any entry payment the room may not have heard of yet
                     Welcomed?.Invoke();
                     break;
                 case "room": SetRoom(m["room"]); break;

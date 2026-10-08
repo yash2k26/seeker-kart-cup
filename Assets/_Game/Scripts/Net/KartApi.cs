@@ -55,18 +55,21 @@ namespace KartCup
         [Serializable] public class Board { public string track; public List<Entry> entries = new(); }
         [Serializable] public class Entry { public int rank; public string wallet, name, memoSig; public bool isSeeker; public int bestMs; }
         [Serializable] public class RoomCreated { public string code, url; }
-        [Serializable] public class PublicRoom { public string code, host, fee, currency; public int players, maxPlayers; public List<string> tracks = new(); public long createdAt; }
+        [Serializable] public class PublicRoom { public string code, host, minStake = "0", currency; public int players, maxPlayers; public List<string> tracks = new(); public long createdAt; }
         [Serializable] public class PublicRooms { public List<PublicRoom> rooms = new(); }
         [Serializable] public class ShopItem { public string sku, kind, name, blurb, item; public int qty; public double sol; public bool skrOnly, onSale = true; public List<string> grants; public Dictionary<string, int> powers; public Dictionary<string, string> price = new(); }
         [Serializable] public class ConfigDto
         {
-            public string treasuryOwner, treasuryAta, skrMint;
-            public bool paidRooms; public int cutBps, hostShareBps, minPaidPlayers, maxPlayers;
-            public Dictionary<string, List<string>> fees = new();      // currency -> base-unit tiers
-            public Dictionary<string, List<int>> splits = new();       // paid players -> % per place
+            public string treasuryOwner, treasuryAta, skrMint, oreMint, treasuryOreAta;
+            /// Paid rooms' stakes go to this program's room accounts, never to the treasury.
+            public string escrowProgram;
+            public bool paidRooms; public int cutBps, minPaidPlayers, maxPlayers;
+            public Dictionary<string, List<string>> stakes = new();    // currency -> the base-unit stakes a room offers
             public List<ShopItem> catalog = new();
             public ShopItem Item(string sku) => catalog.Find(i => i.sku == sku);
             public bool CanPay => !string.IsNullOrEmpty(treasuryOwner);
+            /// ORE (Regolith Labs; the CLOCK IN side prize): a third rail on the same payment path, only while the Worker names the mint.
+            public bool TakesOre => CanPay && !string.IsNullOrEmpty(oreMint) && !string.IsNullOrEmpty(treasuryOreAta);
         }
 
         /// The Worker's live config (treasury, fee tiers, prices), never compiled into the APK. Fetched once per session;
@@ -83,8 +86,9 @@ namespace KartCup
             }
             return (DateTime.UtcNow - cfgAt).TotalSeconds < maxAgeSeconds ? Cfg : null;
         }
-        public static Awaitable<RoomCreated> CreateRoom(List<string> tracks, string fee, string currency, bool isPublic)
-            => Post<RoomCreated>("/v1/rooms", new { tracks, fee, currency, device = DeviceId, isPublic });
+        /// minStake "0" is a free room; otherwise each player stakes from it up, into the room's escrow.
+        public static Awaitable<RoomCreated> CreateRoom(List<string> tracks, string minStake, string currency, bool isPublic)
+            => Post<RoomCreated>("/v1/rooms", new { tracks, minStake, currency, device = DeviceId, isPublic });
         public static Awaitable<PublicRooms> OpenRooms() => Get<PublicRooms>("/v1/rooms/public");
 
         public static Awaitable<SiwsPayload> Challenge() => Post<SiwsPayload>("/v1/auth/challenge", new { });
@@ -115,10 +119,6 @@ namespace KartCup
         public static Awaitable<Profile> Me() => Get<Profile>("/v1/me");
         public static Awaitable<object> DeleteMe() => Send<object>("DELETE", "/v1/me", null);
         public static Awaitable<object> ConfirmTx(string signature, string raceId) => Post<object>("/v1/tx/confirm", new { signature, raceId });
-        /// An entry payment for a room (session): the room seats it, or verifies and refunds it. Never dropped.
-        public static Awaitable<object> RoomEntry(string code, int round, string signature) => Post<object>($"/v1/rooms/{code}/entry", new { signature, round });
-        /// A payment the phone may have made but never got the signature of: the room looks for it on-chain by its memo.
-        public static Awaitable<object> RoomEntryScan(string code, int round) => Post<object>($"/v1/rooms/{code}/entry", new { scan = true, round });
         /// `pending` is the Worker's 202 (not landed at 'confirmed' yet): a 2xx, so it arrives as an answer, not an exception.
         [Serializable] public class Verified { public bool pending; public List<string> granted; }
         public static Awaitable<Verified> VerifyPurchase(string signature, string sku, string orderId, string currency) => Post<Verified>("/v1/purchase/verify", new { signature, sku, orderId, currency });
@@ -158,80 +158,6 @@ namespace KartCup
         {
             public readonly long Status;
             public ApiException(long status, string body) : base($"{status}: {body}") { Status = status; }
-        }
-    }
-
-    /// Entry payments this phone made that no room has acknowledged yet. The transfer is on-chain before any room hears
-    /// of it, so the signature is written down first and delivered over HTTP until a room answers: the room then seats
-    /// it, or verifies and refunds it. Nothing depends on the socket being up or the seat still being there.
-    /// Each is kept with the wallet that paid (delivered only under that wallet's session). An attempt is written down
-    /// before the wallet app even opens: if the game dies before the signature comes back, the room is asked to look
-    /// for the transfer on-chain by its memo.
-    public static class PendingEntries
-    {
-        const string Key = "kc.entries";
-        const string Scan = "scan:";
-        const long ScanForSeconds = 300;          // an attempt is asked about for five minutes, then let go
-        [Serializable] public class Entry { public string code, sig, wallet; public int round; public long at; }
-        static bool flushing;
-        static long Now => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-
-        static List<Entry> Load() { try { return JsonConvert.DeserializeObject<List<Entry>>(PlayerPrefs.GetString(Key, "[]")) ?? new List<Entry>(); } catch { return new List<Entry>(); } }
-        static void Store(List<Entry> list) { PlayerPrefs.SetString(Key, JsonConvert.SerializeObject(list)); PlayerPrefs.Save(); }
-        static void Remove(string sig) { var list = Load(); list.RemoveAll(e => e.sig == sig); Store(list); }
-        public static bool Has(string sig) => Load().Exists(e => e.sig == sig);
-
-        public static void Add(string code, int round, string sig, string wallet)
-        {
-            var list = Load();
-            if (!list.Exists(e => e.sig == sig)) list.Add(new Entry { code = code, round = round, sig = sig, wallet = wallet, at = Now });
-            Store(list);
-        }
-
-        /// Before the wallet app opens: returns the attempt's id, to be replaced by the signature or dropped.
-        public static string Attempt(string code, int round, string wallet)
-        {
-            var id = Scan + Guid.NewGuid().ToString("N");
-            Add(code, round, id, wallet);
-            return id;
-        }
-
-        public static void Forget(string id) { if (!string.IsNullOrEmpty(id)) Remove(id); }
-
-        /// Deliver every undelivered entry. Safe to call often: a room answers a repeat as already known.
-        public static async Awaitable Flush()
-        {
-            if (flushing || !KartApi.HasSession) return;
-            flushing = true;
-            try
-            {
-                var me = KartApi.SessionWallet;
-                foreach (var e in Load())
-                {
-                    if (!string.IsNullOrEmpty(e.wallet) && e.wallet != me) continue;   // another wallet's: kept until it signs in
-                    bool attempt = e.sig.StartsWith(Scan);
-                    try
-                    {
-                        if (attempt) { await KartApi.RoomEntryScan(e.code, e.round); if (Now - e.at > ScanForSeconds) Remove(e.sig); }
-                        else { await KartApi.RoomEntry(e.code, e.round, e.sig); Remove(e.sig); }
-                    }
-                    // not a payment, taken by someone else, or no such room: there is nothing to deliver it to
-                    catch (KartApi.ApiException x) when (x.Status == 400 || x.Status == 404) { Remove(e.sig); }
-                    catch (Exception x) { Debug.LogWarning("[entry] will retry: " + x.Message); }
-                }
-            }
-            finally { flushing = false; }
-        }
-
-        /// Right after paying: deliver now, and keep trying for about half a minute if the network is being difficult.
-        public static async Awaitable Deliver(string sig)
-        {
-            for (float wait = 2f; wait <= 16f && Has(sig); wait *= 2f)
-            {
-                await Flush();
-                if (!Has(sig)) return;
-                await Awaitable.WaitForSecondsAsync(wait);
-            }
         }
     }
 

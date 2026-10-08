@@ -15,15 +15,8 @@ const RPC_ALLOW = new Set([
   'getTokenAccountsByOwner', 'getAccountInfo', 'getMinimumBalanceForRentExemption', 'getTransaction',
 ]);
 
-export async function rpc(env: Env, method: string, params: unknown[]) {
-  const r = await fetch(env.HELIUS_URL, {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-  });
-  const j = await r.json<any>();
-  if (j.error) throw new Error(`${method}: ${j.error.message}`);
-  return j.result;
-}
+export { rpc } from './rpc';
+import { rpc } from './rpc';
 
 // The APK never holds an RPC key: it talks to /rpc, which forwards an allow-list of methods, a few at a time.
 const RPC_MAX_CALLS = 8, RPC_MAX_BYTES = 64 * 1024;
@@ -141,11 +134,11 @@ export async function txConfirm(req: Request, env: Env, _ctx: ExecutionContext, 
 }
 
 /** POST /v1/purchase/verify { signature, sku, orderId, currency? } — a transfer of the catalog price to the treasury
- *  (SOL to the owner, SKR to its ATA) plus memo "kc:buy:<sku>:<orderId>". Prices live in catalog.ts (+ PRICES_JSON). */
+ *  (SOL to the owner, SKR or ORE to its associated account) plus memo "kc:buy:<sku>:<orderId>". Prices live in catalog.ts (+ PRICES_JSON). */
 export async function purchaseVerify(req: Request, env: Env, _ctx: ExecutionContext, wallet: string | null) {
   if (!wallet) return bad('unauthorized', 401);
   const { signature, sku, orderId, currency } = await req.json<any>().catch(() => ({}));
-  const cur: Currency = currency === 'SOL' ? 'SOL' : 'SKR';
+  const cur: Currency = currency === 'SOL' ? 'SOL' : currency === 'ORE' ? 'ORE' : 'SKR';
   const price = sku ? priceOf(String(sku), cur, await rates(env), env.PRICES_JSON) : null;
   if (typeof signature !== 'string' || signature.length > 128 || !sku || !orderId || price === null) return bad('bad request');
   // The quote the player saw may be minutes old and the token moved: accept 90% of today's price (research/23 §F.1).

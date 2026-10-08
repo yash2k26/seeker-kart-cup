@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using BigInteger = System.Numerics.BigInteger;   // not the namespace: it has its own Vector2/Vector3
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -92,12 +93,15 @@ namespace KartCup
             bool mine = top.Count > 0 && top[0] == Cup.PlayerCharacter;
             string heading = mine ? (cupPodium ? "YOU TAKE THE CUP!" : "YOU WIN!")
                 : top.Count > 0 ? $"{Name(top[0]).ToUpperInvariant()} {(cupPodium ? "TAKES THE CUP!" : "WINS!")}" : "";
-            // with money on the room, each place's card carries what it paid (the room's last race settles it)
+            // with money on the room, each podium card carries what that place is paid: fair shares from the stakes and
+            // the cup's order, the arithmetic the escrow settles with (the chain's own figures follow on the status line)
             var paid = RoomClient.Instance != null && RoomClient.Instance.Room != null && RoomClient.Instance.Room.IsPaid && final ? RoomClient.Instance.Room : null;
+            var shares = paid != null ? Shares(paid) : null;
             StartCoroutine(Ceremony(top.Select((c, i) =>
             {
                 var w = Podium(c, Name(c));
-                if (paid != null && i < paid.prizes.Count) w.prize = "+" + WalletFlow.Amount(paid.prizes[i], paid.currency);
+                var wallet = paid?.standings != null && i < paid.standings.Count ? paid.players.Find(p => p.id == paid.standings[i].id)?.wallet : null;
+                if (wallet != null && shares.TryGetValue(wallet, out var amount) && amount > 0) w.prize = WalletFlow.Amount(amount.ToString(), paid.currency);
                 return w;
             }).ToList(), heading, 2.6f));   // after the finish line's moment: the place, the swing to the driver's face
         }
@@ -248,23 +252,39 @@ namespace KartCup
             if (!room.IsPaid) { status.text = line; return; }
             if (!final) { status.text = line + $"   ·   pool {WalletFlow.Amount(room.pool, room.currency)}"; return; }
 
-            var wallet = client.Me?.wallet;
-            var prize = verdict.payouts?.Find(p => p.kind == "prize" && p.wallet == wallet);
-            var host = verdict.payouts?.Find(p => p.kind == "host" && p.wallet == wallet);
-            if (prize == null && host == null) { status.text = line + "   ·   no prize this time"; return; }
-            var parts = new List<string>();
-            if (prize != null) parts.Add($"You won {WalletFlow.Amount(prize.amount, prize.currency, true)}");
-            if (host != null) parts.Add($"{(prize != null ? "+ " : "")}{WalletFlow.Amount(host.amount, host.currency)} host reward");
-            status.text = string.Join(" ", parts) + "   ·   " + PayoutState(prize ?? host);
+            // What the escrow pays this wallet: its own figure once settled, the same arithmetic until then.
+            var me = client.Me;
+            if (me?.wallet == null || me.stake == null) { status.text = line; return; }
+            var payout = verdict.payouts?.Find(p => p.wallet == me.wallet);
+            var amount = payout != null ? BigInteger.Parse(payout.amount) : Shares(room).TryGetValue(me.wallet, out var share) ? share : BigInteger.Zero;
+            var stake = BigInteger.Parse(me.stake);
+            string Amount(BigInteger v) => WalletFlow.Amount(v.ToString(), room.currency);
+            if (payout?.kind == "refund") { status.text = $"Your {Amount(stake)} stake is going back   ·   " + PayoutState(payout); return; }
+            if (amount == 0) { status.text = line + "   ·   no prize this time"; return; }
+            var what = amount > stake ? $"You won {Amount(amount - stake)} (paid {Amount(amount)})" : $"{Amount(amount)} of your {Amount(stake)} back";
+            status.text = what + "   ·   " + (payout != null ? PayoutState(payout) : "settling on-chain…");
         }
 
         static string PayoutState(RoomClient.Payout p) => p.status switch
         {
             "confirmed" => $"paid ✓ {WalletFlow.Short(p.signature)}",
             "sent" => "sending to your wallet…",
-            "failed" => "payout stuck — contact support with this room's code",
             _ => "paying out…",
         };
+
+        /// What each staked wallet is paid: the cup's order (then anyone staked who scored nothing) through fair shares,
+        /// the arithmetic the escrow settles with.
+        static Dictionary<string, BigInteger> Shares(RoomClient.RoomState room)
+        {
+            var staked = room.players.Where(p => p.paid && p.stake != null && p.wallet != null).ToList();
+            var order = (room.standings ?? new List<RoomClient.Standing>()).Select(s => room.players.Find(p => p.id == s.id)?.wallet)
+                .Where(w => w != null && staked.Exists(p => p.wallet == w)).Distinct().ToList();
+            order.AddRange(staked.Select(p => p.wallet).Where(w => !order.Contains(w)));
+            var split = FairShares.Split(order.Select(w => BigInteger.Parse(staked.Find(p => p.wallet == w).stake)).ToList(), Enumerable.Range(0, order.Count).ToList(), room.cutBps);
+            var shares = new Dictionary<string, BigInteger>();
+            if (split != null) for (int i = 0; i < order.Count; i++) shares[order[i]] = split.Value.payouts[i];
+            return shares;
+        }
 
         void OnlineClosed(string reason) { if (status != null) status.text = reason ?? "Room closed"; }
 
