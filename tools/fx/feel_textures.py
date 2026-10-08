@@ -114,10 +114,52 @@ def speedlines(w=2048, h=1024, seed=7):
     return out
 
 
+def wheel(size=1024, slices=8, gold_slice=7):
+    """The daily wheel (DailySpin): eight slices in the shell's two violets, the gold chest's slice in gold, a gold
+    rim studded with lights, a hub. Slice i is centred i * 45 degrees clockwise from the top."""
+    big = size * 2
+    im = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    c, r = big / 2, big / 2 - 8
+    rim = r * 0.115
+    d.ellipse([c - r, c - r, c + r, c + r], fill=(201, 140, 26, 255))                    # the gold rim
+    inner = r - rim
+    a = (46, 11, 112, 255); b = (75, 37, 176, 255); g = (176, 122, 16, 255)
+    for i in range(slices):
+        mid = -90 + i * 360 / slices
+        col = g if i == gold_slice else (a if i % 2 == 0 else b)
+        d.pieslice([c - inner, c - inner, c + inner, c + inner], mid - 180 / slices, mid + 180 / slices, fill=col)
+    for i in range(slices):                                                               # thin gold spokes between slices
+        ang = math.radians(-90 + (i + 0.5) * 360 / slices)
+        d.line([(c, c), (c + inner * math.cos(ang), c + inner * math.sin(ang))], fill=(255, 205, 90, 255), width=10)
+    for k in range(slices * 2):                                                           # the rim's studs
+        ang = math.radians(k * 360 / (slices * 2))
+        x, y, sr = c + (r - rim / 2) * math.cos(ang), c + (r - rim / 2) * math.sin(ang), rim * 0.24
+        d.ellipse([x - sr, y - sr, x + sr, y + sr], fill=(255, 244, 205, 255))
+    hub = r * 0.17
+    d.ellipse([c - hub, c - hub, c + hub, c + hub], fill=(201, 140, 26, 255))
+    d.ellipse([c - hub * 0.62, c - hub * 0.62, c + hub * 0.62, c + hub * 0.62], fill=(23, 5, 64, 255))
+    return im.resize((size, size), Image.LANCZOS)
+
+
+def pointer(size=256):
+    """The wheel's pointer: a gold wedge pointing down at the slice under it, outlined in the dark ink."""
+    big = size * 4
+    im = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    pts = [(big * 0.18, big * 0.12), (big * 0.82, big * 0.12), (big * 0.5, big * 0.9)]
+    d.polygon(pts, fill=(23, 5, 64, 255))
+    inset = [(big * 0.27, big * 0.2), (big * 0.73, big * 0.2), (big * 0.5, big * 0.76)]
+    d.polygon(inset, fill=(255, 177, 38, 255))
+    return im.resize((size, size), Image.LANCZOS)
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     bubble().save(OUT + "fx_bubble.png")
     star().save(OUT + "fx_star.png")
     puff().save(OUT + "fx_puff.png")
     speedlines().save(OUT + "fx_speedlines.png")
-    print("wrote fx_bubble, fx_star, fx_puff, fx_speedlines")
+    wheel().save(OUT + "fx_wheel.png")
+    pointer().save(OUT + "fx_pointer.png")
+    print("wrote fx_bubble, fx_star, fx_puff, fx_speedlines, fx_wheel, fx_pointer")

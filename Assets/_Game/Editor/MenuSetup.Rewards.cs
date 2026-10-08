@@ -98,6 +98,7 @@ public static partial class MenuSetup
         });
         UnityEditor.Events.UnityEventTools.AddPersistentListener(tbutton.onClick, chestButton.Tap);
         if (screen.transform.Find("Update") is RectTransform update) update.anchoredPosition = new Vector2(-64, 360);
+        DailyWheel(screen);   // the daily wheel beside the chest (MenuSetup.Spin.cs)
 
         // the toast: one line, one action, under the profile chip, over the hoarding
         var toastRoot = Rect("Toast", screen.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-64, -156), new Vector2(1060, 108));

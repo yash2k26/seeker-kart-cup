@@ -31,6 +31,8 @@ public static class FeelSetup
     }
 
     public static Material BubbleMaterial => AssetDatabase.LoadAssetAtPath<Material>(MatDir + "FX_Bubble.mat");
+    /// One of the FX folder's pictures as a UI sprite (imported as one first): the daily wheel's.
+    public static Sprite Sprite(string name) { Import(name, true); return AssetDatabase.LoadAssetAtPath<Sprite>(Tex + name + ".png"); }
     public static Sprite SpeedLines => AssetDatabase.LoadAssetAtPath<Sprite>(Tex + "fx_speedlines.png");
 
     /// Taken: gold stars thrown out of where the bubble was, and a violet ring that opens and fades.

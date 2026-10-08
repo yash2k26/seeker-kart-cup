@@ -258,6 +258,12 @@ public static class MenuPreview
                 foreach (var garage in Object.FindObjectsByType<GaragePanel>(FindObjectsSortMode.None)) garage.ShowInEditor(2, Paints.IndexOf("gold") + 1);
                 Canvas.ForceUpdateCanvases(); Shot(cam, "menu7-gold-locked");
             }
+            if (i == 0)   // the daily wheel, open on the gold chest
+            {
+                foreach (var w in Object.FindObjectsByType<SpinWheel>(FindObjectsSortMode.None)) w.ShowInEditor(7);
+                Canvas.ForceUpdateCanvases(); Shot(cam, "menu0-spin");
+                foreach (var w in Object.FindObjectsByType<SpinWheel>(FindObjectsSortMode.None)) w.HideInEditor();
+            }
             if (i == 10)   // the event card before a Tour race: a boss duel
             {
                 foreach (var tour in Object.FindObjectsByType<TourPanel>(FindObjectsSortMode.None)) tour.CardInEditor(0, 4);
