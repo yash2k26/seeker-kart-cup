@@ -101,6 +101,9 @@ namespace KartCup
 
         public static CharacterDatabase Roster => FindAnyObjectByType<RaceSpawner>()?.roster;
 
+        static bool DeviceAutopilot => !Application.isEditor && !RoomClient.InRaceRoom
+            && System.IO.File.Exists(System.IO.Path.Combine(Application.persistentDataPath, "autopilot"));
+
         /// The room's roster in join order. Our own kart is the real thing; everyone else is a RemoteKart proxy.
         void SpawnOnline()
         {
@@ -177,7 +180,14 @@ namespace KartCup
                 pose?.Bind(kart.rb);
             }
 
-            if (isPlayer) { go.AddComponent<KartHooks>().Bind(kart, pose, true); go.AddComponent<KartInputMobile>(); }
+            if (isPlayer)
+            {
+                go.AddComponent<KartHooks>().Bind(kart, pose, true);
+                // A test hook for the phone: with a file named "autopilot" in the app's own files folder (only adb puts
+                // one there), the field's AI drives the player's kart, so a whole race can be watched on the device.
+                if (DeviceAutopilot) { var ai = go.AddComponent<KartAi>(); ai.Configure(def, firstWaypoint, character); Debug.Log("[race] autopilot drives the player"); }
+                else go.AddComponent<KartInputMobile>();
+            }
             else if (!online)
             {
                 go.AddComponent<KartHooks>().Bind(kart, pose, false);

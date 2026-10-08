@@ -20,7 +20,7 @@ public static partial class MenuSetup
         var button = tile.gameObject.AddComponent<Button>();
         var feel = tile.gameObject.AddComponent<PressFeel>();
         var face = Face("Spin", tile, lip);
-        var icon = Rect("Wheel", face, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -26), new Vector2(150, 150));
+        var icon = Rect("Wheel", face, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -98), new Vector2(150, 150));   // centred 98 down: inside the tile (Rect pivots at the middle)
         var iconImg = icon.gameObject.AddComponent<Image>(); iconImg.sprite = wheelSprite; iconImg.preserveAspect = true; iconImg.raycastTarget = false;
         icon.gameObject.AddComponent<SlowTurn>();
         var line = Label("Line", face, display, "FREE SPIN", 30, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 22), new Vector2(210, 44));
