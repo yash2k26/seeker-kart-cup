@@ -26,6 +26,7 @@ public static class FeelSetup
         Dizzy();
         WheelDust();
         SmashPuff();
+        ShieldMaterial();
         AssetDatabase.SaveAssets();
         Debug.Log("[feel] built BubblePop, HitPuff, Dizzy, WheelDust");
     }
@@ -154,6 +155,20 @@ public static class FeelSetup
         r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false;
         PrefabUtility.SaveAsPrefabAsset(go, Out + "WheelDust.prefab");
         Object.DestroyImmediate(go);
+    }
+
+    /// The shield round a kart (the Beeman and Pip abilities): a see-through violet shell, brighter at the rim.
+    static void ShieldMaterial()
+    {
+        string path = Out + "Shield.mat";
+        var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+        var unlit = Shader.Find("Universal Render Pipeline/Unlit");
+        if (m == null) { m = new Material(unlit) { name = "Shield" }; AssetDatabase.CreateAsset(m, path); }
+        m.shader = unlit; m.SetColor("_BaseColor", new Color(0.55f, 0.42f, 1f, 0.22f));
+        m.SetFloat("_Surface", 1); m.SetFloat("_Blend", 2); m.SetFloat("_Cull", 2); m.SetFloat("_ZWrite", 0);
+        m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha); m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.One);
+        m.renderQueue = 3000; m.SetOverrideTag("RenderType", "Transparent"); m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        EditorUtility.SetDirty(m);
     }
 
     static void Bubble()

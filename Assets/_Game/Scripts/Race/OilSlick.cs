@@ -14,6 +14,8 @@ namespace KartCup
         readonly Dictionary<Kart, float> last = new();
 
         void OnEnable() => All.Add(this);
+        /// The kart that just dropped it (Maroo's ability) is not caught by it for a while.
+        public void Spare(Kart k, float seconds) => last[k] = Time.time + seconds - 2f;
         void OnDisable() => All.Remove(this);
 
         void OnTriggerEnter(Collider other)

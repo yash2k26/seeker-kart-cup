@@ -71,6 +71,7 @@ public static class Playtest
         moments.Clear(); lastAmmo = 0; pickups = 0; hits = 0; wasSpinning = false; wasFinished = false;
         oobTest = args.Contains("-oob"); smashTest = args.Contains("-smash"); oobDone = smashDone = countShot = false;
         Smashable.Smashed -= OnSmashed; Smashable.Smashed += OnSmashed;
+        Ability.Used -= OnAbility; Ability.Used += OnAbility; abilities = 0;
         for (int i = 0; i < args.Length - 1; i++) { if (args[i] == "-every") double.TryParse(args[i + 1], out every); if (args[i] == "-seconds") double.TryParse(args[i + 1], out until); }
         sweep = null;
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-camsweep")
@@ -260,6 +261,20 @@ public static class Playtest
         var lines = Object.FindFirstObjectByType<SpeedLines>(); var img = lines != null ? lines.GetComponent<UnityEngine.UI.Image>() : null;
         var pk = Object.FindFirstObjectByType<RaceManager>()?.Player?.GetComponent<Kart>();
         Debug.Log($"[playtest] probe: speed lines {(img != null ? $"enabled {img.enabled} alpha {img.color.a:0.00} sprite {img.sprite?.name}" : "missing")}; player boostReserve {pk?.boostReserve:0.00} speed {pk?.velMag:0.0}");
+    }
+
+    static int abilities;
+    /// Someone used their special: a frame from the race camera, and one from beside the kart that used it.
+    static void OnAbility(Ability a)
+    {
+        if (!EditorApplication.isPlaying || abilities >= 8) return;
+        abilities++;
+        double t = EditorApplication.timeSinceStartup - start;
+        var k = a.transform; string tag = $"ability{track}-{abilities}-{a.def.name.Replace(' ', '_')}";
+        itemFrom = k.position + k.right * 6f - k.forward * 4f + Vector3.up * 3f; itemAt = k.position + k.forward * 4f + Vector3.up;
+        moments.Add((t + 0.4, "side:" + tag + "-side"));
+        if (a.isPlayer) moments.Add((t + 0.25, tag));
+        Debug.Log($"[playtest] {a.name} used {a.def.name}");
     }
 
     static void OnSmashed(Smashable s, Kart k)

@@ -197,6 +197,7 @@ namespace KartCup
                 ai.skill = Mathf.Clamp(ai.skill * RaceMode.Difficulty, 0.8f, 1.12f);   // the event's pace (Tour cups, bosses)
             }
             // a remote kart gets no hooks and no input: RemoteKart poses the driver and spins the wheels itself
+            if (!online && !Weekly.Racing) Ability.On(kart, def.displayName, isPlayer);   // each driver's special (solo races)
             return kart;
         }
     }

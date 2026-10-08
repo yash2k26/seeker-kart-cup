@@ -7,7 +7,7 @@ namespace KartCup
     /// One on-screen control. Press-and-hold for drift/brake, single press for the item slot.
     public sealed class HoldButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerEnterHandler, IPointerExitHandler
     {
-        public enum Control { Drift, Brake, Item, Boost, SteerLeft, SteerRight, Accelerate }
+        public enum Control { Drift, Brake, Item, Boost, SteerLeft, SteerRight, Accelerate, Ability }
         [SerializeField] Control control = Control.Drift;
         [SerializeField] InputManager input;
         [SerializeField] CanvasGroup fade;               // optional: dims while held
@@ -51,6 +51,7 @@ namespace KartCup
         void Set(bool down)
         {
             if (input == null && steering == null) return;
+            if (control == Control.Ability) { if (down) RaceHud.Instance?.FireAbility(); return; }
             if (input == null && control != Control.SteerLeft && control != Control.SteerRight) return;
             switch (control)
             {

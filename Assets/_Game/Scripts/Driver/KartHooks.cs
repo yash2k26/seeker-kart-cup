@@ -51,6 +51,9 @@ namespace KartCup
 
         /// Runs as the cast happens (the shot is already in the scene when Powerslide raises the event), not a frame
         /// later: a physics step in between is all a trap needs to hit the kart it was dropped under.
+        /// An ability fired an item straight through its Item (Ability.Cast): the same care as a cast.
+        public void AfterCast() => OnCast();
+
         void OnCast()
         {
             foreach (var shot in FindObjectsByType<SpawnedProjectileItem>(FindObjectsSortMode.None))

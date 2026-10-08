@@ -854,6 +854,14 @@ public static partial class TrackSetup
         var driftBtn = Button("Drift", safe.transform, input, HoldButton.Control.Drift, ink, new Vector2(1, 0), new Vector2(-376, 64), new Vector2(224, 184), "DRIFT", display, steering);
         var brakeBtn = Button("Brake", safe.transform, input, HoldButton.Control.Brake, ink, new Vector2(1, 0), new Vector2(-624, 64), new Vector2(184, 150), "BRAKE", display, steering);
         var itemBtn = Button("Item", safe.transform, input, HoldButton.Control.Item, ink, new Vector2(1, 0), new Vector2(-64, 272), new Vector2(288, 128), "ITEM", display, steering);
+        // the driver's special, on the left thumb's side above the arrows (Beach Buggy's ability button); lit when charged
+        var abilityBtn = Button("Ability", safe.transform, input, HoldButton.Control.Ability, ink, new Vector2(0, 0), new Vector2(64, 272), new Vector2(288, 128), "BURST", display, steering);
+        var abilityTrack = Plate("AbilityCharge", safe.transform, new Vector2(0, 0), new Vector2(64, 404), new Vector2(288, 16), new Color(Design.Ink900.r, Design.Ink900.g, Design.Ink900.b, 0.75f));
+        var abilityFillRt = Rect("Fill", abilityTrack, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        abilityFillRt.offsetMin = new Vector2(4, 4); abilityFillRt.offsetMax = new Vector2(-4, -4);
+        var abilityFill = abilityFillRt.gameObject.AddComponent<Image>(); abilityFill.sprite = Design.Row; abilityFill.color = Design.Accent; abilityFill.raycastTarget = false;
+        abilityFill.type = Image.Type.Filled; abilityFill.fillMethod = Image.FillMethod.Horizontal; abilityFill.fillAmount = 0f;
+        abilityTrack.SetParent(abilityBtn.transform, true);   // shown and hidden with the button
 
         // Readouts sit on dark plates: paper on sky and sand failed contrast on the device shots.
         var deep = new Color(Design.Ink900.r, Design.Ink900.g, Design.Ink900.b, 0.66f);
@@ -919,6 +927,9 @@ public static partial class TrackSetup
         hudSo.FindProperty("itemIcon").objectReferenceValue = itemIcon;
         var ammo = Text("Ammo", itemBtn.transform.Find("ItemFace"), display, "", 40, Design.OnAccent, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-18, 0), new Vector2(110, 60));
         hudSo.FindProperty("ammoLabel").objectReferenceValue = ammo;
+        hudSo.FindProperty("abilityButton").objectReferenceValue = abilityBtn;
+        hudSo.FindProperty("abilityFill").objectReferenceValue = abilityFill;
+        hudSo.FindProperty("abilityLabel").objectReferenceValue = abilityBtn.GetComponentInChildren<TMP_Text>();
         // an achievement done mid-race: a banner under the race bar for a few seconds (RaceHud.Award)
         var awardPlate = Plate("AwardPlate", safe.transform, new Vector2(0.5f, 0), new Vector2(0, 250), new Vector2(1040, 68), deep);   // low: the finish words own the top
         var award = Text("Award", awardPlate, display, "", 32, paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000, 60));

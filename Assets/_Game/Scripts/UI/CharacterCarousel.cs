@@ -137,7 +137,9 @@ namespace KartCup
                 nameLabel.text = def.displayName.ToUpperInvariant();
                 if (Application.isPlaying) UiMotion.Punch(nameLabel.transform, 1.08f, 0.25f);   // a new driver, said out loud
             }
-            if (blurbLabel != null) blurbLabel.text = def.blurb;
+            // the driver's special, as Beach Buggy's driver screen names it under the character
+            var special = Ability.For(def.displayName);
+            if (blurbLabel != null) blurbLabel.text = $"{def.blurb}\n<color=#FFB126>{special.name}</color>  <size=90%>{special.line}</size>";
             speedBar?.Set(def.speed);
             accelBar?.Set(def.accel);
             handlingBar?.Set(def.handling);

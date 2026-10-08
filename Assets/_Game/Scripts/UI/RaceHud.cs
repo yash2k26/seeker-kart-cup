@@ -21,6 +21,10 @@ namespace KartCup
         [SerializeField] Image itemIcon;
         [SerializeField] TMP_Text ammoLabel;       // "×3": a box gives three shots, and the slot never said so
         [SerializeField] GameObject awardPlate;   // an achievement just done: a banner under the race bar
+        // the driver's special (Ability): its button, its name, the charge filling under it
+        [SerializeField] Image abilityButton, abilityFill;
+        [SerializeField] TMP_Text abilityLabel;
+        Ability playerAbility; bool abilityWasReady;
         [SerializeField] TMP_Text awardLabel;
         float awardUntil;
         [SerializeField] string[] glyphNames = System.Array.Empty<string>();
@@ -42,18 +46,52 @@ namespace KartCup
 
         public static RaceHud Instance { get; private set; }
         void Awake() => Instance = this;
-        void OnDestroy() { if (Instance == this) Instance = null; Achievements.Unlocked -= Award; }
+        void OnDestroy() { if (Instance == this) Instance = null; Achievements.Unlocked -= Award; Ability.Used -= OnAbility; }
+
+        /// The ability button.
+        public void FireAbility()
+        {
+            if (playerAbility == null) return;
+            if (!playerAbility.Fire()) Haptics.Play(Haptics.Kind.Tick);   // not charged yet (OnAbility says the rest)
+        }
+
+        /// Anyone's special: yours in big gold letters; a rival's near you as a line, so a spin has a name on it.
+        void OnAbility(Ability a)
+        {
+            if (a.isPlayer) { Big($"<color=#FFB126>{a.def.name}!</color>", 1.1f); AudioDirector.Instance?.Confirm(); return; }
+            var p = race != null ? race.Player : null;
+            if (p == null || (a.transform.position - p.transform.position).sqrMagnitude > 70f * 70f) return;
+            var who = a.GetComponent<KartProgress>();
+            Banner($"{(who != null ? who.racerName.ToUpperInvariant() : "RIVAL")}   ·   <color=#FFB126>{a.def.name}</color>", 1.6f);
+        }
+
+        void AbilityButton()
+        {
+            if (abilityButton == null) return;
+            if (playerAbility == null && race.Player != null) playerAbility = race.Player.GetComponent<Ability>();
+            bool show = playerAbility != null && race.state != RaceManager.State.Finished;
+            if (abilityButton.gameObject.activeSelf != show) abilityButton.gameObject.SetActive(show);
+            if (!show) return;
+            if (abilityLabel != null && abilityLabel.text != playerAbility.def.name) abilityLabel.text = playerAbility.def.name;
+            bool ready = playerAbility.Ready;
+            if (abilityFill != null) abilityFill.fillAmount = playerAbility.charge01;
+            var c = ready ? accent : idle; abilityButton.color = new Color(c.r, c.g, c.b, abilityButton.color.a);
+            if (abilityLabel != null) abilityLabel.color = ready ? onAccent : new Color(0.96f, 0.94f, 0.9f);
+            if (ready && !abilityWasReady) { UiMotion.Punch(abilityButton.transform, 1.15f, 0.3f); Haptics.Play(Haptics.Kind.TierUp); }
+            abilityWasReady = ready;
+        }
 
         void Award(Achievements.Def d) => Banner($"<color=#FFB126>ACHIEVEMENT</color>   {d.title.ToUpperInvariant()}   ·   + {Chests.Names[(int)d.reward]}");
 
         /// A line on the award plate for a few seconds (an achievement, a gold paint earned).
-        public void Banner(string text)
+        public void Banner(string text, float seconds = 3.2f)
         {
             if (awardPlate == null || awardLabel == null) return;
+            if (awardPlate.activeSelf && awardLabel.text.Contains("ACHIEVEMENT") && !text.Contains("ACHIEVEMENT")) return;   // an award is not cut short
             awardLabel.text = text;
             awardPlate.SetActive(true);
             UiMotion.Punch(awardPlate.transform, 1.12f, 0.3f);
-            awardUntil = Time.unscaledTime + 3.2f;
+            awardUntil = Time.unscaledTime + seconds;
             AudioDirector.Instance?.Confirm();
         }
 
@@ -63,6 +101,7 @@ namespace KartCup
         void Start()
         {
             Achievements.Unlocked += Award;
+            Ability.Used += OnAbility;
             if (awardPlate != null) awardPlate.SetActive(false);
             race = RaceManager.Instance;
             if (race == null) return;
@@ -160,6 +199,7 @@ namespace KartCup
             }
 
             WrongWay(p);
+            AbilityButton();
             if (awardPlate != null && awardPlate.activeSelf && Time.unscaledTime > awardUntil) awardPlate.SetActive(false);
             if (bigLabel != null && bigLabel.enabled && Time.time >= bigUntil) bigLabel.enabled = false;
         }

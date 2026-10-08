@@ -161,8 +161,16 @@ namespace KartCup
             else if (drifting && driftWant < 0.25f) drifting = false;
 
             Items(race, dt);
+            if (race != null && race.state == RaceManager.State.Racing && Time.time > nextAbility)
+            {
+                nextAbility = Time.time + Random.Range(0.8f, 2.2f);
+                if (ability == null) ability = GetComponent<Ability>();
+                ability?.ThinkFor(this, 1f - severity);
+            }
             base.Update();
         }
+
+        Ability ability; float nextAbility;
 
         /// Nudge off the racing line when another kart already owns it, and lift rather than rear-end them.
         float Traffic(RaceManager race)
