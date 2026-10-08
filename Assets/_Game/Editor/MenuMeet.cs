@@ -18,12 +18,22 @@ public static class MenuMeet
 
     // Who brings which kart: where it stands on the road (metres from the meet's centre: +X along the road to the
     // camera's right, +Z away from the camera), its heading (180 = nose at the camera), and what its driver is up to.
-    static readonly (string who, Vector3 at, float yaw, Act act)[] Crew =
+    // 9 Oct 2026: the whole roster, in select-screen order, left to right in two staggered lanes (near, far, near...)
+    // 3.25 m apart, so ten karts fit within 15 m of the hoarding and the title's dolly can keep both it and the
+    // chosen driver in frame. The driver select drives the camera from bay to bay (MenuBackdrop.Spot): Beach Buggy's
+    // one-set character screen. The three poses go round: lean on the kart, wipe its nose, sit on it.
+    const float Spacing = 3.25f, NearZ = -2.2f, FarZ = 4.4f;
+    static (string who, Vector3 at, float yaw, Act act)[] Crew()
     {
-        ("Toly",   new Vector3( 0.2f, 0f, -2.2f), 212f, Act.Lean),
-        ("Mert",   new Vector3( 8.2f, 0f,  3.6f), 258f, Act.Wipe),
-        ("Akshay", new Vector3(-3.4f, 0f,  4.4f), 228f, Act.Sit),
-    };
+        var roster = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
+        var names = roster != null && roster.characters.Length > 0 ? roster.characters.Where(c => c != null).Select(c => c.displayName).ToArray() : new[] { "Toly", "Mert", "Akshay" };
+        var acts = new[] { (Act.Lean, 212f), (Act.Wipe, 258f), (Act.Sit, 228f) };
+        return names.Select((who, i) =>
+        {
+            var (act, yaw) = acts[i % acts.Length];
+            return (who, new Vector3((i - (names.Length - 1) / 2f) * Spacing, 0f, i % 2 == 0 ? NearZ : FarZ), yaw, act);
+        }).ToArray();
+    }
 
     /// True where the meet stands: the menu keeps its palms and rocks off the road and out of the camera's way.
     public static bool Covers(Vector3 centre, Vector3 p) =>
@@ -36,7 +46,13 @@ public static class MenuMeet
         root.position = at;
         Street(root);
         Hoarding(root);
-        foreach (var c in Crew) Park(root, c.who, c.at, c.yaw, c.act);
+        foreach (var c in Crew())
+        {
+            Park(root, c.who, c.at, c.yaw, c.act);
+            // each bay's own warm key from the camera's side: the select screen stands close, and the two meet lights
+            // only reach the middle of the row
+            Spot(root, "BayKey_" + c.who, c.at + new Vector3(-2.5f, 6.5f, -7.5f), c.at + new Vector3(0f, 1.4f, 0f), new Color(1f, 0.88f, 0.72f), 150f, 48f);
+        }
         // The lamps stand behind the karts and rim them; the faces need light from the camera's side. A warm key from
         // high on the left, a cool fill low on the right: the film's meet.
         Spot(root, "MeetKey", new Vector3(-10f, 10f, -17f), new Vector3(2f, 2f, 0f), new Color(1f, 0.86f, 0.68f), 230f, 52f);

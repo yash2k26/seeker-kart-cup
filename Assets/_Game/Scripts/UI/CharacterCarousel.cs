@@ -22,6 +22,7 @@ namespace KartCup
         [SerializeField] TMP_Text nextLabel, secondaryLabel, tertiaryLabel;
         [SerializeField] Button secondaryButton, tertiaryButton;
         string message;   // a purchase's status, shown in the blurb's second line while it is fresh
+        MenuBackdrop backdrop; Transform bay;   // the street select: the driver's bay on the meet, when MenuMeet built one
         [SerializeField] StatBar speedBar, accelBar, handlingBar, weightBar, turboBar, attackBar;
         // The podium is a turntable: it turns steadily (degrees per second) with the kart standing on it. Swaying the
         // kart alone over bare sand read as floating. Time-based, so the garage and this screen never jump between them.
@@ -150,7 +151,10 @@ namespace KartCup
         {
             enabled = on;
             if (current != null) current.SetActive(on);
+            if (backdrop != null) backdrop.Spot = on && bay != null && gameObject.activeInHierarchy ? bay : null;
         }
+        /// The select screen opened again: the camera back to the driver on show.
+        public void Refocus() { if (backdrop != null && bay != null) backdrop.Spot = bay; }
 
         void Show()
         {
@@ -160,7 +164,15 @@ namespace KartCup
             if (current != null) Destroy(current);
             var kartPrefab = kartPrefabs.FirstOrDefault(k => k.name.EndsWith(def.kartId)) ?? kartPrefabs.FirstOrDefault();
             var driverPrefab = driverPrefabs.FirstOrDefault(d => d.name.EndsWith(def.driverId)) ?? driverPrefabs.FirstOrDefault();
-            if (standing && driverPrefab != null && podium != null) current = StandUp(driverPrefab, Application.isPlaying);
+            backdrop ??= FindFirstObjectByType<MenuBackdrop>();
+            bay = backdrop != null ? backdrop.BayOf(def.displayName) : null;
+            if (bay != null)
+            {   // the street: the camera goes to the driver where they stand with their kart; the turntable stays empty
+                backdrop.Spot = bay;
+                if (!Locked && CharacterDatabase.SelectedIndex == index) backdrop.Home = bay;
+                if (Application.isPlaying) bay.GetComponentInChildren<MeetActor>()?.Fidget();
+            }
+            else if (standing && driverPrefab != null && podium != null) current = StandUp(driverPrefab, Application.isPlaying);
             else if (kartPrefab != null && podium != null) current = Mount(kartPrefab, driverPrefab, podium, def.tint, Application.isPlaying);
 
             if (nameLabel != null)

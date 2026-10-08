@@ -37,6 +37,7 @@ namespace KartCup
         {
             Instance = this;
             backdrop = FindFirstObjectByType<MenuBackdrop>();
+            if (backdrop != null && roster != null) backdrop.Home = backdrop.BayOf(roster.Selected?.displayName);   // the title shows your driver
             RoomClient.LoadRequested += OnLoadRequested;
             RoomClient.RoomChanged += OnRoomChanged;
             Application.deepLinkActivated += OnDeepLink;
@@ -102,6 +103,11 @@ namespace KartCup
             if (panel == 0) backToTour = false;   // left the select screen by BACK: PLAY goes on to the tracks again
             if (backdrop != null) backdrop.Focused = panel == Select || panel == Garage || panel == Items;   // hold a composed angle while a kart is on show; the track panel covers the vista
             if (backdrop != null) backdrop.Close = panel == Select;                                          // the driver screen frames a person, close
+            if (backdrop != null)
+            {   // the street select's bay only while the driver screen is up; the garage and items use the turntable
+                if (panel == Select) { carousel ??= FindFirstObjectByType<CharacterCarousel>(); carousel?.Refocus(); }
+                else backdrop.Spot = null;
+            }
         }
 
         int Direction(int from, int to)

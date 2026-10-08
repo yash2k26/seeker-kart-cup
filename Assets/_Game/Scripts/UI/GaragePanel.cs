@@ -183,6 +183,7 @@ namespace KartCup
         {
             var backdrop = FindFirstObjectByType<MenuBackdrop>();
             if (backdrop == null || kart == null) return;
+            backdrop.Spot = null;   // the garage is on the turntable, not on the street
             var b = new Bounds(kart.transform.position, Vector3.zero);
             foreach (var r in kart.GetComponentsInChildren<MeshRenderer>()) b.Encapsulate(r.bounds);
             float size = Mathf.Max(b.size.x, b.size.z);

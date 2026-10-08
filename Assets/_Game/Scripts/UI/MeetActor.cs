@@ -37,6 +37,9 @@ namespace KartCup
             if (anim != null && anim.clip != null) anim[anim.clip.name].time = Random.Range(0f, anim.clip.length);
         }
 
+        /// A take now: the driver the select screen just arrived at reacts.
+        public void Fidget() { nextFidget = Time.time; }
+
         void Update()
         {
             if (anim == null || fidgets == null || fidgets.Length == 0 || Time.time < nextFidget) return;
