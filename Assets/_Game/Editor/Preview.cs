@@ -258,6 +258,12 @@ public static class MenuPreview
                 foreach (var garage in Object.FindObjectsByType<GaragePanel>(FindObjectsSortMode.None)) garage.ShowInEditor(2, Paints.IndexOf("gold") + 1);
                 Canvas.ForceUpdateCanvases(); Shot(cam, "menu7-gold-locked");
             }
+            if (i == 10)   // the event card before a Tour race: a boss duel
+            {
+                foreach (var tour in Object.FindObjectsByType<TourPanel>(FindObjectsSortMode.None)) tour.CardInEditor(0, 4);
+                Canvas.ForceUpdateCanvases(); Shot(cam, "menu10-card");
+                foreach (var tour in Object.FindObjectsByType<TourPanel>(FindObjectsSortMode.None)) tour.ShowInEditor(1);
+            }
         }
         // The chest overlay over the title: a gold chest open, then the page that explains chests and its drop rates
         var reveal = Object.FindObjectsByType<ChestReveal>(FindObjectsInactive.Include, FindObjectsSortMode.None).FirstOrDefault();

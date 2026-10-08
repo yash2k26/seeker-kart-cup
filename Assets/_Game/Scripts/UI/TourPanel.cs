@@ -22,6 +22,12 @@ namespace KartCup
         [SerializeField] Image prizeSwatch;
         [SerializeField] TMP_Text prizeLabel;
         [SerializeField] Color tabOn, tabOff, textOn, textOff, starOn, starOff, playNext, playIdle, inkOnNext = new(0.09f, 0.02f, 0.25f), inkIdle = new(0.96f, 0.94f, 0.9f);
+        // Beach Buggy's event card, before the race: the mode and its one rule, the stars still to earn, the goal, what
+        // it pays, your best on that circuit, and a big RACE
+        [SerializeField] GameObject card;
+        [SerializeField] TMP_Text cardMode, cardTitle, cardTrack, cardRule, cardGoal, cardPrize, cardBest;
+        [SerializeField] Image[] cardStars = System.Array.Empty<Image>();
+        int pendingRow = -1;
 
         int cup = -1;
 
@@ -37,7 +43,48 @@ namespace KartCup
         {
             var c = Tour.Cups[cup];
             if (!Tour.Open(cup) || row >= c.events.Length) { Haptics.Play(Haptics.Kind.Tick); AudioDirector.Instance?.Error(); return; }
-            ScreenFlow.Instance?.StartTourEvent(c.events[row], c);
+            if (card == null) { ScreenFlow.Instance?.StartTourEvent(c.events[row], c); return; }
+            pendingRow = row;
+            ShowCard(c, row);
+            UiMotion.Show(card, card.transform.childCount > 0 ? card.transform.GetChild(0) : card.transform);
+            Haptics.Play(Haptics.Kind.Tick); AudioDirector.Instance?.Click();
+        }
+
+        /// The card's RACE.
+        public void Race()
+        {
+            var c = Tour.Cups[cup];
+            if (pendingRow < 0 || pendingRow >= c.events.Length) return;
+            ScreenFlow.Instance?.StartTourEvent(c.events[pendingRow], c);
+        }
+
+        /// The card's back: the list again.
+        public void CloseCard() { if (card != null && card.activeSelf) UiMotion.Hide(card); pendingRow = -1; }
+
+        void OnDisable() { if (card != null) card.SetActive(false); pendingRow = -1; }
+
+        void ShowCard(Tour.CupDef c, int row)
+        {
+            var e = c.events[row];
+            bool duel = e.mode == RaceMode.Kind.Duel, boss = row == c.events.Length - 1;
+            var rival = duel && roster != null && e.rival >= 0 ? roster.At(e.rival) : null;
+            int got = Tour.Stars(e.id);
+            if (cardMode != null) cardMode.text = boss ? "BOSS DUEL" : RaceMode.Name(e.mode);
+            if (cardTitle != null) cardTitle.text = e.title.ToUpperInvariant();
+            if (cardTrack != null) cardTrack.text = Tracks.At(e.track).name.ToUpperInvariant() + "  ·  " + c.name;
+            if (cardRule != null) cardRule.text = e.mode switch
+            {
+                RaceMode.Kind.Duel => rival != null ? $"One on one against {rival.displayName}. First over the line wins." : "One on one. First over the line wins.",
+                RaceMode.Kind.Elimination => "The last kart is knocked out every 15 seconds. Be the last one left.",
+                _ => "Race the other drivers to the finish line.",
+            };
+            if (cardGoal != null) cardGoal.text = duel ? "WIN THE DUEL  ·  3 STARS" : "1ST  3 STARS   ·   2ND  2   ·   3RD  1";
+            var paint = boss ? Paints.All.FirstOrDefault(p => p.sku == c.bossPaint) : null;
+            if (cardPrize != null) cardPrize.text = boss ? (Tour.BossBeaten(cup) ? $"{paint?.name}  ·  WON" : $"{paint?.name ?? "A PAINT"}  +  GOLDEN CHEST") : got >= Tour.StarsPerEvent ? "ALL STARS WON" : "STARS TOWARD THE NEXT CUP";
+            float best = Tracks.Best(Tracks.At(e.track).id);
+            if (cardBest != null) cardBest.text = best > 0f ? $"YOUR BEST  {RaceHud.Clock(best)}" : "NO BEST YET";
+            for (int k = 0; k < cardStars.Length; k++)
+                if (cardStars[k] != null) { cardStars[k].color = (duel ? got > 0 : k < got) ? starOn : starOff; cardStars[k].gameObject.SetActive(!duel || k == 1); }
         }
 
         public void ChangeDriver() => ScreenFlow.Instance?.ChangeDriverFromTour();
@@ -94,6 +141,8 @@ namespace KartCup
         }
 
         /// Editor-side preview.
-        public void ShowInEditor(int i) { cup = i; Show(); }
+        public void ShowInEditor(int i) { cup = i; Show(); if (card != null) card.SetActive(false); }
+        /// Previews: the event card for a row, open.
+        public void CardInEditor(int i, int row) { cup = i; Show(); pendingRow = row; ShowCard(Tour.Cups[cup], row); if (card != null) card.SetActive(true); }
     }
 }

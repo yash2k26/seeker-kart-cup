@@ -212,6 +212,33 @@ public static partial class MenuSetup
             rows[i] = rt.gameObject;
         }
 
+        // Beach Buggy's event card: opens over the list when a PLAY is tapped; RACE starts it, the dim closes it
+        var cardRoot = Rect("EventCard", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        var cardDim = cardRoot.gameObject.AddComponent<Image>(); cardDim.color = new Color(Deep.r, Deep.g, Deep.b, 0.8f);
+        var closeCard = cardRoot.gameObject.AddComponent<Button>(); closeCard.transition = Selectable.Transition.None;
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(closeCard.onClick, panel.CloseCard);
+        var ec = Rect("Card", cardRoot, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -24), new Vector2(1100, 840));
+        var ecImg = Design.AsCard(ec, Panel); ecImg.raycastTarget = true;   // taps on the card do not close it
+        var cMode = Label("Mode", ec, strong, "RACE", 30, Accent, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -40), new Vector2(900, 40)); cMode.characterSpacing = 10f;
+        var cTitle = Label("Title", ec, display, "", 80, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -86), new Vector2(1000, 100));
+        cTitle.enableAutoSizing = true; cTitle.fontSizeMin = 48; cTitle.fontSizeMax = 80;
+        var cTrack = Label("Track", ec, strong, "", 28, Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -190), new Vector2(1000, 40)); cTrack.characterSpacing = 4f;
+        var cardStars = new Image[3];
+        for (int k = 0; k < 3; k++)
+        {
+            var st = Rect("Star" + k, ec, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2((k - 1) * 130, -310), new Vector2(110, 110));
+            cardStars[k] = st.gameObject.AddComponent<Image>(); cardStars[k].sprite = IconSprite("star"); cardStars[k].raycastTarget = false;
+        }
+        var cRule = Label("Rule", ec, body, "", 32, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -400), new Vector2(940, 90));
+        cRule.textWrappingMode = TextWrappingModes.Normal;
+        var cGoal = Label("Goal", ec, strong, "", 28, Accent, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -490), new Vector2(940, 40));
+        var cPrize = Label("Prize", ec, strong, "", 26, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -536), new Vector2(940, 40));
+        var cBest = Label("Best", ec, body, "", 24, Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -578), new Vector2(940, 36));
+        var raceBtn = Button("Race", ec, "RACE", Accent, Paper, 56, new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(480, 128), icon: "flag");
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(raceBtn.onClick, panel.Race);
+        Shine(raceBtn);
+        cardRoot.gameObject.SetActive(false);
+
         new SerializedObject(panel).Do(s =>
         {
             s.FindProperty("roster").objectReferenceValue = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
@@ -229,6 +256,12 @@ public static partial class MenuSetup
             Fill(s.FindProperty("playBacks"), playBacks.Cast<Object>().ToArray());
             Fill(s.FindProperty("plays"), plays.Cast<Object>().ToArray());
             s.FindProperty("prizeSwatch").objectReferenceValue = sw;
+            s.FindProperty("card").objectReferenceValue = cardRoot.gameObject;
+            s.FindProperty("cardMode").objectReferenceValue = cMode; s.FindProperty("cardTitle").objectReferenceValue = cTitle;
+            s.FindProperty("cardTrack").objectReferenceValue = cTrack; s.FindProperty("cardRule").objectReferenceValue = cRule;
+            s.FindProperty("cardGoal").objectReferenceValue = cGoal; s.FindProperty("cardPrize").objectReferenceValue = cPrize;
+            s.FindProperty("cardBest").objectReferenceValue = cBest;
+            Fill(s.FindProperty("cardStars"), cardStars.Cast<Object>().ToArray());
             s.FindProperty("prizeLabel").objectReferenceValue = prize;
             s.FindProperty("tabOn").colorValue = Design.Ink600;
             s.FindProperty("tabOff").colorValue = new Color(0, 0, 0, 0);
