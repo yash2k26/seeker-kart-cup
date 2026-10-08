@@ -51,7 +51,7 @@ public static class MenuMeet
             Park(root, c.who, c.at, c.yaw, c.act);
             // each bay's own warm key from the camera's side: the select screen stands close, and the two meet lights
             // only reach the middle of the row
-            Spot(root, "BayKey_" + c.who, c.at + new Vector3(-2.5f, 6.5f, -7.5f), c.at + new Vector3(0f, 1.4f, 0f), new Color(1f, 0.88f, 0.72f), 150f, 48f);
+            Spot(root, "BayKey_" + c.who, c.at + new Vector3(-2.5f, 6.5f, -7.5f), c.at + new Vector3(0f, 1.4f, 0f), new Color(1f, 0.88f, 0.72f), 110f, 48f);
         }
         // The lamps stand behind the karts and rim them; the faces need light from the camera's side. A warm key from
         // high on the left, a cool fill low on the right: the film's meet.
