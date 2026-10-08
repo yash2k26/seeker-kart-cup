@@ -14,6 +14,9 @@ namespace KartCup
         public Color tint = Color.white;
         [Range(-2, 2)] public int speed, accel, handling, weight, turbo, attack;   // six pips that sum to zero: a shape, not an edge
         public string blurb = "";
+        /// "" = free. "driver.<id>" = locked: bought in the shop (catalog.ts) or earned by beating them as a Tour boss.
+        public string sku = "";
+        public bool IsFree => string.IsNullOrEmpty(sku);
 
         /// Paint the kart in this racer's colour. Six runtime material instances per race is nothing, and the SRP
         /// Batcher still batches them because it keys on the shader, not the material.

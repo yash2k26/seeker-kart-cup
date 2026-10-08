@@ -8,7 +8,7 @@ export type Currency = 'SOL' | 'SKR' | 'ORE';
 export const DECIMALS: Record<Currency, number> = { SOL: 9, SKR: 6, ORE: 11 };
 
 export type Powers = { speed: number; turbo: number; grip: number; armor: number; attack: number };
-export type Sku = { sku: string; kind: 'kart' | 'paint' | 'bundle' | 'item'; name: string; blurb: string; sol: number; skrOnly?: boolean; grants?: string[]; until?: string;
+export type Sku = { sku: string; kind: 'kart' | 'paint' | 'bundle' | 'item' | 'driver'; name: string; blurb: string; sol: number; skrOnly?: boolean; grants?: string[]; until?: string;
                     powers?: Powers; item?: string; qty?: number };
 
 /** A kart's price follows its powers: five of 0..5 pips, and the total lands on a rung. The phone carries the same
@@ -23,6 +23,9 @@ const kart = (id: string, name: string, blurb: string, speed: number, turbo: num
 };
 const pack = (id: string, item: string, name: string, blurb: string, qty: number, sol: number): Sku =>
   ({ sku: `item.${id}${qty}`, kind: 'item', name, blurb, item, qty, sol });
+// The four judges (9 Oct 2026): locked drivers, each also earned free by beating them in their Kartel Tour boss duel
+// (Tour.cs bossSku). The sku names must match TrackSetup.Roster's paid table.
+const driver = (id: string, name: string, blurb: string, sol: number): Sku => ({ sku: 'driver.' + id, kind: 'driver', name, blurb, sol });
 
 // research/23: sell karts, paint and what you take into a race, never drivers (three are real people). Every price
 // is in SOL (1 Oct 2026: no dollars anywhere; SKR and ORE are derived from it in prices.ts). Karts by their powers: Street
@@ -44,6 +47,11 @@ export const CATALOG: Sku[] = [
   kart('garbage-truck',    'Garbage Chain', 'Hauls the whole mempool.',              2, 3, 3, 5, 5),
   kart('tractor',          'Yield Farmer',  'Slow off the line, unstoppable after.', 2, 5, 3, 5, 3),
   kart('race-future',      'Photon',        'Low, wide, glued to the road.',         5, 4, 5, 2, 2),
+
+  driver('mert',   'Mert',   'Indexes every corner before he takes it. Or beat him in Cup 1.',             0.08),
+  driver('akshay', 'Akshay', 'Top speed, turns like a ferry. Or beat him in Cup 2.',                       0.08),
+  driver('chase',  'Chase',  'Knows every dev on the grid. Waves at all of them. Or beat him in Cup 3.',   0.08),
+  driver('toly',   'Toly',   'Ships blocks faster than you can read them. Or beat him in Cup 4.',          0.12),
 
   // packs: the item name is the ItemManager's, the count is credited to the phone's inventory when the purchase verifies
   pack('rocket',  'Rocket',      'Rockets x3',  'Straight, fast, no manners.',                3, 0.01),

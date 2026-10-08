@@ -23,3 +23,4 @@ MonoBehaviour:
   turbo: 1
   attack: -1
   blurb: Ships blocks faster than you can read them.
+  sku: driver.toly

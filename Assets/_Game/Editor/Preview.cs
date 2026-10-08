@@ -173,8 +173,10 @@ public static class MenuPreview
     {
         var cfg = new KartApi.ConfigDto { treasuryOwner = "sample", treasuryAta = "sample", skrMint = "sample", oreMint = "sample", treasuryOreAta = "sample" };
         var karts = AssetDatabase.LoadAssetAtPath<KartDatabase>("Assets/_Game/Data/Karts.asset");
+        var roster = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
         var skus = (karts != null ? karts.karts.Where(k => k != null && !string.IsNullOrEmpty(k.sku)).Select(k => k.sku) : Enumerable.Empty<string>())
-                   .Concat(Paints.All.Where(p => !string.IsNullOrEmpty(p.sku)).Select(p => p.sku)).Concat(Inventory.Packs.Select(p => p.sku));
+                   .Concat(Paints.All.Where(p => !string.IsNullOrEmpty(p.sku)).Select(p => p.sku)).Concat(Inventory.Packs.Select(p => p.sku))
+                   .Concat(roster != null ? roster.characters.Where(c => c != null && !c.IsFree).Select(c => c.sku) : Enumerable.Empty<string>());
         foreach (var sku in skus.Distinct())
         {
             bool skrOnly = sku == "paint.rally";

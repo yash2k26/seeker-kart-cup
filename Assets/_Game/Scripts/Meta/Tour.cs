@@ -7,7 +7,8 @@ namespace KartCup
 {
     /// Kartel Tour, the career (Beach Buggy's series): four cups of five events, each event worth up to three stars
     /// (1st 3, 2nd 2, 3rd 1; a duel's win 3), kept at their best. Stars open the next cup. Each cup ends in a boss duel
-    /// against one of the grid's own: beat them and their paint is yours (never sold), with a golden chest. A cup's
+    /// against one of the grid's own: beat them and they join your roster (the four judges are otherwise bought) with
+    /// their paint (never sold) and a golden chest. A cup's
     /// field is quicker than the last (RaceMode.Difficulty), so the stars mean something.
     public static class Tour
     {
@@ -15,13 +16,13 @@ namespace KartCup
         public sealed class CupDef
         {
             public string name, kicker; public int gate; public float pace;
-            public int boss; public string bossPaint; public Event[] events;
+            public int boss; public string bossPaint, bossSku; public Event[] events;
         }
 
         // roster indices (TrackSetup.Roster): 0 Toly 1 Mert 2 Akshay 3 Emmett 4 Bitsy 5 Pip 6 Chase 7 Beeman 8 Maroo 9 Andrew
         public static readonly CupDef[] Cups =
         {
-            new() { name = "ROOKIE RUN", kicker = "CUP 1", gate = 0, pace = 0.93f, boss = 1, bossPaint = "boss.mert", events = new[]
+            new() { name = "ROOKIE RUN", kicker = "CUP 1", gate = 0, pace = 0.93f, boss = 1, bossPaint = "boss.mert", bossSku = "driver.mert", events = new[]
             {
                 new Event { id = "c1e1", title = "Night Sprint", track = 0, mode = RaceMode.Kind.Race },
                 new Event { id = "c1e2", title = "Pine Run", track = 2, mode = RaceMode.Kind.Race },
@@ -29,7 +30,7 @@ namespace KartCup
                 new Event { id = "c1e4", title = "Cold Start", track = 1, mode = RaceMode.Kind.Race },
                 new Event { id = "c1b", title = "BOSS: MERT", track = 0, mode = RaceMode.Kind.Duel, rival = 1 },
             } },
-            new() { name = "COAST CUP", kicker = "CUP 2", gate = 9, pace = 0.98f, boss = 2, bossPaint = "boss.akshay", events = new[]
+            new() { name = "COAST CUP", kicker = "CUP 2", gate = 9, pace = 0.98f, boss = 2, bossPaint = "boss.akshay", bossSku = "driver.akshay", events = new[]
             {
                 new Event { id = "c2e1", title = "Sunset Laps", track = 3, mode = RaceMode.Kind.Race },
                 new Event { id = "c2e2", title = "Ridge Cut", track = 2, mode = RaceMode.Kind.Elimination },
@@ -37,7 +38,7 @@ namespace KartCup
                 new Event { id = "c2e4", title = "Black Ice", track = 1, mode = RaceMode.Kind.Elimination },
                 new Event { id = "c2b", title = "BOSS: AKSHAY", track = 1, mode = RaceMode.Kind.Duel, rival = 2 },
             } },
-            new() { name = "PRO SERIES", kicker = "CUP 3", gate = 21, pace = 1.02f, boss = 6, bossPaint = "boss.chase", events = new[]
+            new() { name = "PRO SERIES", kicker = "CUP 3", gate = 21, pace = 1.02f, boss = 6, bossPaint = "boss.chase", bossSku = "driver.chase", events = new[]
             {
                 new Event { id = "c3e1", title = "Speedway Heat", track = 3, mode = RaceMode.Kind.Elimination },
                 new Event { id = "c3e2", title = "Summit Rush", track = 1, mode = RaceMode.Kind.Race },
@@ -45,7 +46,7 @@ namespace KartCup
                 new Event { id = "c3e4", title = "Coast Knockout", track = 0, mode = RaceMode.Kind.Elimination },
                 new Event { id = "c3b", title = "BOSS: CHASE", track = 2, mode = RaceMode.Kind.Duel, rival = 6 },
             } },
-            new() { name = "LEGENDS", kicker = "CUP 4", gate = 36, pace = 1.06f, boss = 0, bossPaint = "boss.toly", events = new[]
+            new() { name = "LEGENDS", kicker = "CUP 4", gate = 36, pace = 1.06f, boss = 0, bossPaint = "boss.toly", bossSku = "driver.toly", events = new[]
             {
                 new Event { id = "c4e1", title = "Midnight Grand", track = 0, mode = RaceMode.Kind.Race },
                 new Event { id = "c4e2", title = "Peak Elimination", track = 1, mode = RaceMode.Kind.Elimination },
@@ -116,8 +117,11 @@ namespace KartCup
                 {
                     var paint = Paints.All.FirstOrDefault(p => p.sku == cup.bossPaint);
                     if (paint != null) Unlocks.Earn(paint.sku);
+                    bool recruited = !string.IsNullOrEmpty(cup.bossSku) && !Unlocks.Has(cup.bossSku);
+                    if (recruited) Unlocks.Earn(cup.bossSku);   // the boss drives for you now (Beach Buggy's recruit)
                     Chests.Give(Chests.Tier.Treasure);
-                    r.prize = $"{paint?.name ?? "A PAINT"} IS YOURS  ·  + GOLDEN TREASURE CHEST";
+                    string who = ev.title.Replace("BOSS: ", "");
+                    r.prize = (recruited ? $"{who} JOINS YOUR ROSTER  ·  " : "") + $"{paint?.name ?? "A PAINT"} IS YOURS  ·  + GOLDEN TREASURE CHEST";
                 }
             }
             KartApi.Event("tour", new { id, place, stars, gained = r.gained });

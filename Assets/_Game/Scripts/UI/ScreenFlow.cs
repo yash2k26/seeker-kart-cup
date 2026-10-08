@@ -15,6 +15,7 @@ namespace KartCup
         [SerializeField] GameObject[] panels = System.Array.Empty<GameObject>();   // 0 title, 1 select, 2 board, 3 settings, 4 track, 5 rooms, 6 lobby, 7 garage
         [SerializeField] int startPanel;
         [SerializeField] CharacterDatabase roster;
+        CharacterCarousel carousel;
         [SerializeField] TMP_Text playLabel;      // says CONTINUE CUP when one is half-run
 
         const int Select = 1, Track = 4, Rooms = 5, Lobby = 6, Garage = 7, Items = 8, WeeklyScreen = 9, TourScreen = 10, AchievementsScreen = 11;
@@ -118,6 +119,7 @@ namespace KartCup
         public void ShowTrack()
         {
             if (Time.unscaledTime - lastShow < 0.3f) return;   // NEXT overlaps PLAY: a double tap must not skip character select
+            if (current == Select) { carousel ??= FindFirstObjectByType<CharacterCarousel>(); if (carousel != null && carousel.Locked) { carousel.Unlock("SKR"); return; } }   // a judge not yet bought or beaten
             if (current == Select && roster != null) Voices.Say(roster.At(CharacterDatabase.SelectedIndex)?.driverId, "go");   // the chosen driver is in
             if (backToTour) { backToTour = false; Show(TourScreen); return; }        // the driver was changed from the Tour
             Show(Track);

@@ -163,7 +163,7 @@ namespace KartCup
                     !owned && (trial || item != null));
                 SetButton(tertiaryLabel, tertiaryButton, !owned && Ore(item) != "" ? $"PAY {Ore(item)}" : "", !owned);
             }
-            Beside(secondaryButton, tertiaryButton);
+            UiMotion.Beside(secondaryButton, tertiaryButton);
 
             for (int i = 0; i < powerBars.Length; i++)
                 if (powerBars[i] != null) powerBars[i].SetCount(i switch { 0 => def.speed, 1 => def.turbo, 2 => def.grip, 3 => def.armor, _ => def.attack });
@@ -193,14 +193,6 @@ namespace KartCup
         {
             if (label != null) label.text = text;
             if (button != null) { button.gameObject.SetActive(!string.IsNullOrEmpty(text)); button.interactable = interactable; }
-        }
-
-        /// The SOL button shares its row with the ORE one when both show, and has the row to itself otherwise.
-        static void Beside(Button left, Button right)
-        {
-            if (left == null) return;
-            var rt = (RectTransform)left.transform; bool both = right != null && right.gameObject.activeSelf;
-            rt.sizeDelta = new Vector2(both ? 284 : 584, rt.sizeDelta.y); rt.anchoredPosition = new Vector2(both ? -150 : 0, rt.anchoredPosition.y);
         }
 
         static string Skr(KartApi.ShopItem i) => WalletFlow.Amount(i.price.GetValueOrDefault("SKR"), "SKR");

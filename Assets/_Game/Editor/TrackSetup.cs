@@ -767,6 +767,9 @@ public static partial class TrackSetup
             ("Maroo",    "oopi", "Maroo",  0,  0,  1, -1,  1, -1, "Big curls, bigger drifts."),
             ("Andrew",   "ooli", "Andrew", 1,  0,  1,  0, -1, -1, "Reviews every corner. Approves none."),
         };
+        // The four CLOCK IN judges are locked (9 Oct 2026): bought in the shop, or earned by beating them in their Tour boss
+        // duel (Tour.Cups bossSku). The same names are the Tour bosses, so the two tables must agree.
+        var paid = new Dictionary<string, string> { ["Toly"] = "driver.toly", ["Mert"] = "driver.mert", ["Akshay"] = "driver.akshay", ["Chase"] = "driver.chase" };
         var defs = (db.characters ?? System.Array.Empty<CharacterDef>()).Where(d => d != null).ToList();
         foreach (var r in rows)
         {
@@ -780,6 +783,7 @@ public static partial class TrackSetup
                 Debug.Log($"[track] roster: added {r.name}");
             }
             def.displayName = r.name; def.kartId = r.kart; def.driverId = r.driver; def.blurb = r.blurb;
+            def.sku = paid.TryGetValue(r.name, out var sku) ? sku : "";
             def.speed = r.sp; def.accel = r.ac; def.handling = r.hd; def.weight = r.wt; def.turbo = r.tb; def.attack = r.at;
             EditorUtility.SetDirty(def);
         }

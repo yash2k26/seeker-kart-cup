@@ -57,6 +57,14 @@ namespace KartCup
         }
 
         /// Scale punch for a value that just changed: position, countdown digit, a callout.
+        /// A SOL button shares its row with the ORE one when both show, and has the row to itself otherwise (the shop screens).
+        public static void Beside(UnityEngine.UI.Button left, UnityEngine.UI.Button right)
+        {
+            if (left == null) return;
+            var rt = (RectTransform)left.transform; bool both = right != null && right.gameObject.activeSelf;
+            rt.sizeDelta = new Vector2(both ? 284 : 584, rt.sizeDelta.y); rt.anchoredPosition = new Vector2(both ? -150 : 0, rt.anchoredPosition.y);
+        }
+
         public static void Punch(Transform t, float from = 1.25f, float seconds = 0.3f)
         {
             if (t == null || !Application.isPlaying) return;

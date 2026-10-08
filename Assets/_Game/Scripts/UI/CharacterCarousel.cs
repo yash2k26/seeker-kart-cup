@@ -1,8 +1,10 @@
+using System.Collections.Generic;
 using System.Linq;
 using PowerslideKartPhysics;
 using PrimeTween;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace KartCup
 {
@@ -16,6 +18,10 @@ namespace KartCup
         [SerializeField] GameObject[] kartPrefabs;
         [SerializeField] GameObject[] driverPrefabs;
         [SerializeField] TMP_Text nameLabel, blurbLabel;
+        // the big button says CHOOSE TRACK, or UNLOCK · price for a locked judge; the half-row under it takes SOL and ORE
+        [SerializeField] TMP_Text nextLabel, secondaryLabel, tertiaryLabel;
+        [SerializeField] Button secondaryButton, tertiaryButton;
+        string message;   // a purchase's status, shown in the blurb's second line while it is fresh
         [SerializeField] StatBar speedBar, accelBar, handlingBar, weightBar, turboBar, attackBar;
         // The podium is a turntable: it turns steadily (degrees per second) with the kart standing on it. Swaying the
         // kart alone over bare sand read as floating. Time-based, so the garage and this screen never jump between them.
@@ -34,6 +40,8 @@ namespace KartCup
         /// The driver on the turntable changed (arrows, a flick, or a face in the roster strip).
         public static event System.Action<int> Changed;
         public int Index => index;
+        /// The driver on show is a judge this phone has not bought or beaten yet: browsable, not raceable.
+        public bool Locked => roster != null && !CharacterDatabase.Owned(roster.At(index));
 
         void Start()
         {
@@ -49,8 +57,8 @@ namespace KartCup
         {
             if (roster == null || i < 0 || i >= roster.characters.Length) return;
             if (i == index) { Poke(); return; }
-            index = i;
-            CharacterDatabase.SelectedIndex = index;
+            index = i; message = null;
+            if (!Locked) CharacterDatabase.SelectedIndex = index;   // a locked judge is looked at, not picked
             Show();
             Greet(0.22f);
         }
@@ -107,12 +115,35 @@ namespace KartCup
         {
             if (roster == null || roster.characters.Length == 0) return;
             index = ((index + delta) % roster.characters.Length + roster.characters.Length) % roster.characters.Length;
-            CharacterDatabase.SelectedIndex = index;
+            message = null;
+            if (!Locked) CharacterDatabase.SelectedIndex = index;
             Haptics.Play(Haptics.Kind.Tick);
             AudioDirector.Instance?.Click();
             Show();
             Greet(0.22f);
         }
+
+        static void SetButton(TMP_Text label, Button button, string text)
+        {
+            if (label != null) label.text = text;
+            if (button != null) button.gameObject.SetActive(!string.IsNullOrEmpty(text));
+        }
+
+        /// CHOOSE TRACK on a locked judge, or a tap on the SOL/ORE half-row: buy them. Beating them in the Tour is the free way.
+        public async void Unlock(string currency)
+        {
+            var def = roster != null ? roster.At(index) : null;
+            if (def == null || !Locked || busy) return;
+            if (WalletFlow.Instance == null) { message = "Wallet not ready"; Show(); return; }
+            busy = true; message = "Opening wallet…"; Show();
+            bool ok = await WalletFlow.Instance.Buy(def.sku, currency);
+            busy = false; message = WalletFlow.Instance.LastStatus;
+            if (ok) { CharacterDatabase.SelectedIndex = index; Haptics.Play(Haptics.Kind.Win); AudioDirector.Instance?.Confirm(); Greet(0.2f); }
+            Show();
+        }
+        bool busy;
+        public void Secondary() => Unlock("SOL");
+        public void Tertiary() => Unlock("ORE");
 
         /// The garage borrows the podium: hide our kart (and stop turning it) while it is open, bring it back after.
         public void SetVisible(bool on)
@@ -139,7 +170,18 @@ namespace KartCup
             }
             // the driver's special, as Beach Buggy's driver screen names it under the character
             var special = Ability.For(def.displayName);
-            if (blurbLabel != null) blurbLabel.text = $"{def.blurb}\n<color=#FFB126>{special.name}</color>  <size=90%>{special.line}</size>";
+            bool locked = Locked;
+            var item = locked ? KartApi.Cfg?.Item(def.sku) : null;
+            // two lines fit above the stat rows: the blurb and the special, or (locked) the one line that says how to get them
+            string second = message ?? $"<color=#FFB126>{special.name}</color>  <size=90%>{special.line}</size>";
+            if (blurbLabel != null) blurbLabel.text = locked && message == null ? $"<color=#FFB126>LOCKED</color>  Beat {def.displayName} in Kartel Tour, or unlock now."
+                                                    : $"{def.blurb}\n{second}";
+            if (nextLabel != null) nextLabel.text = !locked ? "CHOOSE TRACK" : item != null ? $"UNLOCK  ·  {WalletFlow.Amount(item.price.GetValueOrDefault("SKR"), "SKR")}" : KartApi.Cfg == null ? "CONNECT TO BUY" : "…";
+            string sol = item != null ? WalletFlow.Amount(item.price.GetValueOrDefault("SOL"), "SOL") : "";
+            string ore = item != null && KartApi.Cfg != null && KartApi.Cfg.TakesOre ? WalletFlow.Amount(item.price.GetValueOrDefault("ORE"), "ORE") : "";
+            SetButton(secondaryLabel, secondaryButton, locked && sol != "" ? $"PAY {sol}" : "");
+            SetButton(tertiaryLabel, tertiaryButton, locked && ore != "" ? $"PAY {ore}" : "");
+            UiMotion.Beside(secondaryButton, tertiaryButton);
             speedBar?.Set(def.speed);
             accelBar?.Set(def.accel);
             handlingBar?.Set(def.handling);

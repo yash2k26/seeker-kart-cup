@@ -483,10 +483,16 @@ public static partial class MenuSetup
         var labels = new[] { "SPEED", "ACCEL", "GRIP", "WEIGHT", "TURBO", "ATTACK" };
         for (int i = 0; i < 6; i++) bars[i] = StatRow(card, labels[i], -276 - i * 56);
 
-        var next = Button("Next", card, "CHOOSE TRACK", Accent, Paper, 52,
-                          new Vector2(0.5f, 0), new Vector2(0, 48), new Vector2(584, 136), icon: "next", iconAfter: true);
+        var next = Button("Next", card, "CHOOSE TRACK", Accent, Paper, 46,
+                          new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(584, 112), icon: "next", iconAfter: true);   // 112 high: the pay row fits above it, under ATTACK
         Wire(next, nameof(ScreenFlow.ShowTrack));
         Shine(next);
+        // a locked judge: PAY in SOL / PAY in ORE above the big button (which reads UNLOCK · SKR); both hidden otherwise
+        var payB = Button("Secondary", card, "PAY SOL", Slate, Paper, 32, new Vector2(0.5f, 0), new Vector2(0, 160), new Vector2(584, 72));
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(payB.onClick, carousel.Secondary);
+        var payC = Button("Tertiary", card, "PAY ORE", Slate, Paper, 32, new Vector2(0.5f, 0), new Vector2(150, 160), new Vector2(284, 72));
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(payC.onClick, carousel.Tertiary);
+        payB.gameObject.SetActive(false); payC.gameObject.SetActive(false);
 
         // Every driver's face in a row along the bottom right, clear of the card: tap one to put them on the turntable.
         var roster = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
@@ -569,6 +575,11 @@ public static partial class MenuSetup
         so.FindProperty("weightBar").objectReferenceValue = bars[3];
         so.FindProperty("turboBar").objectReferenceValue = bars[4];
         so.FindProperty("attackBar").objectReferenceValue = bars[5];
+        so.FindProperty("nextLabel").objectReferenceValue = next.GetComponentInChildren<TMP_Text>();
+        so.FindProperty("secondaryLabel").objectReferenceValue = payB.GetComponentInChildren<TMP_Text>();
+        so.FindProperty("tertiaryLabel").objectReferenceValue = payC.GetComponentInChildren<TMP_Text>();
+        so.FindProperty("secondaryButton").objectReferenceValue = payB;
+        so.FindProperty("tertiaryButton").objectReferenceValue = payC;
         so.ApplyModifiedPropertiesWithoutUndo();
         return screen;
     }

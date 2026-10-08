@@ -97,21 +97,13 @@ namespace KartCup
             Set(primaryLabel, primaryButton, fi != null ? $"UNLOCK  ·  {Skr(fi)}" : KartApi.Cfg == null ? "CONNECT TO BUY" : "…", fi != null && !busy);
             Set(secondaryLabel, secondaryButton, fi != null && !string.IsNullOrEmpty(fi.price.GetValueOrDefault("SOL")) ? $"PAY {Sol(fi)}" : "", fi != null && !busy);
             Set(tertiaryLabel, tertiaryButton, Ore(fi) != "" ? $"PAY {Ore(fi)}" : "", fi != null && !busy);
-            Beside(secondaryButton, tertiaryButton);
+            UiMotion.Beside(secondaryButton, tertiaryButton);
         }
 
         static void Set(TMP_Text label, Button button, string text, bool interactable)
         {
             if (label != null) label.text = text;
             if (button != null) { button.gameObject.SetActive(!string.IsNullOrEmpty(text)); button.interactable = interactable; }
-        }
-
-        /// The SOL button shares its row with the ORE one when both show, and has the row to itself otherwise.
-        static void Beside(Button left, Button right)
-        {
-            if (left == null) return;
-            var rt = (RectTransform)left.transform; bool both = right != null && right.gameObject.activeSelf;
-            rt.sizeDelta = new Vector2(both ? 284 : 584, rt.sizeDelta.y); rt.anchoredPosition = new Vector2(both ? -150 : 0, rt.anchoredPosition.y);
         }
 
         static string Skr(KartApi.ShopItem i) => WalletFlow.Amount(i.price.GetValueOrDefault("SKR"), "SKR");
