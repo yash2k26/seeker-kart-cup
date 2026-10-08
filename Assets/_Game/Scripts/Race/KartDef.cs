@@ -26,14 +26,16 @@ namespace KartCup
         public void ApplyTo(Kart kart)
         {
             int s = speed - 2, t = turbo - 2, g = grip - 2, a = armor - 2, k = attack - 2;
-            kart.maxSpeed *= 1f + s * 0.035f;
-            kart.acceleration *= 1f + s * 0.02f;
-            kart.boostSpeedAdd *= 1f + t * 0.12f;
-            kart.driftBoostAdd *= 1f + t * 0.10f;
-            kart.boostBurnRate *= 1f - t * 0.08f;
-            kart.steerRate *= 1f + g * 0.04f;
-            kart.maxSteer *= 1f + g * 0.025f;
-            kart.sidewaysFriction *= 1f + g * 0.03f;
+            // A pip is 6% of top speed (9 Oct 2026; was 3.5%): a Hero kart's SPEED 5 is +18%, so a bought kart visibly
+            // walks away from a free one, Beach Buggy's way. referee.ts V_SUSTAINED and referee-test.ts carry the same numbers.
+            kart.maxSpeed *= 1f + s * 0.06f;
+            kart.acceleration *= 1f + s * 0.04f;
+            kart.boostSpeedAdd *= 1f + t * 0.15f;
+            kart.driftBoostAdd *= 1f + t * 0.12f;
+            kart.boostBurnRate *= 1f - t * 0.10f;
+            kart.steerRate *= 1f + g * 0.06f;
+            kart.maxSteer *= 1f + g * 0.04f;
+            kart.sidewaysFriction *= 1f + g * 0.045f;
             kart.spinDecel *= Mathf.Max(0.4f, 1f - a * 0.1f);   // ARMOR: a hit costs less speed (spinDecel slows a spinning kart)
             if (kart.rb != null) kart.rb.mass *= 1f + a * 0.08f;
             var powers = KartPowers.On(kart.gameObject);

@@ -9,7 +9,7 @@ const check = (ok: boolean, what: string) => { if (!ok) { failures++; console.lo
 // Every kart in the shop, under the quickest driver the stat range allows (+2 SPEED, +2 TURBO) and with a Nitro's
 // 8 m/s kick on top, fits under the cap: the sums are KartDef.ApplyTo and CharacterDef.ApplyTo on a 40 m/s kart with
 // a 10 m/s boost, and ItemSetup's Nitro.
-const top = (p: Powers) => 40 * 1.10 * (1 + (p.speed - 2) * 0.035) + 10 * 1.16 * (1 + (p.turbo - 2) * 0.12);
+const top = (p: Powers) => 40 * 1.10 * (1 + (p.speed - 2) * 0.06) + 10 * 1.16 * (1 + (p.turbo - 2) * 0.15);
 const fastest = Math.max(...CATALOG.filter(s => s.powers).map(s => top(s.powers!)));
 check(fastest + 8 <= V_SUSTAINED, `the fastest kart in the shop (${fastest.toFixed(1)} m/s, plus a Nitro) fits under the ${V_SUSTAINED} m/s cap`);
 
