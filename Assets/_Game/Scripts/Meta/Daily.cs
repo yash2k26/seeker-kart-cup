@@ -51,6 +51,7 @@ namespace KartCup
             Chests.Give(Chests.Tier.Silver);
             Chests.AddStars(3);
             KartApi.Event("daily", new { day = c.day, place });
+            Achievements.Add(Achievements.Stat.DailyDone);
             return LastPaid = true;
         }
 

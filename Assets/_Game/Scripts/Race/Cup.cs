@@ -88,7 +88,11 @@ namespace KartCup
 
         /// The last race has been scored. The standings stay on screen, but the cup is no longer resumable, so
         /// killing the app here offers a fresh cup rather than replaying the final race for ever.
-        public static void MarkFinished() { PlayerPrefs.DeleteKey(Key); PlayerPrefs.Save(); }
+        public static void MarkFinished()
+        {
+            if (!IsSingleRace && PlayerPlace == 1) Achievements.Add(Achievements.Stat.GrandPrixWon);
+            PlayerPrefs.DeleteKey(Key); PlayerPrefs.Save();
+        }
 
         public static int PointsOf(int character) => points.TryGetValue(character, out var p) ? p : 0;
 

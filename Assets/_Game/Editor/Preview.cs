@@ -222,6 +222,7 @@ public static class MenuPreview
         });
         Chests.Preview(12, Chests.Tier.Gold, Chests.Tier.Silver);
         Tour.Preview(("c1e1", 3), ("c1e2", 2), ("c1e3", 3), ("c1e4", 1), ("c1b", 3), ("c2e1", 2));
+        Achievements.Preview();
         foreach (var d in Object.FindObjectsByType<DailyCard>(FindObjectsInactive.Include, FindObjectsSortMode.None)) d.ShowInEditor();
         foreach (var w in Object.FindObjectsByType<WeeklyCard>(FindObjectsInactive.Include, FindObjectsSortMode.None)) w.ShowInEditor();
         foreach (var c in Object.FindObjectsByType<ChestButton>(FindObjectsInactive.Include, FindObjectsSortMode.None)) c.ShowInEditor();
@@ -240,6 +241,7 @@ public static class MenuPreview
             if (i == 8) foreach (var shop in Object.FindObjectsByType<ItemsPanel>(FindObjectsSortMode.None)) shop.ShowInEditor(0);
             if (i == 9) foreach (var weekly in Object.FindObjectsByType<WeeklyPanel>(FindObjectsSortMode.None)) weekly.ShowInEditor();
             if (i == 10) foreach (var tour in Object.FindObjectsByType<TourPanel>(FindObjectsSortMode.None)) tour.ShowInEditor(1);
+            if (i == 11) foreach (var a in Object.FindObjectsByType<AchievementsPanel>(FindObjectsSortMode.None)) a.ShowInEditor();
             if (i != 7 && carousel != null) carousel.SetVisible(true);
             foreach (var img in Object.FindObjectsByType<Image>(FindObjectsSortMode.None))
                 if (img.name == "Single" || img.name == "Cell0")

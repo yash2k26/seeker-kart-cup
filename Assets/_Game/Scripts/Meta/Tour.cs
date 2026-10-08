@@ -121,6 +121,8 @@ namespace KartCup
                 }
             }
             KartApi.Event("tour", new { id, place, stars, gained = r.gained });
+            Achievements.Set(Achievements.Stat.TourStars, Total);
+            Achievements.Set(Achievements.Stat.BossesBeaten, Enumerable.Range(0, Cups.Length).Count(BossBeaten));
             return Last = r;
         }
 

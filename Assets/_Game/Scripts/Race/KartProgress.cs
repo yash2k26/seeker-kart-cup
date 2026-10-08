@@ -68,6 +68,7 @@ namespace KartCup
             {
                 outAt = Time.time;
                 if (isPlayer && racing) RaceHud.Instance?.Callout("OUT OF BOUNDS", 1.3f);
+                if (isPlayer && sunk) Achievements.Add(Achievements.Stat.Swims);
                 Debug.Log($"[race] {racerName} out of bounds at {transform.position} ({(lost ? "fell" : "in the water")})");
             }
             if (outAt > 0f)

@@ -45,6 +45,7 @@ namespace KartCup
                 Haptics.Play(Haptics.Kind.Boost);
                 AudioDirector.Instance?.TierUp(3);
                 KartApi.Event("start_boost", new { left = pressedAt });
+                Achievements.Add(Achievements.Stat.StartBoosts);
             }
             if (RoomClient.InRaceRoom) return;                    // online there is no AI field
             foreach (var r in race.racers)

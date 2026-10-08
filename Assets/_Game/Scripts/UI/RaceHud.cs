@@ -20,6 +20,9 @@ namespace KartCup
         // What the slot shows while an item is held: its glyph (Design's), by ItemManager name.
         [SerializeField] Image itemIcon;
         [SerializeField] TMP_Text ammoLabel;       // "×3": a box gives three shots, and the slot never said so
+        [SerializeField] GameObject awardPlate;   // an achievement just done: a banner under the race bar
+        [SerializeField] TMP_Text awardLabel;
+        float awardUntil;
         [SerializeField] string[] glyphNames = System.Array.Empty<string>();
         [SerializeField] Sprite[] glyphs = System.Array.Empty<Sprite>();
         TMP_Text itemWord; Color itemWordIdle;
@@ -39,13 +42,25 @@ namespace KartCup
 
         public static RaceHud Instance { get; private set; }
         void Awake() => Instance = this;
-        void OnDestroy() { if (Instance == this) Instance = null; }
+        void OnDestroy() { if (Instance == this) Instance = null; Achievements.Unlocked -= Award; }
+
+        void Award(Achievements.Def d)
+        {
+            if (awardPlate == null || awardLabel == null) return;
+            awardLabel.text = $"<color=#FFB126>ACHIEVEMENT</color>   {d.title.ToUpperInvariant()}   ·   + {Chests.Names[(int)d.reward]}";
+            awardPlate.SetActive(true);
+            UiMotion.Punch(awardPlate.transform, 1.12f, 0.3f);
+            awardUntil = Time.unscaledTime + 3.2f;
+            AudioDirector.Instance?.Confirm();
+        }
 
         /// A big word in the middle of the screen for a while (Elimination's knockouts).
         public void Callout(string s, float seconds) => Big(s, seconds);
 
         void Start()
         {
+            Achievements.Unlocked += Award;
+            if (awardPlate != null) awardPlate.SetActive(false);
             race = RaceManager.Instance;
             if (race == null) return;
             race.onCountdown.AddListener(n => Big(n > 0 ? n.ToString() : "GO!"));
@@ -142,6 +157,7 @@ namespace KartCup
             }
 
             WrongWay(p);
+            if (awardPlate != null && awardPlate.activeSelf && Time.unscaledTime > awardUntil) awardPlate.SetActive(false);
             if (bigLabel != null && bigLabel.enabled && Time.time >= bigUntil) bigLabel.enabled = false;
         }
 

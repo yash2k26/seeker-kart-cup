@@ -104,6 +104,7 @@ namespace KartCup
             var tier = S.pending[0];
             S.pending.RemoveAt(0);
             var rewards = Roll(tier);
+            Achievements.Add(Achievements.Stat.ChestsOpened);
             foreach (var r in rewards) Apply(r);
             Save();
             KartApi.Event("chest_open", new { tier = tier.ToString(), rewards = rewards.Select(r => $"{r.kind}:{r.id}x{r.qty}").ToArray() });

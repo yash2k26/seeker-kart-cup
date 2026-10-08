@@ -17,9 +17,9 @@ namespace KartCup
         [SerializeField] CharacterDatabase roster;
         [SerializeField] TMP_Text playLabel;      // says CONTINUE CUP when one is half-run
 
-        const int Select = 1, Track = 4, Rooms = 5, Lobby = 6, Garage = 7, Items = 8, WeeklyScreen = 9, TourScreen = 10;
+        const int Select = 1, Track = 4, Rooms = 5, Lobby = 6, Garage = 7, Items = 8, WeeklyScreen = 9, TourScreen = 10, AchievementsScreen = 11;
         // How deep each panel sits under the title: going deeper slides in from the right, coming back from the left.
-        static readonly int[] Depth = { 0, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1 };
+        static readonly int[] Depth = { 0, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1 };
 
         /// Set before loading the menu: open straight into the lobby (rematch) or join a code (invite link).
         public static bool PendingLobby;
@@ -128,6 +128,7 @@ namespace KartCup
         public void ShowItems() => Show(Items);
         public void ShowWeekly() => Show(WeeklyScreen);
         public void ShowTour() => Show(TourScreen);
+        public void ShowAchievements() => Show(AchievementsScreen);
 
         bool backToTour;
         /// The Tour's CHANGE: the select screen, whose NEXT then comes back to the Tour.

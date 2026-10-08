@@ -37,7 +37,7 @@ namespace KartCup
             var puff = Resources.Load<GameObject>("FX/SmashPuff");
             if (puff != null) Instantiate(puff, transform.position + Vector3.up * 0.4f, Quaternion.identity);
             var p = kart.GetComponent<KartProgress>();
-            if (p != null && p.isPlayer) { Haptics.Play(Haptics.Kind.Tick); AudioDirector.Instance?.Hit(); CameraFeel.Instance?.Kick(-kart.transform.forward, 0.25f); }
+            if (p != null && p.isPlayer) { Haptics.Play(Haptics.Kind.Tick); AudioDirector.Instance?.Hit(); CameraFeel.Instance?.Kick(-kart.transform.forward, 0.25f); Achievements.Add(Achievements.Stat.Smashes); }
         }
 
         void Update()

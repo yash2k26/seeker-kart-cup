@@ -18,6 +18,7 @@ namespace KartCup
         KartPowers powers;
         ItemMount mount;
         int knownAmmo;
+        bool wasDrifting; int driftTier;
 
         public void Bind(Kart k, BlockyDriverPose pose, bool player)
         {
@@ -32,7 +33,7 @@ namespace KartCup
 
             caster = GetComponent<ItemCaster>();
             powers = GetComponent<KartPowers>();
-            if (caster != null && player) caster.castEvent.AddListener(() => AudioDirector.Instance?.UseItem(caster.item != null ? caster.item.itemName : null));
+            if (caster != null && player) caster.castEvent.AddListener(() => { AudioDirector.Instance?.UseItem(caster.item != null ? caster.item.itemName : null); Achievements.Add(Achievements.Stat.ItemsUsed); });
             mount = ItemMount.On(k);   // the pod and the cradle: their own listener notes what was fired, before ours below runs
             if (caster != null) caster.castEvent.AddListener(OnCast);
         }
@@ -89,6 +90,8 @@ namespace KartCup
                 knownAmmo = caster.ammo;
                 heldItem = caster.item;
             }
+            // a drift let go with at least one tier charged fires a boost (Achievements counts them)
+            if (isPlayer) { if (wasDrifting && !kart.drifting && driftTier > 0) Achievements.Add(Achievements.Stat.DriftBoosts); driftTier = kart.drifting ? kart.boostCount : 0; wasDrifting = kart.drifting; }
             if (isPlayer && CameraFeel.Instance != null && rb != null)
                 CameraFeel.Instance.SetSpeed01(rb.linearVelocity.magnitude / Mathf.Max(1f, kart.maxSpeed));
         }

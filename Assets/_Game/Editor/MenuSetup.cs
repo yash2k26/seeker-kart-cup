@@ -62,12 +62,13 @@ public static partial class MenuSetup
         var items = ItemsScreen(safe);
         var weeklyScreen = WeeklyScreen(safe);
         var tourScreen = TourScreen(safe);
+        var achievementsScreen = AchievementsScreen(safe);
 
         var so = new SerializedObject(flow);
         so.FindProperty("roster").objectReferenceValue = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
         so.FindProperty("playLabel").objectReferenceValue = title.transform.Find("Plate/Actions/Play/PlayFace/PlayLabel")?.GetComponent<TMP_Text>();
         var panels = so.FindProperty("panels");
-        panels.arraySize = 11;
+        panels.arraySize = 12;
         panels.GetArrayElementAtIndex(0).objectReferenceValue = title;
         panels.GetArrayElementAtIndex(1).objectReferenceValue = select;
         panels.GetArrayElementAtIndex(2).objectReferenceValue = board;
@@ -79,6 +80,7 @@ public static partial class MenuSetup
         panels.GetArrayElementAtIndex(8).objectReferenceValue = items;
         panels.GetArrayElementAtIndex(9).objectReferenceValue = weeklyScreen;
         panels.GetArrayElementAtIndex(10).objectReferenceValue = tourScreen;
+        panels.GetArrayElementAtIndex(11).objectReferenceValue = achievementsScreen;
         so.ApplyModifiedPropertiesWithoutUndo();
 
         Curtain();

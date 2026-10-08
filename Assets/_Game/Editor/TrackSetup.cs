@@ -919,6 +919,11 @@ public static partial class TrackSetup
         hudSo.FindProperty("itemIcon").objectReferenceValue = itemIcon;
         var ammo = Text("Ammo", itemBtn.transform.Find("ItemFace"), display, "", 40, Design.OnAccent, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-18, 0), new Vector2(110, 60));
         hudSo.FindProperty("ammoLabel").objectReferenceValue = ammo;
+        // an achievement done mid-race: a banner under the race bar for a few seconds (RaceHud.Award)
+        var awardPlate = Plate("AwardPlate", safe.transform, new Vector2(0.5f, 0), new Vector2(0, 250), new Vector2(1040, 68), deep);   // low: the finish words own the top
+        var award = Text("Award", awardPlate, display, "", 32, paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000, 60));
+        hudSo.FindProperty("awardPlate").objectReferenceValue = awardPlate.gameObject;
+        hudSo.FindProperty("awardLabel").objectReferenceValue = award;
         var held = new[] { "Rocket", "Homing Item", "Bomb", "Nitro", "Bouncer", "Sun Bomb", "Trap", "Turbo" };   // Turbo: the slot said ITEM
         var glyphNames = hudSo.FindProperty("glyphNames"); glyphNames.arraySize = held.Length;
         for (int i = 0; i < held.Length; i++) glyphNames.GetArrayElementAtIndex(i).stringValue = held[i];

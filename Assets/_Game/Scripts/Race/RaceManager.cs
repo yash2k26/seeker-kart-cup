@@ -30,6 +30,7 @@ namespace KartCup
         public readonly List<KartProgress> racers = new();
 
         int lastTick = -1;
+        bool playerWasLast;                              // for "From the Back" (Achievements)
         double goAt = -1;                                // online: GO on the unscaled clock, shared by every phone
         readonly List<KartProgress> order = new();
 
@@ -109,6 +110,7 @@ namespace KartCup
                     // than maximumDeltaTime, and a finish that far off the room's clock is thrown out as a DNF.
                     raceTime = goAt > 0 ? (float)(Time.unscaledTimeAsDouble - goAt) : raceTime + Time.deltaTime;
                     order.Sort((a, b) => b.score.CompareTo(a.score));
+                    if (raceTime > 5f && Player != null && racers.Count > 2 && PositionOf(Player) == racers.Count) playerWasLast = true;
                     break;
             }
         }
@@ -130,6 +132,13 @@ namespace KartCup
             if (RoomClient.InRaceRoom) p.GetComponent<Kart>().active = false;
             else if (p.isPlayer) FinishLap.Cruise(p);
             p.GetComponent<KartHooks>()?.OnFinish();                            // the driver's cheer, and the winner's bark
+            if (p.isPlayer)
+            {
+                // achievements: online only the race counts (the order is the room's); the Weekly's lap is not a race
+                int place = 0; foreach (var r in racers) if (r.finished && r.finishTime <= p.finishTime) place++;
+                if (RoomClient.InRaceRoom) Achievements.Add(Achievements.Stat.Races);
+                else if (!Weekly.Racing) Achievements.Race(place, Cup.TrackId, playerWasLast);
+            }
             onFinish.Invoke(p);
             if (p.isPlayer) state = State.Finished;
         }
