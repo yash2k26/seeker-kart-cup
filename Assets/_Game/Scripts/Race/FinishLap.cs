@@ -10,15 +10,25 @@ namespace KartCup
         public static void Cruise(KartProgress p)
         {
             if (p == null) return;
-            var touch = p.GetComponent<KartInputMobile>();
-            if (touch != null) Object.DestroyImmediate(touch);              // one KartInput per kart: the AI takes its place now
-            if (p.GetComponent<KartAi>() == null)
-            {
-                var ai = p.gameObject.AddComponent<KartAi>();
-                ai.Configure(null, NearestAhead(p.transform), 7);
-                ai.skill = 0.84f;
-            }
             p.GetComponent<KartHooks>()?.SwingCamera();
+            // The line is crossed inside a trigger callback (Checkpoint -> Pass -> Finish), where Unity refuses
+            // DestroyImmediate: the touch input stayed, AddComponent<KartAi> then failed (one KartInput per kart) and the
+            // null threw out of RaceManager.Finish, so on a phone the results never came (10 Oct 2026). The touch input is
+            // switched off now and swapped for the AI a frame later, outside the callback.
+            var touch = p.GetComponent<KartInputMobile>();
+            if (touch != null) touch.enabled = false;
+            p.StartCoroutine(TakeOver(p, touch));
+        }
+
+        static System.Collections.IEnumerator TakeOver(KartProgress p, KartInputMobile touch)
+        {
+            if (touch != null) Object.Destroy(touch);              // one KartInput per kart: the AI takes its place
+            yield return null;                                     // Destroy lands at the end of this frame
+            if (p == null || p.GetComponent<KartAi>() != null) yield break;
+            var ai = p.gameObject.AddComponent<KartAi>();
+            if (ai == null) yield break;
+            ai.Configure(null, NearestAhead(p.transform), 7);
+            ai.skill = 0.84f;
         }
 
         /// The waypoint just up the road from here (the chain is the AI's racing line).

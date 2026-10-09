@@ -181,8 +181,10 @@ for (const [id, g] of Object.entries(TRACK_GEO)) {
     // first state 3 s after GO from a fast kart: the start line credited then must not make lap 1 look too fast
     const late = referee(g, drive(g, 55, 15).filter(p => p.t >= 3));
     check(late.bad === null && finishT(late, g) !== null, `${id} a fast kart first seen 3 s after GO is fine (${late.bad})`);
-    // a 14 s gap mid-race at 45 m/s (more than half a lap): the referee must not unwrap the kart a lap backwards
-    const long = referee(g, drive(g, 45, 15).filter(p => p.t < 12 || p.t > 26));
+    // a 14 s gap mid-race at 45 m/s (more than half a lap): the referee must not unwrap the kart a lap backwards.
+    // Placed by the race's own length (one lap since 10 Oct 2026: a fixed 12-26 s gap swallowed the finish)
+    const raceS = (path(g).L * g.laps + 35) / 45, gapAt = Math.min(12, 0.2 * raceS);
+    const long = referee(g, drive(g, 45, 15).filter(p => p.t < gapAt || p.t > gapAt + 14));
     check(long.bad === null && finishT(long, g) !== null, `${id} a 14 s gap mid-race still finishes (${long.bad}, ${long.n} crossings)`);
     // lost out there: 25 s of circles 8 m past the corridor, then back to the road
     const out = g.halfWidth + g.kerb + 25 + 8, { at } = path(g), s0 = gateArc(3) + 20, pts: Sample[] = [];
@@ -223,11 +225,12 @@ for (const [id, g] of Object.entries(TRACK_GEO)) {
     const gapCheat = referee(g, [...pre, ...post]);
     check(finishT(gapCheat, g) === null || gapCheat.bad !== null, `${id} a silent gap and a step back earn no lap (${gapCheat.bad}, ${gapCheat.n} crossings)`);
     // a respawn eight gates back (the phone missed a gate at a trigger's edge much earlier in the lap)
-    const s28 = referee(g, base15.filter(p2 => p2.t <= 28)), gi8 = (s28.n - 8 + k3 * 4) % k3, gate8 = g.gates[gi8];
+    const tR = Math.min(28, 0.8 * (path(g).L * g.laps + 35) / 45);   // late enough to be eight gates in, on one lap or two
+    const s28 = referee(g, base15.filter(p2 => p2.t <= tR)), gi8 = (s28.n - 8 + k3 * 4) % k3, gate8 = g.gates[gi8];
     const gateS8 = gateArc(gi8) + Math.floor((s28.n - 8) / k3) * L;
-    const rs8: Sample[] = base15.filter(p2 => p2.t <= 28);
-    for (let tt = 28 + 1 / 15, j = 0; j < 4000; tt += 1 / 15, j++) {
-      const sA = gateS8 + 45 * (tt - 28 - 1 / 15); if (sA > L * g.laps + 20) break;
+    const rs8: Sample[] = base15.filter(p2 => p2.t <= tR);
+    for (let tt = tR + 1 / 15, j = 0; j < 4000; tt += 1 / 15, j++) {
+      const sA = gateS8 + 45 * (tt - tR - 1 / 15); if (sA > L * g.laps + 20) break;
       const q = j === 0 ? { x: gate8[0], z: gate8[2] } : path(g).at(sA);
       rs8.push({ t: +tt.toFixed(3), x: q.x, y: 0, z: q.z });
     }
@@ -237,7 +240,8 @@ for (const [id, g] of Object.entries(TRACK_GEO)) {
 
   // network stalls: seconds with no samples, even through corners, must not cost an honest drive a gate
   for (const gap of [3, 8]) {
-    const stalled = referee(g, drive(g, 45, 15).filter(p => p.t < 20 || p.t > 20 + gap));
+    const stallAt = Math.min(20, 0.2 * (path(g).L * g.laps + 35) / 45);   // by the race's length, as above
+    const stalled = referee(g, drive(g, 45, 15).filter(p => p.t < stallAt || p.t > stallAt + gap));
     check(stalled.bad === null && finishT(stalled, g) !== null, `${id} an honest drive with a ${gap} s gap in its samples finishes (${stalled.bad}, ${stalled.n} crossings)`);
   }
   const sparse = referee(g, drive(g, 50, 5).filter((_, i) => i % 2 === 0));

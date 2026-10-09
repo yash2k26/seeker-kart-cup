@@ -28,6 +28,9 @@ public static class Playtest
     // -autopilot: the AI drives the player's kart, so the camera, the HUD and everything that happens to a kart are seen
     // in motion. -every S: a frame every S seconds from the green light (auto<track>-NN.png). -seconds N: run that long.
     static bool autopilot, autoSet;
+    // -gatewalk: the player keeps the phone's touch input and is carried through every gate in turn, so the line is
+    // crossed inside a real trigger callback, as on a phone (the autopilot's AI input hid the finish bug of 10 Oct 2026).
+    static bool gatewalk; static int walkGate; static double nextWalk;
     static float[][] sweep;   // -camsweep "dist,height,look,fov;...": each auto frame with the next camera
     // with -autopilot, frames on the moments that matter: a pickup (the roulette), a hit (the throw), the finish
     static readonly System.Collections.Generic.List<(double at, string name)> moments = new();
@@ -67,7 +70,7 @@ public static class Playtest
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-look") look = args[i + 1];   // what the vista frames look at
         item = null; itemShot = 0; thrownAt = -1; goAt = -1; armed = false; heldShot = false;
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-item") item = args[i + 1];
-        autopilot = args.Contains("-autopilot"); autoSet = false; autoShot = 0; nextAuto = -1; every = 0; until = 50;
+        autopilot = args.Contains("-autopilot"); gatewalk = args.Contains("-gatewalk"); walkGate = 0; nextWalk = 0; autoSet = false; autoShot = 0; nextAuto = -1; every = 0; until = 50;
         moments.Clear(); lastAmmo = 0; pickups = 0; hits = 0; wasSpinning = false; wasFinished = false;
         oobTest = args.Contains("-oob"); smashTest = args.Contains("-smash"); oobDone = smashDone = countShot = false;
         Smashable.Smashed -= OnSmashed; Smashable.Smashed += OnSmashed;
@@ -83,6 +86,26 @@ public static class Playtest
         shot = 0; introShot = 0;
         EditorApplication.update += Tick;
         EditorApplication.EnterPlaymode();
+    }
+
+    static void GateWalk(double t)
+    {
+        var race = Object.FindFirstObjectByType<RaceManager>();
+        var p = race != null ? race.Player : null;
+        if (race == null || p == null || race.state != RaceManager.State.Racing) return;
+        if (p.finished)
+        {
+            gatewalk = false;
+            Debug.Log($"[gatewalk] finished: state {race.state}, input {(p.GetComponent<KartInputMobile>() != null ? "touch" : "-")}/{(p.GetComponent<KartAi>() != null ? "ai" : "-")}");
+            return;
+        }
+        nextWalk = t + 0.35;
+        var cp = race.checkpoints[(walkGate++) % race.checkpoints.Length];
+        var rb = p.GetComponent<Rigidbody>();
+        // just short of the gate, moving through it: the physics step after this one carries the kart across the trigger
+        var at = cp.transform.position - cp.transform.forward * 3f + Vector3.up * 0.5f;
+        rb.position = at; rb.rotation = cp.transform.rotation; rb.linearVelocity = cp.transform.forward * 20f;
+        Debug.Log($"[gatewalk] gate {cp.index}: lap {p.lap}, last {p.checkpointIndex}");
     }
 
     static void Tick()
@@ -127,7 +150,8 @@ public static class Playtest
             }
             introShot++;
         }
-        if (autopilot && !autoSet && t > 1) { autoSet = true; if (!Autopilot()) autoSet = false; }   // set first: a throw must not retry every frame
+        if (autopilot && !autoSet && t > 1) { autoSet = true; if (!Autopilot()) autoSet = false; }
+        if (gatewalk && t >= nextWalk) GateWalk(t);   // set first: a throw must not retry every frame
         if (every > 0 && goAt >= 0)
         {
             if (nextAuto < 0) nextAuto = goAt + every;

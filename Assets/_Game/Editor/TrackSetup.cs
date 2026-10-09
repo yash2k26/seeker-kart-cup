@@ -129,7 +129,7 @@ public static partial class TrackSetup
         var session = new GameObject("RaceSession").AddComponent<RaceSession>();   // lap/checkpoint times for the Worker; nothing reached the leaderboard without it
         new SerializedObject(session).Do(s => s.FindProperty("trackId").stringValue = Tracks.At(Index).id);   // what the Worker keys the leaderboard on
         var race = new GameObject("RaceManager").AddComponent<RaceManager>();
-        race.totalLaps = 2;
+        race.totalLaps = 1;   // one lap a race (10 Oct 2026, the user); the referee's contract below says the same
         race.checkpoints = checkpoints;
 
         var hud = Hud(input, angles, out var hudComp);
@@ -458,7 +458,7 @@ public static partial class TrackSetup
     static string GeometryJson(Checkpoint[] gates)
     {
         var sb = new System.Text.StringBuilder();
-        sb.Append($"{{\"lengthM\":{N(Length())},\"laps\":2,\"halfWidth\":{N(HalfWidth)},\"kerb\":{N(Kerb)},\"gateHalfWidth\":{N(HalfWidth + Kerb + GateSlack)},");
+        sb.Append($"{{\"lengthM\":{N(Length())},\"laps\":1,\"halfWidth\":{N(HalfWidth)},\"kerb\":{N(Kerb)},\"gateHalfWidth\":{N(HalfWidth + Kerb + GateSlack)},");
         sb.Append("\"gates\":[");
         for (int i = 0; i < gates.Length; i++)
         {

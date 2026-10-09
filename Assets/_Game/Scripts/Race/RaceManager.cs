@@ -14,7 +14,7 @@ namespace KartCup
         public enum State { Idle, Countdown, Racing, Finished }
 
         [Header("Rules")]
-        public int totalLaps = 2;
+        public int totalLaps = 1;   // one lap (10 Oct 2026, the user); TrackSetup and worker/src/tracks.json say the same
         public float countdownSeconds = 3f;
         public Checkpoint[] checkpoints = System.Array.Empty<Checkpoint>();
 
@@ -130,8 +130,9 @@ namespace KartCup
             // Solo, a kart over the line keeps driving (the player's on autopilot, under a swinging camera); online every
             // kart stops, as before: what the other phones see of ours is the room's to show.
             if (RoomClient.InRaceRoom) p.GetComponent<Kart>().active = false;
-            else if (p.isPlayer) FinishLap.Cruise(p);
-            p.GetComponent<KartHooks>()?.OnFinish();                            // the driver's cheer, and the winner's bark
+            // the cruise, the cheer and the achievements are dressing: whatever they throw, the race still ends below
+            else if (p.isPlayer) Guard(() => FinishLap.Cruise(p));
+            Guard(() => p.GetComponent<KartHooks>()?.OnFinish());                // the driver's cheer, and the winner's bark
             if (p.isPlayer)
             {
                 // achievements: online only the race counts (the order is the room's); the Weekly's lap is not a race
@@ -139,8 +140,10 @@ namespace KartCup
                 if (RoomClient.InRaceRoom) Achievements.Add(Achievements.Stat.Races);
                 else if (!Weekly.Racing) Achievements.Race(place, Cup.TrackId, playerWasLast);
             }
-            onFinish.Invoke(p);
             if (p.isPlayer) state = State.Finished;
+            onFinish.Invoke(p);
         }
+
+        static void Guard(System.Action a) { try { a(); } catch (System.Exception e) { Debug.LogException(e); } }
     }
 }
