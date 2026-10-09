@@ -23,7 +23,7 @@ namespace KartCup
         // the camera arrives at the next bay (a dolly, not a cut).
         [SerializeField] float spotAngle = 22f, spotRadius = 10.2f, spotHeight = 3.0f, spotLook = 1.2f, spotYaw = 8f, glide = 4.5f;
         // A far-lane bay (MenuMeet FarZ) is looked at from between the near karts: straighter, closer, from higher up.
-        [SerializeField] float farAngle = 10f, farRadius = 9.2f, farHeight = 3.9f, farLook = 1.4f, farYaw = 6f;
+        [SerializeField] float farAngle = 0f, farRadius = 9.5f, farHeight = 5.2f, farLook = 1.6f, farYaw = 8f;   // straight down the gap between the near karts, high enough to look over their drivers
 
         public bool Focused { get; set; }
         public bool Close { get; set; }

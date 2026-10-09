@@ -14,23 +14,33 @@ public static class MenuMeet
     const string Art = "Assets/_Game/Art/", MeshDir = Art + "Models/Props/Menu/", Mats = Art + "Materials/";
     const float HalfRoad = 7f, RoadY = 0.05f, Length = 90f;
 
-    enum Act { Lean, Wipe, Sit }
+    // What a driver is up to on the street: by their kart (Lean, Wipe, Sit) or about their own business (the rest). 9 Oct
+    // 2026, the user: "every character shouldn't have karts, that is repetitive; someone can be playing on the arcade
+    // machine, someone eating a burger". Beach Buggy's character screen gives each racer their own spot and prop.
+    enum Act { Lean, Wipe, Sit, Arcade, Burger, Phone, Bench, Crate, Kick }
+    static bool ByKart(Act a) => a == Act.Lean || a == Act.Wipe || a == Act.Sit;
+    static readonly Dictionary<string, Act> Business = new()
+    {
+        ["Toly"] = Act.Lean, ["Mert"] = Act.Arcade, ["Akshay"] = Act.Sit, ["Emmett"] = Act.Burger, ["Bitsy"] = Act.Wipe,
+        ["Pip"] = Act.Crate, ["Chase"] = Act.Lean, ["Beeman"] = Act.Phone, ["Maroo"] = Act.Bench, ["Andrew"] = Act.Kick,
+    };
+    const float DriverScale = 2.76f;   // every kart's seat scale: a driver on foot is the size of the one who sits in it
 
-    // Who brings which kart: where it stands on the road (metres from the meet's centre: +X along the road to the
-    // camera's right, +Z away from the camera), its heading (180 = nose at the camera), and what its driver is up to.
-    // 9 Oct 2026: the whole roster, in select-screen order, left to right in two staggered lanes (near, far, near...)
-    // 3.25 m apart, so ten karts fit within 15 m of the hoarding and the title's dolly can keep both it and the
-    // chosen driver in frame. The driver select drives the camera from bay to bay (MenuBackdrop.Spot): Beach Buggy's
-    // one-set character screen. The three poses go round: lean on the kart, wipe its nose, sit on it.
-    const float Spacing = 3.25f, NearZ = -2.2f, FarZ = 4.4f;
+    // Where each stands on the road (metres from the meet's centre: +X along the road to the camera's right, +Z away
+    // from the camera). The whole roster, in select-screen order, two staggered lanes 3.25 m apart, so ten bays fit
+    // within 15 m of the hoarding and the title's dolly keeps both it and the chosen driver in frame. The driver select
+    // drives the camera from bay to bay (MenuBackdrop.Spot). A kart bay's yaw is the kart's heading (180 = nose at the
+    // camera); a prop bay lays itself out.
+    const float Spacing = 3.75f, NearZ = -2.2f, FarZ = 4.6f;
     static (string who, Vector3 at, float yaw, Act act)[] Crew()
     {
         var roster = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
         var names = roster != null && roster.characters.Length > 0 ? roster.characters.Where(c => c != null).Select(c => c.displayName).ToArray() : new[] { "Toly", "Mert", "Akshay" };
-        var acts = new[] { (Act.Lean, 212f), (Act.Wipe, 258f), (Act.Sit, 228f) };
+        var kartActs = new[] { (Act.Lean, 212f), (Act.Wipe, 258f), (Act.Sit, 228f) };
         return names.Select((who, i) =>
         {
-            var (act, yaw) = acts[i % acts.Length];
+            var act = Business.TryGetValue(who, out var b) ? b : kartActs[i % kartActs.Length].Item1;
+            float yaw = ByKart(act) ? kartActs.First(k => k.Item1 == act).Item2 : 0f;
             return (who, new Vector3((i - (names.Length - 1) / 2f) * Spacing, 0f, i % 2 == 0 ? NearZ : FarZ), yaw, act);
         }).ToArray();
     }
@@ -48,7 +58,7 @@ public static class MenuMeet
         Hoarding(root);
         foreach (var c in Crew())
         {
-            Park(root, c.who, c.at, c.yaw, c.act);
+            if (ByKart(c.act)) Park(root, c.who, c.at, c.yaw, c.act); else Scene(root, c.who, c.at, c.act);
             // each bay's own warm key from the camera's side: the select screen stands close, and the two meet lights
             // only reach the middle of the row
             Spot(root, "BayKey_" + c.who, c.at + new Vector3(-2.5f, 6.5f, -7.5f), c.at + new Vector3(0f, 1.4f, 0f), new Color(1f, 0.88f, 0.72f), 110f, 48f);
@@ -157,13 +167,25 @@ public static class MenuMeet
         throwLight.intensity = 200f; throwLight.color = new Color(0.62f, 0.78f, 1f); throwLight.shadows = LightShadows.None;
     }
 
-    // ---------- the karts and their drivers ----------
+    // ---------- the drivers: by their karts ----------
+
+    static System.Func<string, bool, AnimationClip> Takes(GameObject driverPrefab, string who)
+    {
+        var model = PodiumSetup.ModelOf(AssetDatabase.GetAssetPath(driverPrefab));
+        return (take, loop) => PodiumSetup.Clip(model, take, $"meet_{take}_{who}", loop);
+    }
+
+    static (CharacterDef def, GameObject driver) Cast(string who)
+    {
+        var def = AssetDatabase.LoadAssetAtPath<CharacterDef>($"Assets/_Game/Data/Character_{who}.asset");
+        var driver = def != null ? AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Game/Prefabs/Drivers/Driver_{def.driverId}.prefab") : null;
+        return (def, driver);
+    }
 
     static void Park(Transform root, string who, Vector3 at, float yaw, Act act)
     {
-        var def = AssetDatabase.LoadAssetAtPath<CharacterDef>($"Assets/_Game/Data/Character_{who}.asset");
+        var (def, driverPrefab) = Cast(who);
         var kartPrefab = def != null ? AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Game/Prefabs/Karts/Kart_{def.kartId}.prefab") : null;
-        var driverPrefab = def != null ? AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Game/Prefabs/Drivers/Driver_{def.driverId}.prefab") : null;
         if (kartPrefab == null || driverPrefab == null) { Debug.LogWarning($"[menu] meet: no kart or driver for {who}"); return; }
 
         var slot = new GameObject("Kart_" + who).transform;
@@ -173,7 +195,7 @@ public static class MenuMeet
         // kart saved in a scene would wake its physics and race scripts in the menu.
         var kart = CharacterCarousel.Mount(kartPrefab, null, slot, Color.white, false);
         var seat = kart.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "DriverSeat");
-        float scale = seat != null ? seat.lossyScale.x : 1f;       // the driver as big as the one who sits in it
+        float scale = seat != null ? seat.lossyScale.x : DriverScale;       // the driver as big as the one who sits in it
         foreach (var ps in kart.GetComponentsInChildren<ParticleSystem>(true)) if (ps != null) Object.DestroyImmediate(ps.gameObject);
         for (int pass = 0; pass < 4; pass++)                        // some require each other: what one pass cannot remove, the next can
             foreach (var c in kart.GetComponentsInChildren<Component>(true))
@@ -203,8 +225,7 @@ public static class MenuMeet
         // without contact they hover.
         Contact(slot, new Vector3(box.center.x, 0.04f, box.center.z), new Vector2(box.size.x, box.size.z) * 1.55f);
 
-        var model = PodiumSetup.ModelOf(AssetDatabase.GetAssetPath(driverPrefab));
-        AnimationClip Take(string take, bool loop) => PodiumSetup.Clip(model, take, $"meet_{take}_{who}", loop);
+        var Take = Takes(driverPrefab, who);
         var holder = new GameObject("Driver_" + who).transform;
         holder.SetParent(slot, false);
         holder.localScale = Vector3.one * scale;
@@ -228,8 +249,24 @@ public static class MenuMeet
                 floor = TopAt(kart, slot, new Vector2(0f, box.max.z - 0.7f), 0.5f);
                 break;
         }
-        if (main == null) return;
+        var d = Stand(slot, holder, driverPrefab, main, others, floor, act == Act.Wipe, out var body);
+        if (d == null) return;
+        if (act == Act.Wipe)
+        {
+            var rag = Box(Find(d.transform, "arm-right"), "Rag", RagMaterial(), Vector3.zero, Vector3.one);
+            rag.position = PodiumSetup.End(body, Find(d.transform, "arm-right"));
+            rag.rotation = slot.rotation; SetWorldScale(rag, new Vector3(0.1f, 0.03f, 0.13f) * scale);
+        }
+        float tyres = kart.GetComponentsInChildren<MeshRenderer>().Min(r => r.bounds.min.y) - slot.position.y;
+        Debug.Log($"[menu] meet: {who} {act} by a {def.kartId} ({box.size.x:F2} x {box.size.z:F2} m, top {box.max.y:F2}, lowest {tyres:F2}), driver scale {scale:F2}, on {floor:F2}");
+    }
 
+    /// The driver on their feet (or seat) in `holder`: the takes, the rig skinned by hand down onto `floor`, the contact
+    /// patch, the moon's shadow for everything in the bay, the actor. Null when the main take is missing.
+    static GameObject Stand(Transform slot, Transform holder, GameObject driverPrefab, AnimationClip main, AnimationClip[] others, float floor, bool glances, out SkinnedMeshRenderer body)
+    {
+        body = null;
+        if (main == null) return null;
         var d = (GameObject)PrefabUtility.InstantiatePrefab(driverPrefab, holder);
         PrefabUtility.UnpackPrefabInstance(d, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
         foreach (var pose in d.GetComponentsInChildren<BlockyDriverPose>(true)) Object.DestroyImmediate(pose);
@@ -240,7 +277,7 @@ public static class MenuMeet
         foreach (var c in others.Prepend(main)) anim.AddClip(c, c.name);
         anim.clip = main; anim.playAutomatically = true; anim.cullingType = AnimationCullingType.AlwaysAnimate;
         main.SampleAnimation(d, 0f);                                 // the pose the scene opens (and is previewed) in
-        var body = d.GetComponentsInChildren<SkinnedMeshRenderer>(true).First(r => r.name.ToLowerInvariant().Contains("body"));
+        body = d.GetComponentsInChildren<SkinnedMeshRenderer>(true).First(r => r.name.ToLowerInvariant().Contains("body"));
         foreach (var smr in d.GetComponentsInChildren<SkinnedMeshRenderer>(true)) smr.updateWhenOffscreen = true;
         // Down onto it: the rig's origin is the hips, and each take stands them at its own height. Skinned by hand
         // (Kenney's rig weights every vertex wholly to one bone, as PodiumSetup.End relies on): exact in edit mode.
@@ -248,27 +285,210 @@ public static class MenuMeet
         var toWorld = body.bones.Select((bone, i) => bone.localToWorldMatrix * skin.bindposes[i]).ToArray();
         var ys = skin.vertices.Select((v, i) => toWorld[weights[i].boneIndex0].MultiplyPoint3x4(v).y).ToList();
         d.transform.position += Vector3.up * (slot.position.y + floor - ys.Min());
-        if (floor == 0f) Contact(slot, new Vector3(holder.localPosition.x, 0.045f, holder.localPosition.z), Vector2.one * 0.75f * scale);
-        // The race turns its karts' shadows off (twelve of them, on a phone) and lets the blob stand in. Three parked
-        // ones can afford the moon's: long, toward the camera.
+        if (floor == 0f) Contact(slot, new Vector3(holder.localPosition.x, 0.045f, holder.localPosition.z), Vector2.one * 0.75f * holder.localScale.x);
+        // The race turns its karts' shadows off (twelve of them, on a phone) and lets the blob stand in. A street of
+        // parked ones can afford the moon's: long, toward the camera.
         foreach (var r in slot.GetComponentsInChildren<Renderer>().Where(r => r.name != "BlobShadow" && r.name != "Contact"))
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
-        if (act == Act.Wipe)
+        d.AddComponent<MeetActor>().Bind(anim, Find(d.transform, "head"), others.Select(c => c.name).ToArray(), glances);
+        return d;
+    }
+
+    // ---------- the drivers: about their own business ----------
+
+    /// A bay without a kart: a prop at the bay's origin and the driver using it. Every prop faces so the driver is
+    /// side-on or three-quarter to the camera (MeetActor turns the head the rest of the way).
+    static void Scene(Transform root, string who, Vector3 at, Act act)
+    {
+        var (def, driverPrefab) = Cast(who);
+        if (driverPrefab == null) { Debug.LogWarning($"[menu] meet: no driver for {who}"); return; }
+        var slot = new GameObject("Bay_" + who).transform;
+        slot.SetParent(root, false);
+        slot.localPosition = at + Vector3.up * RoadY;
+        float scale = DriverScale;
+        var Take = Takes(driverPrefab, who);
+        var holder = new GameObject("Driver_" + who).transform;
+        holder.SetParent(slot, false);
+        holder.localScale = Vector3.one * scale;
+        AnimationClip main; AnimationClip[] others; float floor = 0f; bool glances = false;
+        switch (act)
         {
-            var rag = Box(Find(d.transform, "arm-right"), "Rag", RagMaterial(), Vector3.zero, Vector3.one);
-            rag.position = PodiumSetup.End(body, Find(d.transform, "arm-right"));
-            rag.rotation = slot.rotation; SetWorldScale(rag, new Vector3(0.1f, 0.03f, 0.13f) * scale);
+            case Act.Arcade:    // the cabinet faces the road (its screen and marquee read); the driver hangs at its side, Beach Buggy's Rez
+                Arcade(slot);
+                holder.localPosition = new Vector3(1.55f, 0f, -0.15f); holder.localRotation = Quaternion.Euler(0f, 192f, 0f);
+                main = Take("idle", true); others = new[] { Take("emote-yes", false), Take("emote-no", false) };
+                break;
+            case Act.Burger:    // standing at a crate table with a bottle on it, both hands on the burger
+                var table = Prop(slot, "Survival/box-large.fbx", "Survival", new Vector3(-0.95f * scale * 0.5f - 0.7f, 0f, 0.5f), 15f, 1.3f);
+                if (table != null) Prop(slot, "Survival/bottle.fbx", "Survival", new Vector3(table.transform.localPosition.x, TopAt(table, slot, new Vector2(table.transform.localPosition.x, 0.5f), 0.4f, null), 0.5f), 0f, 1.3f);
+                holder.localPosition = Vector3.zero; holder.localRotation = Quaternion.Euler(0f, 200f, 0f);
+                main = Take("holding-both", true); others = new[] { Take("emote-yes", false) };
+                break;
+            case Act.Phone:     // reading something, now and then looking up
+                holder.localPosition = Vector3.zero; holder.localRotation = Quaternion.Euler(0f, 192f, 0f);
+                main = Take("holding-right", true); others = new[] { Take("emote-no", false) }; glances = true;
+                break;
+            case Act.Bench:     // on a park bench, facing the road
+            {
+                var bench = Prop(slot, "Holiday/bench.fbx", "Holiday", Vector3.zero, 180f, scale * 0.9f);
+                var bb = BoundsOf(bench, slot);                                  // the kit's pivots sit at a corner: work from the bounds
+                float x = bb.center.x, z = bb.min.z + bb.size.z * 0.4f;           // the hips over the seat, not the backrest
+                holder.localPosition = new Vector3(x, 0f, z); holder.localRotation = Quaternion.Euler(0f, 180f, 0f);
+                main = Take("sit", true); others = new[] { Take("emote-yes", false) };
+                floor = TopAt(bench, slot, new Vector2(x, z), 0.25f * bb.size.x, null);
+                if (floor <= 0f) floor = bb.min.y + bb.size.y * 0.45f;
+                break;
+            }
+            case Act.Crate:     // sat on a crate, a case of bottles beside
+            {
+                var crate = Prop(slot, "Survival/box-large.fbx", "Survival", Vector3.zero, 10f, 4f);        // the kit's box is a quarter metre: four of them make a seat
+                Prop(slot, "Pirate/crate-bottles.fbx", "Pirate", new Vector3(1.9f, 0f, 0.5f), -20f, 2f);
+                var cb = BoundsOf(crate, slot);
+                holder.localPosition = new Vector3(cb.center.x, 0f, cb.min.z + 0.3f); holder.localRotation = Quaternion.Euler(0f, 180f, 0f);
+                main = Take("sit", true); others = new[] { Take("emote-no", false) };
+                floor = cb.max.y;
+                break;
+            }
+            default:            // Kick: a traffic cone, kicked and kicked again; the kicker three-quarters to the camera, the cone along his kick
+                Prop(slot, "ToyCar/item-cone.fbx", "ToyCar", new Vector3(0.75f, 0f, -0.75f), 0f, 2.2f);
+                holder.localPosition = new Vector3(-0.8f, 0f, 0.8f); holder.localRotation = Quaternion.Euler(0f, 135f, 0f);
+                main = Take("attack-kick-right", true); others = new[] { Take("emote-no", false) };
+                break;
         }
-        d.AddComponent<MeetActor>().Bind(anim, Find(d.transform, "head"), others.Select(c => c.name).ToArray(), act == Act.Wipe);
-        float tyres = kart.GetComponentsInChildren<MeshRenderer>().Min(r => r.bounds.min.y) - slot.position.y;
-        Debug.Log($"[menu] meet: {who} {act} by a {def.kartId} ({box.size.x:F2} x {box.size.z:F2} m, top {box.max.y:F2}, lowest {tyres:F2}), driver scale {scale:F2}, {ys.Max() - ys.Min():F2} m tall, on {floor:F2}");
+        var d = Stand(slot, holder, driverPrefab, main, others, floor, glances, out var body);
+        if (d == null) { Debug.LogWarning($"[menu] meet: {who}'s take for {act} is missing"); return; }
+        if (act == Act.Burger) BurgerAt(d, body, scale);
+        if (act == Act.Phone) PhoneAt(d, body, scale);
+        Debug.Log($"[menu] meet: {who} {act}, driver scale {scale:F2}, on {floor:F2}");
+    }
+
+    /// A Kenney prop under the bay, in one of the kit materials.
+    static GameObject Prop(Transform slot, string fbx, string mat, Vector3 at, float yaw, float scale)
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(Art + "Models/Props/" + fbx);
+        if (prefab == null) { Debug.LogWarning($"[menu] meet: no prop {fbx}"); return null; }
+        var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, slot);
+        go.transform.localPosition = at; go.transform.localRotation = Quaternion.Euler(0, yaw, 0); go.transform.localScale = Vector3.one * scale;
+        var m = Mat(mat);
+        if (m != null) foreach (var r in go.GetComponentsInChildren<MeshRenderer>()) r.sharedMaterial = m;
+        return go;
+    }
+
+    static Bounds BoundsOf(GameObject go, Transform slot)
+    {
+        var b = new Bounds(Vector3.zero, Vector3.zero); bool any = false;
+        if (go == null) return b;
+        foreach (var mf in go.GetComponentsInChildren<MeshFilter>().Where(f => f.sharedMesh != null))
+        {
+            var m = slot.worldToLocalMatrix * mf.transform.localToWorldMatrix;
+            foreach (var v in mf.sharedMesh.vertices) { var p = m.MultiplyPoint3x4(v); if (any) b.Encapsulate(p); else { b = new Bounds(p, Vector3.zero); any = true; } }
+        }
+        return b;
+    }
+
+    /// An arcade cabinet built from primitives, the front facing the bay's +X: a violet shell, the lockup on the marquee,
+    /// a track on the screen (lit, and lighting the player), two sticks and four buttons on a sloped panel.
+    static void Arcade(Transform slot)
+    {
+        var cab = new GameObject("Arcade").transform; cab.SetParent(slot, false); cab.localScale = Vector3.one * 1.15f;   // front to -Z: the road and the camera
+        var shell = Solid("Cabinet", new Color(0.18f, 0.04f, 0.44f), 0.35f);
+        var dark = Solid("CabinetDark", new Color(0.05f, 0.02f, 0.12f), 0.25f);
+        var gold = Solid("CabinetGold", new Color(1f, 0.69f, 0.15f), 0.55f);
+        var red = Solid("CabinetRed", new Color(0.9f, 0.12f, 0.1f), 0.5f);
+        Box(cab, "Body", shell, new Vector3(0, 1.0f, 0.2f), new Vector3(1.3f, 2.0f, 1.0f));
+        Box(cab, "Head", shell, new Vector3(0, 2.5f, 0.42f), new Vector3(1.3f, 1.0f, 0.56f));
+        Box(cab, "Marquee", dark, new Vector3(0, 2.78f, 0.1f), new Vector3(1.3f, 0.44f, 0.1f));
+        var panel = Box(cab, "Panel", dark, new Vector3(0, 1.5f, -0.33f), new Vector3(1.3f, 0.1f, 0.6f)); panel.localRotation = Quaternion.Euler(-14f, 0, 0);
+        Box(cab, "Trim", gold, new Vector3(0, 2.02f, -0.29f), new Vector3(1.32f, 0.05f, 0.05f));
+        var screenTex = AssetDatabase.LoadAssetAtPath<Texture2D>(Art + "Textures/UI/Tracks/beach.png");
+        Quad(cab, "Screen", Unlit("ArcadeScreen", screenTex, 1.3f), new Vector3(0, 2.1f, -0.265f), Quaternion.Euler(-8f, 0, 0), new Vector2(1.08f, 0.82f));
+        var lockup = AssetDatabase.LoadAssetAtPath<Texture2D>(Art + "Textures/UI/kartel_lockup.png");
+        Quad(cab, "MarqueeFace", Unlit("ArcadeMarquee", lockup, 1.15f), new Vector3(0, 2.78f, 0.045f), Quaternion.identity, new Vector2(1.2f, 0.44f));
+        foreach (float x in new[] { -0.36f, 0.2f })
+        {
+            Cyl(cab, "Stick", dark, new Vector3(x, 1.66f, -0.42f), 0.03f, 0.1f);
+            Ball(cab, "Knob", red, new Vector3(x, 1.8f, -0.42f), 0.07f);
+        }
+        for (int i = 0; i < 4; i++) Ball(cab, "Button", i % 2 == 0 ? red : gold, new Vector3(-0.2f + i * 0.14f, 1.6f, -0.52f), 0.045f);
+        var glow = new GameObject("ScreenGlow").AddComponent<Light>(); glow.transform.SetParent(cab, false);
+        glow.transform.localPosition = new Vector3(0, 2.0f, -0.7f);
+        glow.type = LightType.Point; glow.range = 3.6f; glow.intensity = 28f; glow.color = new Color(0.55f, 0.75f, 1f); glow.shadows = LightShadows.None;
+    }
+
+    /// A burger in both hands: buns, patty, lettuce; rides the right arm bone like the rag.
+    static void BurgerAt(GameObject d, SkinnedMeshRenderer body, float scale)
+    {
+        var r = Find(d.transform, "arm-right"); var l = Find(d.transform, "arm-left");
+        if (r == null) return;
+        var at = l != null ? (PodiumSetup.End(body, r) + PodiumSetup.End(body, l)) / 2f : PodiumSetup.End(body, r);
+        var burger = new GameObject("Burger").transform; burger.SetParent(r, true);
+        burger.position = at + d.transform.forward * 0.1f * scale; burger.rotation = d.transform.rotation; SetWorldScale(burger, Vector3.one);   // in front of the hand blocks, not inside them
+        float s = 0.075f * scale;
+        var bun = Solid("Bun", new Color(0.87f, 0.62f, 0.3f), 0.3f);
+        Cyl(burger, "BunBottom", bun, new Vector3(0, -0.55f * s, 0), s, 0.28f * s);
+        Cyl(burger, "Patty", Solid("Patty", new Color(0.33f, 0.16f, 0.07f), 0.2f), new Vector3(0, -0.12f * s, 0), 1.05f * s, 0.16f * s);
+        Cyl(burger, "Lettuce", Solid("Lettuce", new Color(0.36f, 0.72f, 0.22f), 0.2f), new Vector3(0, 0.1f * s, 0), 1.18f * s, 0.05f * s);
+        var top = Ball(burger, "BunTop", bun, new Vector3(0, 0.45f * s, 0), s); top.localScale = new Vector3(2f * s, 1.3f * s, 2f * s);
+    }
+
+    /// A phone in the right hand, its screen lit toward the face, and its light on it.
+    static void PhoneAt(GameObject d, SkinnedMeshRenderer body, float scale)
+    {
+        var r = Find(d.transform, "arm-right");
+        if (r == null) return;
+        var slab = Box(r, "Phone", Solid("PhoneBody", new Color(0.08f, 0.08f, 0.1f), 0.6f), Vector3.zero, Vector3.one);
+        slab.position = PodiumSetup.End(body, r) + d.transform.forward * 0.12f * scale + Vector3.up * 0.04f * scale;   // in front of the hand block
+        slab.rotation = d.transform.rotation * Quaternion.Euler(-40f, 0f, 0f);
+        SetWorldScale(slab, new Vector3(0.07f, 0.14f, 0.008f) * scale);
+        var face = Quad(slab, "Glow", Unlit("PhoneGlow", null, 1f, new Color(0.62f, 0.8f, 1f)), new Vector3(0, 0, -0.52f), Quaternion.identity, new Vector2(0.86f, 0.9f));
+        var light = new GameObject("PhoneLight").AddComponent<Light>(); light.transform.SetParent(slab, false); light.transform.localPosition = new Vector3(0, 0, -2f);
+        light.type = LightType.Point; light.range = 1.6f * scale; light.intensity = 9f; light.color = new Color(0.62f, 0.8f, 1f); light.shadows = LightShadows.None;
+    }
+
+    // ---------- primitives and materials ----------
+
+    static Material Solid(string name, Color colour, float smooth)
+    {
+        var m = ContentSetup.LoadOrCreate(Mats + "Meet_" + name + ".mat", Shader.Find("Universal Render Pipeline/Lit"));
+        m.SetColor("_BaseColor", colour); m.SetFloat("_Smoothness", smooth); EditorUtility.SetDirty(m);
+        return m;
+    }
+    static Material Unlit(string name, Texture2D tex, float gain, Color? tint = null)
+    {
+        var m = ContentSetup.LoadOrCreate(Mats + "Meet_" + name + ".mat", Shader.Find("Universal Render Pipeline/Unlit"));
+        m.SetTexture("_BaseMap", tex); m.SetColor("_BaseColor", (tint ?? Color.white) * gain); EditorUtility.SetDirty(m);
+        return m;
+    }
+    static Transform Primitive(PrimitiveType kind, Transform parent, string name, Material mat, Vector3 pos)
+    {
+        var go = GameObject.CreatePrimitive(kind);
+        Object.DestroyImmediate(go.GetComponent<Collider>());
+        go.name = name; go.transform.SetParent(parent, false); go.transform.localPosition = pos;
+        go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+        return go.transform;
+    }
+    static Transform Quad(Transform parent, string name, Material mat, Vector3 pos, Quaternion rot, Vector2 size)
+    {
+        var q = Primitive(PrimitiveType.Quad, parent, name, mat, pos);
+        q.localRotation = rot; q.localScale = new Vector3(size.x, size.y, 1f);
+        q.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        return q;
+    }
+    static Transform Cyl(Transform parent, string name, Material mat, Vector3 pos, float radius, float halfHeight)
+    {
+        var c = Primitive(PrimitiveType.Cylinder, parent, name, mat, pos); c.localScale = new Vector3(radius * 2f, halfHeight, radius * 2f); return c;
+    }
+    static Transform Ball(Transform parent, string name, Material mat, Vector3 pos, float radius)
+    {
+        var b = Primitive(PrimitiveType.Sphere, parent, name, mat, pos); b.localScale = Vector3.one * radius * 2f; return b;
     }
 
     /// The highest point of the kart's meshes within `radius` of a spot (slot frame, X and Z), as a height over the slot.
-    static float TopAt(GameObject kart, Transform slot, Vector2 spot, float radius)
+    static float TopAt(GameObject kart, Transform slot, Vector2 spot, float radius, string only = "Body")
     {
         float top = 0f;
-        foreach (var mf in kart.GetComponentsInChildren<MeshFilter>().Where(f => f.sharedMesh != null && f.name == "Body"))
+        if (kart == null) return top;
+        foreach (var mf in kart.GetComponentsInChildren<MeshFilter>().Where(f => f.sharedMesh != null && (only == null || f.name == only)))
         {
             var m = slot.worldToLocalMatrix * mf.transform.localToWorldMatrix;
             foreach (var v in mf.sharedMesh.vertices)
