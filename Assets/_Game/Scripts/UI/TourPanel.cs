@@ -27,6 +27,15 @@ namespace KartCup
         [SerializeField] GameObject card;
         [SerializeField] TMP_Text cardMode, cardTitle, cardTrack, cardRule, cardGoal, cardPrize, cardBest;
         [SerializeField] Image[] cardStars = System.Array.Empty<Image>();
+        // Beach Buggy's Choose Series (10 Oct 2026): the cards first (pick), a tap opens that series' events (detail)
+        [SerializeField] GameObject pick, detail;
+        [SerializeField] Image[] seriesPics = System.Array.Empty<Image>(), seriesBoss = System.Array.Empty<Image>();
+        [SerializeField] GameObject[] seriesLocks = System.Array.Empty<GameObject>(), seriesStars = System.Array.Empty<GameObject>();
+        [SerializeField] TMP_Text[] seriesFoots = System.Array.Empty<TMP_Text>();
+        [SerializeField] Sprite[] trackArt = System.Array.Empty<Sprite>();
+        [SerializeField] string[] portraitIds = System.Array.Empty<string>();
+        [SerializeField] Sprite[] portraits = System.Array.Empty<Sprite>();
+        bool picking = true;
         int pendingRow = -1;
 
         int cup = -1;
@@ -34,7 +43,23 @@ namespace KartCup
         void OnEnable()
         {
             if (cup < 0) cup = Enumerable.Range(0, Tour.Cups.Length).Where(Tour.Open).DefaultIfEmpty(0).Max();   // the furthest open cup
+            picking = true;
             Show();
+        }
+
+        /// A series card: its events. A locked one only says what opens it.
+        public void Pick(int i)
+        {
+            cup = Mathf.Clamp(i, 0, Tour.Cups.Length - 1);
+            if (!Tour.Open(cup)) { Haptics.Play(Haptics.Kind.Tick); AudioDirector.Instance?.Error(); Show(); return; }
+            picking = false; Haptics.Play(Haptics.Kind.Tick); AudioDirector.Instance?.Click(); Show();
+        }
+        /// From the events back to the cards; false when the cards are already up (the flow goes home then).
+        public bool Back()
+        {
+            if (picking) return false;
+            CloseCard(); picking = true; Show();
+            return true;
         }
 
         public void SetCup(int i) { cup = Mathf.Clamp(i, 0, Tour.Cups.Length - 1); Haptics.Play(Haptics.Kind.Tick); Show(); }
@@ -94,13 +119,35 @@ namespace KartCup
             if (cup < 0) cup = 0;
             var c = Tour.Cups[cup];
             bool open = Tour.Open(cup);
+            if (pick != null) pick.SetActive(picking);
+            if (detail != null) detail.SetActive(!picking);
+            for (int i = 0; i < seriesPics.Length && i < Tour.Cups.Length; i++)
+            {
+                var k = Tour.Cups[i]; bool isOpen = Tour.Open(i);
+                int art = k.events.Length > 0 ? k.events[0].track : 0;
+                if (seriesPics[i] != null) { seriesPics[i].sprite = art < trackArt.Length ? trackArt[art] : null; seriesPics[i].color = isOpen ? Color.white : new Color(0.5f, 0.5f, 0.6f); }
+                if (i < seriesLocks.Length && seriesLocks[i] != null) seriesLocks[i].SetActive(!isOpen);
+                if (i < seriesBoss.Length && seriesBoss[i] != null)
+                {
+                    var bossDef = roster != null && k.boss >= 0 && k.boss < roster.characters.Length ? roster.characters[k.boss] : null;
+                    int p = bossDef != null ? System.Array.IndexOf(portraitIds, bossDef.driverId) : -1;
+                    seriesBoss[i].sprite = p >= 0 && p < portraits.Length ? portraits[p] : null;
+                    seriesBoss[i].enabled = seriesBoss[i].sprite != null;
+                }
+                if (i < seriesStars.Length && seriesStars[i] != null) seriesStars[i].SetActive(isOpen);
+                if (i < seriesFoots.Length && seriesFoots[i] != null)
+                    seriesFoots[i].text = isOpen ? $"{Tour.CupStars(i)} / {k.events.Length * Tour.StarsPerEvent}" : $"LOCKED  ·  {k.gate} STARS";
+            }
             for (int i = 0; i < tabBacks.Length; i++)
             {
                 if (tabBacks[i] != null) tabBacks[i].color = i == cup ? tabOn : tabOff;
                 if (i < tabLabels.Length && tabLabels[i] != null)
                 {
                     tabLabels[i].color = i == cup ? textOn : textOff;
-                    tabLabels[i].text = (Tour.Open(i) ? "" : "<size=80%>LOCKED · </size>") + Tour.Cups[i].kicker;
+                    var k = Tour.Cups[i];
+                    tabLabels[i].text = Tour.Open(i)
+                        ? $"{k.name}\n<size=62%><color=#FFB126>{Tour.CupStars(i)} / {k.events.Length * Tour.StarsPerEvent} STARS</color></size>"
+                        : $"{k.name}\n<size=62%>LOCKED  ·  {k.gate} STARS TO OPEN</size>";
                 }
             }
             if (total != null) total.text = $"{Tour.Total} / {Tour.MaxStars}";
@@ -141,7 +188,8 @@ namespace KartCup
         }
 
         /// Editor-side preview.
-        public void ShowInEditor(int i) { cup = i; Show(); if (card != null) card.SetActive(false); }
+        public void ShowInEditor(int i) { cup = i; picking = false; Show(); if (card != null) card.SetActive(false); }
+        public void PickInEditor() { picking = true; Show(); if (card != null) card.SetActive(false); }
         /// Previews: the event card for a row, open.
         public void CardInEditor(int i, int row) { cup = i; Show(); pendingRow = row; ShowCard(Tour.Cups[cup], row); if (card != null) card.SetActive(true); }
     }

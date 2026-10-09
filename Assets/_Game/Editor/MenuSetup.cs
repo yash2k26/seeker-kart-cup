@@ -64,6 +64,7 @@ public static partial class MenuSetup
         var tourScreen = TourScreen(safe);
         var achievementsScreen = AchievementsScreen(safe);
         var gemsScreen = GemsScreen(safe);
+        var front = FrontScreen(safe);
         // the title's hero: the chosen driver by the chosen kart on the street's home stage
         var home = title.AddComponent<HomeStage>();
         new SerializedObject(home).Do(s =>
@@ -76,9 +77,9 @@ public static partial class MenuSetup
 
         var so = new SerializedObject(flow);
         so.FindProperty("roster").objectReferenceValue = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
-        so.FindProperty("playLabel").objectReferenceValue = title.transform.Find("Plate/Actions/Play/PlayFace/PlayLabel")?.GetComponent<TMP_Text>();
+        so.FindProperty("playLabel").objectReferenceValue = title.transform.Find("Plate/Actions/Quick/QuickFace/QuickLabel")?.GetComponent<TMP_Text>();   // the quick-race door says CONTINUE CUP mid-cup
         var panels = so.FindProperty("panels");
-        panels.arraySize = 13;
+        panels.arraySize = 14;
         panels.GetArrayElementAtIndex(0).objectReferenceValue = title;
         panels.GetArrayElementAtIndex(1).objectReferenceValue = select;
         panels.GetArrayElementAtIndex(2).objectReferenceValue = board;
@@ -92,6 +93,8 @@ public static partial class MenuSetup
         panels.GetArrayElementAtIndex(10).objectReferenceValue = tourScreen;
         panels.GetArrayElementAtIndex(11).objectReferenceValue = achievementsScreen;
         panels.GetArrayElementAtIndex(12).objectReferenceValue = gemsScreen;
+        panels.GetArrayElementAtIndex(13).objectReferenceValue = front;
+        so.FindProperty("startPanel").intValue = 13;   // the front door first; PLAY opens the hub
         so.ApplyModifiedPropertiesWithoutUndo();
 
         Curtain();
@@ -374,6 +377,33 @@ public static partial class MenuSetup
     }
 
     // ---------- screens ----------
+    /// Beach Buggy's front: the lockup big over the street with everyone on it, and one row of doors with PLAY at the
+    /// right. PLAY is the hub (TitleScreen: your driver and kart). Android back from the hub comes here; from here it quits.
+    static GameObject FrontScreen(RectTransform parent)
+    {
+        var screen = Rect("Front", parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject;
+        var plate = Rect("Plate", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        var shade = Rect("Shade", plate, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, 150), new Vector2(0, 420));
+        var img = shade.gameObject.AddComponent<Image>(); img.sprite = FadeSprite(vertical: true); img.color = Deep; img.raycastTarget = false;
+        var lockup = UiSprite(Art + "Textures/UI/kartel_lockup.png");
+        var logo = Rect("Logo", plate, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -70), new Vector2(1400, 512));
+        logo.pivot = new Vector2(0.5f, 1);
+        var mark = logo.gameObject.AddComponent<Image>(); mark.sprite = lockup; mark.preserveAspect = true; mark.raycastTarget = false;
+        var actions = Rect("Actions", plate, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        actions.gameObject.AddComponent<PopIn>();
+        var doors = new (string name, string icon, string caption, string method)[]
+        {
+            ("Settings", "icon_cog", "SETTINGS", nameof(ScreenFlow.ShowSettings)), ("Board", "trophy", "RANKING", nameof(ScreenFlow.ShowLeaderboard)),
+            ("Awards", "star", "AWARDS", nameof(ScreenFlow.ShowAchievements)), ("Online", "globe", "ONLINE", nameof(ScreenFlow.ShowRooms)),
+        };
+        for (int i = 0; i < doors.Length; i++)
+            Wire(Tile(doors[i].name, actions, doors[i].icon, doors[i].caption, new Vector2(0, 0), new Vector2(64 + i * 262, 48), new Vector2(236, 212), glyph: 96f), doors[i].method);
+        var play = Button("Play", actions, "PLAY", Accent, Paper, 76, new Vector2(1, 0), new Vector2(-64, 48), new Vector2(640, 212), icon: "play");
+        Wire(play, nameof(ScreenFlow.ShowTitle));
+        Shine(play);
+        return screen;
+    }
+
     static GameObject TitleScreen(RectTransform parent)
     {
         var screen = Rect("Title", parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject;
@@ -406,12 +436,44 @@ public static partial class MenuSetup
         {
             ("Driver", "user", "DRIVER", nameof(ScreenFlow.ShowSelect)), ("Garage", "kart", "KART", nameof(ScreenFlow.ShowGarage)),
             ("Items", "rocket", "ITEMS", nameof(ScreenFlow.ShowItems)), ("Online", "globe", "ONLINE", nameof(ScreenFlow.ShowRooms)),
-            ("Tour", "flag", "TOUR", nameof(ScreenFlow.ShowTour)),
+            ("Quick", "play", "QUICK RACE", nameof(ScreenFlow.Play)),   // one track, or the cup in flight (the label says CONTINUE CUP then)
         };
         for (int i = 0; i < doors.Length; i++)
             Wire(Tile(doors[i].name, actions, doors[i].icon, doors[i].caption, new Vector2(0, 0), new Vector2(64 + i * 262, 48), new Vector2(236, 212), glyph: 96f), doors[i].method);
-        var play = Button("Play", actions, "PLAY", Accent, Paper, 76, new Vector2(1, 0), new Vector2(-64, 48), new Vector2(640, 212), icon: "play");
-        Wire(play, nameof(ScreenFlow.Play));
+        // the DRIVER and KART doors wear what is chosen, a swap badge in the corner (Beach Buggy's Switch Driver / Switch Car)
+        Image Picture(string door)
+        {
+            var icon = actions.Find($"{door}/{door}Face/{door}Icon")?.GetComponent<Image>();
+            if (icon == null) return null;
+            icon.rectTransform.sizeDelta = new Vector2(140, 140); icon.rectTransform.anchoredPosition = new Vector2(0, -10);
+            var badge = Rect("Swap", icon.rectTransform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(8, 4), new Vector2(54, 54));
+            Design.AsPill(badge, Deep).raycastTarget = false;
+            var glyph = Rect("Glyph", badge, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(38, 38));
+            var gi = glyph.gameObject.AddComponent<Image>(); gi.sprite = IconSprite("swap"); gi.color = Accent; gi.preserveAspect = true; gi.raycastTarget = false;
+            return icon;
+        }
+        var rosterDb = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
+        var driverIds = rosterDb != null ? rosterDb.characters.Where(c => c != null).Select(c => c.driverId).ToArray() : new string[0];
+        var homeDoors = screen.AddComponent<HomeDoors>();
+        new SerializedObject(homeDoors).Do(s =>
+        {
+            s.FindProperty("roster").objectReferenceValue = rosterDb;
+            s.FindProperty("karts").objectReferenceValue = AssetDatabase.LoadAssetAtPath<KartDatabase>("Assets/_Game/Data/Karts.asset");
+            s.FindProperty("driverImage").objectReferenceValue = Picture("Driver");
+            s.FindProperty("kartImage").objectReferenceValue = Picture("Garage");
+            s.FindProperty("driverFallback").objectReferenceValue = IconSprite("user");
+            s.FindProperty("kartFallback").objectReferenceValue = IconSprite("kart");
+            var ids = s.FindProperty("portraitIds"); ids.arraySize = driverIds.Length;
+            for (int i = 0; i < driverIds.Length; i++) ids.GetArrayElementAtIndex(i).stringValue = driverIds[i];
+            Fill(s.FindProperty("portraits"), driverIds.Select(id => AssetDatabase.LoadAssetAtPath<Sprite>(PortraitSetup.Dir + id + ".png")).Cast<Object>().ToArray());
+            var kids = s.FindProperty("kartIds"); kids.arraySize = KartSetup.Karts.Length;
+            for (int i = 0; i < KartSetup.Karts.Length; i++) kids.GetArrayElementAtIndex(i).stringValue = KartSetup.Karts[i];
+            Fill(s.FindProperty("thumbs"), KartSetup.Karts.Select(id => AssetDatabase.LoadAssetAtPath<Sprite>(KartThumbs.Dir + id + ".png")).Cast<Object>().ToArray());
+        });
+        homeDoors.ShowInEditor();
+        // Beach Buggy's Choose Series: the career is the main road. Series after series, each cleared by its stars.
+        var play = Button("Play", actions, "CHOOSE SERIES", Accent, Paper, 60, new Vector2(1, 0), new Vector2(-64, 48), new Vector2(640, 212), icon: "flag");
+        Wire(play, nameof(ScreenFlow.ChooseSeries));
         Shine(play);
 
         // Top right: who you are (sign in), the gems, the two counters (ranking, awards) and the settings.
@@ -1117,7 +1179,7 @@ public static partial class MenuSetup
         var swatches = new Image[1 + Paints.All.Length];
         for (int i = 0; i < swatches.Length; i++)
         {
-            var rt = Rect("Swatch" + i, card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(180 + i * 49, -480), new Vector2(42, 42));   // ten fit the card (the gold makes ten)
+            var rt = Rect("Swatch" + i, card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(176 + i * 45, -480), new Vector2(42, 42));   // eleven fit the card (five bosses, the gold)
             rt.pivot = new Vector2(0, 1);
             swatches[i] = Design.AsPill(rt, Color.white);
             var b = rt.gameObject.AddComponent<Button>();

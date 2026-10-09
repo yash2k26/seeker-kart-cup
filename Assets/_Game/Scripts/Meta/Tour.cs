@@ -54,6 +54,16 @@ namespace KartCup
                 new Event { id = "c4e4", title = "Final Lap Fever", track = 3, mode = RaceMode.Kind.Race },
                 new Event { id = "c4b", title = "BOSS: TOLY", track = 3, mode = RaceMode.Kind.Duel, rival = 0 },
             } },
+            // 10 Oct 2026 (the user: "multiple series, tasks and races to clear each"): a fifth, the hardest field, Beeman
+            // its boss. He is free already, so the prize is his paint and the chest.
+            new() { name = "GRAND TOUR", kicker = "CUP 5", gate = 48, pace = 1.10f, boss = 7, bossPaint = "boss.beeman", bossSku = "", events = new[]
+            {
+                new Event { id = "c5e1", title = "Coast to Coast", track = 0, mode = RaceMode.Kind.Race },
+                new Event { id = "c5e2", title = "Frost Knockout", track = 1, mode = RaceMode.Kind.Elimination },
+                new Event { id = "c5e3", title = "Canopy Chase", track = 2, mode = RaceMode.Kind.Race },
+                new Event { id = "c5e4", title = "Speedway Survivor", track = 3, mode = RaceMode.Kind.Elimination },
+                new Event { id = "c5b", title = "BOSS: BEEMAN", track = 2, mode = RaceMode.Kind.Duel, rival = 7 },
+            } },
         };
         public const int StarsPerEvent = 3;
         public static int MaxStars => Cups.Sum(c => c.events.Length) * StarsPerEvent;

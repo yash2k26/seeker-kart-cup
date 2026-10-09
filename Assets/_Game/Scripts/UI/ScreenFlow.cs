@@ -1,4 +1,5 @@
 using TMPro;
+using PrimeTween;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -16,9 +17,10 @@ namespace KartCup
         [SerializeField] int startPanel;
         [SerializeField] CharacterDatabase roster;
         CharacterCarousel carousel;
+        Transform homeStage;
         [SerializeField] TMP_Text playLabel;      // says CONTINUE CUP when one is half-run
 
-        const int Select = 1, Track = 4, Rooms = 5, Lobby = 6, Garage = 7, Items = 8, WeeklyScreen = 9, TourScreen = 10, AchievementsScreen = 11, GemsScreen = 12;
+        const int Select = 1, Track = 4, Rooms = 5, Lobby = 6, Garage = 7, Items = 8, WeeklyScreen = 9, TourScreen = 10, AchievementsScreen = 11, GemsScreen = 12, Front = 13;
         // How deep each panel sits under the title: going deeper slides in from the right, coming back from the left.
         static readonly int[] Depth = { 0, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1 };
 
@@ -37,7 +39,7 @@ namespace KartCup
         {
             Instance = this;
             backdrop = FindFirstObjectByType<MenuBackdrop>();
-            if (backdrop != null) backdrop.Home = backdrop.Meet != null ? backdrop.Meet.Find("HomeStage") : null;   // the title's camera stands in front of the home stage
+            homeStage = backdrop != null && backdrop.Meet != null ? backdrop.Meet.Find("HomeStage") : null;   // the hub's camera stands in front of it; the front door's runs the street
             RoomClient.LoadRequested += OnLoadRequested;
             RoomClient.RoomChanged += OnRoomChanged;
             Application.deepLinkActivated += OnDeepLink;
@@ -82,8 +84,10 @@ namespace KartCup
             // and leave it to PauseMenu, so the panel check comes first.
             if (!IsMenu || Keyboard.current == null || !Keyboard.current.escapeKey.wasPressedThisFrame) return;
             if (current == Lobby) { AudioDirector.Instance?.Back(); LeaveRoom(); Show(Rooms, silent: false); }        // back out of a lobby = leave it
+            else if (current == Front) Application.Quit();
+            else if (current == TourScreen && (FindFirstObjectByType<TourPanel>()?.Back() ?? false)) AudioDirector.Instance?.Back();   // a series' events step back to the cards
             else if (current > 0) { AudioDirector.Instance?.Back(); Show(current == Track ? Select : current == Items ? Garage : 0, silent: false); }   // back retraces one step: track to select, items to karts
-            else Application.Quit();
+            else { AudioDirector.Instance?.Back(); Show(Front, silent: false); }   // the hub's back is the front door
         }
 
         public void Show(int panel) => Show(panel, silent: false);
@@ -102,6 +106,7 @@ namespace KartCup
             current = panel;
             lastShow = Time.unscaledTime;
             if (panel == 0) backToTour = false;   // left the select screen by BACK: PLAY goes on to the tracks again
+            if (backdrop != null) backdrop.Home = panel == 0 ? homeStage : null;   // the hub looks at your pair; every other screen's title camera runs the street
             if (backdrop != null) backdrop.Focused = panel == Select || panel == Garage || panel == Items;   // hold a composed angle while a kart is on show; the track panel covers the vista
             if (backdrop != null) backdrop.Close = panel == Select;                                          // the driver screen frames a person, close
             if (backdrop != null)
@@ -137,6 +142,21 @@ namespace KartCup
         public void ShowItems() => Show(Items);
         public void ShowWeekly() => Show(WeeklyScreen);
         public void ShowTour() => Show(TourScreen);
+        public void ShowFront() => Show(Front);
+        /// CHOOSE SERIES from the hub: the pair drive off at the camera (HomeStage.DriveOff) and the cut lands on the series.
+        public void ChooseSeries()
+        {
+            if (Time.unscaledTime - lastShow < 0.3f) return;
+            var stage = FindFirstObjectByType<HomeStage>();
+            if (current != 0 || stage == null || stage.Driving) { ShowTour(); return; }
+            lastShow = Time.unscaledTime;
+            var group = panels[0].GetComponent<CanvasGroup>() ?? panels[0].AddComponent<CanvasGroup>();
+            group.blocksRaycasts = false;
+            Tween.Alpha(group, 0f, 0.35f, useUnscaledTime: true);   // the doors drop away as the kart comes; UiMotion.Show brings them back
+            stage.DriveOff(() => Show(TourScreen, silent: true));
+        }
+        /// The series screen's back: the events step back to the cards, the cards back to the hub.
+        public void TourBack() { var p = FindFirstObjectByType<TourPanel>(); if (p == null || !p.Back()) ShowTitle(); }
         int gemsFrom;
         /// The gem shop, from the title's chip, the driver card or a short balance; BACK returns to wherever that was.
         public void ShowGems() { if (current != GemsScreen) gemsFrom = current; Show(GemsScreen); }

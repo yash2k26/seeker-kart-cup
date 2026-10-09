@@ -19,6 +19,7 @@ namespace KartCup
             new() { id = "bossakshay", sku = "boss.akshay", name = "AKSHAY SKY",   color = Hex("2EC2FF"), boss = "AKSHAY" },
             new() { id = "bosschase",  sku = "boss.chase",  name = "CHASE CHROME", color = Hex("C9D2DE"), boss = "CHASE" },
             new() { id = "bosstoly",   sku = "boss.toly",   name = "TOLY GOLD",    color = Hex("FFB126"), boss = "TOLY" },
+            new() { id = "bossbeeman", sku = "boss.beeman", name = "BEEMAN LIME",  color = Hex("B5FF3A"), boss = "BEEMAN" },
             // Beach Buggy's 24k gold skin: never sold. Each kart earns its own by winning a Grand Prix (GoldFor/EarnGold).
             new() { id = "gold",       sku = "gold",        name = "24K GOLD",     color = Hex("E9B640"), gold = true },
         };

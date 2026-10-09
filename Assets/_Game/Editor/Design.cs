@@ -242,7 +242,7 @@ public static class Design
     /// White glyph on clear, 128 px, made once into Gen/Icons. play, back, next, globe, trophy, kart, user, flag; the
     /// race items (rocket, homing, bomb, nitro, bouncer, sunbomb, trap); arc (the loading spinner).
     public static readonly string[] Drawn = { "play", "back", "next", "globe", "trophy", "kart", "user", "flag",
-                                              "rocket", "homing", "bomb", "nitro", "bouncer", "sunbomb", "trap", "arc", "download", "star" };
+                                              "rocket", "homing", "bomb", "nitro", "bouncer", "sunbomb", "trap", "arc", "download", "star", "swap", "lock" };
     /// The race items' glyphs by ItemManager name.
     public static string ItemGlyph(string item) => item switch
     {
@@ -283,6 +283,8 @@ public static class Design
             "trap" => (x, y) => Mathf.Min(Circle(x, y, 64, 64, 14),
                                      Mathf.Min(Seg(x, y, 20, 64, 108, 64, 13), Mathf.Min(Seg(x, y, 42, 26, 86, 102, 13), Seg(x, y, 42, 102, 86, 26, 13)))),
             "arc" => (x, y) => Arc(x, y),
+            "swap" => (x, y) => Swap(x, y),
+            "lock" => (x, y) => Mathf.Min(Box(x, y, 64, 44, 36, 28, 8), Mathf.Max(Ring(x, y, 64, 78, 22, 11), 72f - y)),   // a body and the shackle over it
             "download" => (x, y) => Mathf.Min(Mathf.Min(Seg(x, y, 64, 108, 64, 46, 13), Mathf.Min(Seg(x, y, 38, 70, 64, 44, 13), Seg(x, y, 90, 70, 64, 44, 13))),
                                          Box(x, y, 64, 20, 46, 7, 4)),
             _ => null,
@@ -374,6 +376,18 @@ public static class Design
         float a = Mathf.Atan2(y - 64f, x - 64f) * Mathf.Rad2Deg; if (a < 0f) a += 360f;
         if (a <= 270f) return Ring(x, y, 64, 64, r, w);
         return Mathf.Min(Circle(x, y, 64 + r, 64, w * 0.5f), Circle(x, y, 64, 64 - r, w * 0.5f));
+    }
+    // two arrows chasing each other round a ring: the swap badge on the title's DRIVER and KART doors
+    static float Swap(float x, float y)
+    {
+        const float r = 40f, w = 12f;
+        float a = Mathf.Atan2(y - 64f, x - 64f) * Mathf.Rad2Deg; if (a < 0f) a += 360f;
+        bool onArc = (a >= 15f && a <= 150f) || (a >= 195f && a <= 330f);
+        float arc = onArc ? Ring(x, y, 64, 64, r, w) : float.MaxValue;
+        Vector2 P(float deg, float rr) => new Vector2(64f + Mathf.Cos(deg * Mathf.Deg2Rad) * rr, 64f + Mathf.Sin(deg * Mathf.Deg2Rad) * rr);
+        float h1 = Tri(x, y, P(150, r - 16), P(150, r + 16), P(172, r));
+        float h2 = Tri(x, y, P(330, r - 16), P(330, r + 16), P(352, r));
+        return Mathf.Min(arc, Mathf.Min(h1, h2));
     }
     // a pennant off the pole: a slanted quad as two triangles
     static float Flag(float x, float y) => Mathf.Min(Tri(x, y, new Vector2(38, 108), new Vector2(102, 92), new Vector2(38, 66)),

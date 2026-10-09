@@ -256,9 +256,12 @@ public static class MenuPreview
         {
             for (int j = 0; j < panels.arraySize; j++)
                 ((GameObject)panels.GetArrayElementAtIndex(j).objectReferenceValue).SetActive(i == j);
+            if (backdrop != null) backdrop.Home = i == 0 && backdrop.Meet != null ? backdrop.Meet.Find("HomeStage") : null;   // the hub looks at the stage; the front door runs the street
             if (backdrop != null) backdrop.Snap(i == 1 || i == 7 || i == 8, close: i == 1);     // LateUpdate never runs in edit mode either; the driver screen frames close
             // OnEnable does not run in edit mode: hand the sample/preview content to the panels that need it.
             if (i == 0) foreach (var h in Object.FindObjectsByType<HomeStage>(FindObjectsInactive.Include, FindObjectsSortMode.None)) h.ShowInEditor();
+            if (i == 0) foreach (var d in Object.FindObjectsByType<HomeDoors>(FindObjectsInactive.Include, FindObjectsSortMode.None)) d.ShowInEditor();
+            if (i == 1) foreach (var h in Object.FindObjectsByType<HomeStage>(FindObjectsInactive.Include, FindObjectsSortMode.None)) h.LeaveInEditor();   // the bays back for the select
             if (i == 6) foreach (var lobby in Object.FindObjectsByType<LobbyPanel>(FindObjectsSortMode.None)) lobby.RefreshSample();
             if (i == 7) foreach (var garage in Object.FindObjectsByType<GaragePanel>(FindObjectsSortMode.None)) garage.ShowInEditor(KartSetup.Karts.Length - 1);
             if (i == 7 && backdrop != null) backdrop.Snap(true);   // the framing GaragePanel just fitted to its kart
@@ -276,6 +279,11 @@ public static class MenuPreview
                               $"alpha={string.Join("/", img.GetComponentsInParent<CanvasGroup>(true).Select(g => g.alpha))} colour={img.color} size={img.rectTransform.rect.size}");
             Canvas.ForceUpdateCanvases();
             Shot(cam, $"menu{i}");
+            if (i == 10)   // and the series cards the screen opens on
+            {
+                foreach (var tour in Object.FindObjectsByType<TourPanel>(FindObjectsSortMode.None)) tour.PickInEditor();
+                Canvas.ForceUpdateCanvases(); Shot(cam, "menu10-pick");
+            }
             if (i == 7)   // and the gold, earned for the free kart: Beach Buggy's 24k skin
             {
                 Unlocks.Earn("gold." + KartSetup.Karts[0]);

@@ -1,4 +1,6 @@
+using System.Collections;
 using System.Linq;
+using PowerslideKartPhysics;
 using UnityEngine;
 
 namespace KartCup
@@ -13,10 +15,82 @@ namespace KartCup
         [SerializeField] CharacterDatabase roster;
         [SerializeField] GameObject[] kartPrefabs = System.Array.Empty<GameObject>();
         GameObject kart, driver;
+        public bool Driving { get; private set; }
 
-        void OnEnable() => Build();
-        void OnDisable() => Clear();
-        public void ShowInEditor() => Build();
+        /// CHOOSE SERIES (10 Oct 2026, the user's shot): the driver hops into the kart, the kart turns to the camera and
+        /// drives at it; when it fills the screen `done` runs (the flow cuts to the series). With no pair on the stage, at once.
+        public void DriveOff(System.Action done)
+        {
+            if (kart == null || Driving || !Application.isPlaying) { done?.Invoke(); return; }
+            StartCoroutine(Drive(done));
+        }
+
+        IEnumerator Drive(System.Action done)
+        {
+            Driving = true;
+            var cam = Camera.main;
+            var seat = kart.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "DriverSeat");
+            // 1. the hop: up and over, into the seat; then the seated driver takes over
+            if (driver != null && seat != null)
+            {
+                Vector3 from = driver.transform.position; Quaternion fromRot = driver.transform.rotation;
+                Haptics.Play(Haptics.Kind.Tick); AudioDirector.Instance?.Click();
+                for (float t = 0f; t < 0.55f && driver != null; t += Time.deltaTime)
+                {
+                    float u = Mathf.Clamp01(t / 0.55f);
+                    var p = Vector3.Lerp(from, seat.position, u); p.y += Mathf.Sin(u * Mathf.PI) * 1.7f;
+                    driver.transform.position = p; driver.transform.rotation = Quaternion.Slerp(fromRot, seat.rotation, u);
+                    yield return null;
+                }
+                if (driver != null) Destroy(driver); driver = null;
+                var prefab = carousel != null ? carousel.DriverPrefabFor(roster != null ? roster.Selected : null) : null;
+                if (prefab != null && kart != null) { var d = Instantiate(prefab, seat); d.transform.localPosition = Vector3.zero; d.transform.localRotation = Quaternion.identity; }
+                Haptics.Play(Haptics.Kind.Land);
+                yield return new WaitForSeconds(0.12f);
+            }
+            if (kart == null) { Driving = false; done?.Invoke(); yield break; }
+            // 2. round to face the camera, then go: faster and faster until the nose is in the lens
+            var wheels = kart.GetComponentsInChildren<KartWheel>().Select(w => w.visualWheel).Where(w => w != null).ToArray();
+            Vector3 target = cam != null ? cam.transform.position : kart.transform.position + kart.transform.forward * 20f;
+            Vector3 Flat(Vector3 v) { v.y = 0f; return v; }
+            var dir = Flat(target - kart.transform.position).normalized;
+            var startRot = kart.transform.rotation; var aim = Quaternion.LookRotation(dir, Vector3.up);
+            float speed = 0f, turn = 0f;
+            Haptics.Play(Haptics.Kind.Boost); AudioDirector.Instance?.Confirm();
+            while (kart != null)
+            {
+                float dt = Time.deltaTime;
+                turn = Mathf.MoveTowards(turn, 1f, dt / 0.35f);
+                kart.transform.rotation = Quaternion.Slerp(startRot, aim, Mathf.SmoothStep(0f, 1f, turn));
+                speed = Mathf.Min(speed + 30f * dt, 28f);
+                kart.transform.position += dir * speed * dt;
+                foreach (var w in wheels) if (w != null) w.Rotate(Vector3.right, speed * dt * 140f, Space.Self);
+                var toCam = Flat(target - kart.transform.position);
+                if (toCam.magnitude < 2.4f || Vector3.Dot(dir, toCam) < 0f) break;
+                yield return null;
+            }
+            Driving = false;
+            done?.Invoke();
+        }
+
+        void OnEnable() { Bays(false); Build(); }
+        void OnDisable() { Clear(); Bays(true); }
+        public void ShowInEditor() { Bays(false); Build(); }
+        public void LeaveInEditor() { Clear(); Bays(true); }
+
+        /// The other drivers' bays (Kart_*, Bay_*) are the select screen's scenery: the home is just you and your kart
+        /// (10 Oct 2026, the user), so they go while the title is up and come back for the driver select.
+        void Bays(bool on)
+        {
+            var backdrop = FindFirstObjectByType<MenuBackdrop>();
+            var meet = backdrop != null ? backdrop.Meet : null;
+            if (meet == null) return;
+            for (int i = 0; i < meet.childCount; i++)
+            {
+                var c = meet.GetChild(i);
+                if (c.name.StartsWith("Kart_") || c.name.StartsWith("Bay_") || c.name.StartsWith("BayKey_")) c.gameObject.SetActive(on);
+            }
+        }
 
         void Clear()
         {

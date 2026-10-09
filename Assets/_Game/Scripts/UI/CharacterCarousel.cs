@@ -238,6 +238,8 @@ namespace KartCup
             return d;
         }
 
+        public GameObject DriverPrefabFor(CharacterDef def) => def != null ? driverPrefabs.FirstOrDefault(d => d.name.EndsWith(def.driverId)) ?? driverPrefabs.FirstOrDefault() : null;
+
         /// The driver on their feet at `parent`'s origin, their own idle take playing: the title's home stage borrows the
         /// select screen's clips and lifts. Nothing of the turntable's own state is touched.
         public GameObject StandFor(CharacterDef def, Transform parent)

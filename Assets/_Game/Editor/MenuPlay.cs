@@ -53,20 +53,22 @@ public static class MenuPlay
         (double at, System.Action act)[] steps =
         {
             (5, () => Report("title-a")), (9, () => Report("title-b")), (14, () => Report("title-c")),
-            (14.2, () => flow.Play()), (14.55, () => Shot("fly")), (15.3, () => Shot("hello", ui: true)), (16.5, () => Shot("select", ui: true)),
-            (16.55, () => Object.FindFirstObjectByType<CharacterCarousel>().Poke()), (16.75, () => Shot("poke", ui: true)),
-            (16.9, () => Object.FindFirstObjectByType<CharacterCarousel>().Pick(9)), (17.6, () => Shot("pick", ui: true)),
-            (17.7, () => flow.ShowTitle()), (18.5, () => Shot("back", ui: true)),
-            (18.7, () => flow.Play()), (19.8, () => flow.ShowTrack()), (21.0, () => Shot("track", ui: true)),
-            (21.2, () => flow.StartRace()), (21.32, () => Shot("curtain", ui: true)),
-            (29.0, () => { Debug.Log($"[menuplay] race scene: {UnityEngine.SceneManagement.SceneManager.GetActiveScene().name}, curtain alpha {LoadingCurtain.Instance?.GetComponent<CanvasGroup>()?.alpha}"); Shot("race", ui: true); }),
+            (14.2, () => flow.ShowTitle()), (15.4, () => Shot("hub", ui: true)),                                         // the front door, then the hub: your pair on the stage
+            (15.5, () => flow.ChooseSeries()), (16.0, () => Shot("drive-a", ui: true)), (16.5, () => Shot("drive-b", ui: true)), (17.0, () => Shot("drive-c", ui: true)),
+            (17.9, () => Shot("series", ui: true)), (18.0, () => flow.ShowTitle()), (18.4, () => flow.ShowSelect()), (19.4, () => Shot("select", ui: true)),
+            (19.45, () => Object.FindFirstObjectByType<CharacterCarousel>().Poke()), (19.65, () => Shot("poke", ui: true)),
+            (19.8, () => Object.FindFirstObjectByType<CharacterCarousel>().Pick(9)), (20.5, () => Shot("pick", ui: true)),
+            (20.6, () => flow.ShowTitle()), (21.4, () => Shot("back", ui: true)),
+            (21.6, () => flow.Play()), (22.7, () => flow.ShowTrack()), (23.9, () => Shot("track", ui: true)),
+            (24.1, () => flow.StartRace()), (24.22, () => Shot("curtain", ui: true)),
+            (31.9, () => { Debug.Log($"[menuplay] race scene: {UnityEngine.SceneManagement.SceneManager.GetActiveScene().name}, curtain alpha {LoadingCurtain.Instance?.GetComponent<CanvasGroup>()?.alpha}"); Shot("race", ui: true); }),
             // a win: the podium, then the card with the chest it earned, OPEN, three taps, what was inside
-            (45.0, () => { var race = Object.FindFirstObjectByType<RaceManager>(); if (race != null && race.Player != null) race.Finish(race.Player); }),
-            (56.0, () => { Debug.Log($"[menuplay] chest earned: {Chests.LastEarn.tier} (+{Chests.LastEarn.stars} stars), waiting {Chests.Pending}"); Shot("results", ui: true); }),
-            (56.2, () => Object.FindFirstObjectByType<ChestBadge>()?.Open()), (57.4, () => Shot("chest-drop", ui: true)),
-            (57.6, () => ChestReveal.Instance?.Tap()), (58.0, () => ChestReveal.Instance?.Tap()), (58.4, () => ChestReveal.Instance?.Tap()),
-            (58.62, () => Shot("chest-burst", ui: true)), (59.15, () => Shot("chest-fly", ui: true)), (59.6, () => Shot("chest-fly2", ui: true)),
-            (62.2, () => Shot("chest-cards", ui: true)),
+            (47.9, () => { var race = Object.FindFirstObjectByType<RaceManager>(); if (race != null && race.Player != null) race.Finish(race.Player); }),
+            (58.9, () => { Debug.Log($"[menuplay] chest earned: {Chests.LastEarn.tier} (+{Chests.LastEarn.stars} stars), waiting {Chests.Pending}"); Shot("results", ui: true); }),
+            (59.1, () => Object.FindFirstObjectByType<ChestBadge>()?.Open()), (60.3, () => Shot("chest-drop", ui: true)),
+            (60.5, () => ChestReveal.Instance?.Tap()), (60.9, () => ChestReveal.Instance?.Tap()), (61.3, () => ChestReveal.Instance?.Tap()),
+            (61.52, () => Shot("chest-burst", ui: true)), (62.05, () => Shot("chest-fly", ui: true)), (62.5, () => Shot("chest-fly2", ui: true)),
+            (65.1, () => Shot("chest-cards", ui: true)),
         };
         if (stage < steps.Length) { if (t >= steps[stage].at) steps[stage++].act(); return; }
         EditorApplication.update -= Tick;

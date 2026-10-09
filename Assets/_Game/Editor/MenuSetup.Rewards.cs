@@ -147,23 +147,57 @@ public static partial class MenuSetup
         var screen = Rect("Tour", parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject;
         var dim = Rect("Dim", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(600, 600));
         dim.gameObject.AddComponent<Image>().color = new Color(Deep.r, Deep.g, Deep.b, 0.72f);
-        var bar = Header(screen.transform, "KARTEL TOUR", nameof(ScreenFlow.ShowTitle));
+        var bar = Header(screen.transform, "CHOOSE SERIES", nameof(ScreenFlow.TourBack));
         var panel = screen.AddComponent<TourPanel>();
         var starIcon = Rect("Star", bar, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-330, 0), new Vector2(56, 56));
         var si = starIcon.gameObject.AddComponent<Image>(); si.sprite = IconSprite("star"); si.color = Accent; si.raycastTarget = false;
         var total = Label("Total", bar, display, "0 / 60", 48, Paper, TextAlignmentOptions.Left, new Vector2(1, 0.5f), new Vector2(-290, 0), new Vector2(240, 64));
 
-        var names = Tour.Cups.Select(c => c.kicker).ToArray();
-        var (tabBacks, tabLabels, tabButtons) = Segmented("Cups", screen.transform, names, new Vector2(0.5f, 1), new Vector2(0, -164), new Vector2(1480, 92), 30);
-        for (int i = 0; i < tabButtons.Length; i++)
+        // Beach Buggy's Choose Series: a row of cards, one a series. The name on top, a picture of its first circuit, a
+        // padlock with the boss's face while it is locked, the stars in it (or what opens it) along the bottom. A tap
+        // opens that series' events (Detail); the header's back returns here, then home.
+        var pick = Rect("Pick", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        int n = Tour.Cups.Length; const float cardW = 400f, cardH = 700f, cardGap = 36f;
+        var seriesPics = new Image[n]; var seriesBoss = new Image[n]; var seriesLocks = new GameObject[n]; var seriesStars = new GameObject[n]; var seriesFoots = new TMP_Text[n];
+        var rosterDb = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
+        for (int i = 0; i < n; i++)
         {
-            UnityEditor.Events.UnityEventTools.AddIntPersistentListener(tabButtons[i].onClick, panel.SetCup, i);
-            tabBacks[i].color = i == 0 ? Design.Ink600 : new Color(0, 0, 0, 0);
-            tabLabels[i].color = i == 0 ? Paper : Muted;
+            float x = (i - (n - 1) / 2f) * (cardW + cardGap);
+            var rt = Rect("Series" + i, pick, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(x, -36), new Vector2(cardW, cardH));
+            Design.AsCard(rt, Panel);
+            var b = rt.gameObject.AddComponent<Button>(); rt.gameObject.AddComponent<PressFeel>();
+            UnityEditor.Events.UnityEventTools.AddIntPersistentListener(b.onClick, panel.Pick, i);
+            var head = Rect("Head", rt, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -14), new Vector2(cardW - 28, 88));
+            head.pivot = new Vector2(0.5f, 1);
+            Design.AsRow(head, Design.Ink700).raycastTarget = false;
+            var nm = Label("Name", head, display, Tour.Cups[i].name, 38, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 2), new Vector2(cardW - 44, 80));
+            nm.enableAutoSizing = true; nm.fontSizeMin = 24; nm.fontSizeMax = 38;
+            var picRt = Rect("Picture", rt, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -112), new Vector2(cardW - 28, 436));
+            picRt.pivot = new Vector2(0.5f, 1);
+            picRt.gameObject.AddComponent<RectMask2D>();
+            var art = Rect("Art", picRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(872, 436));   // the 2:1 circuit art, cropped to the card
+            seriesPics[i] = art.gameObject.AddComponent<Image>(); seriesPics[i].raycastTarget = false;
+            var lockRoot = Rect("Lock", picRt, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            var dimImg = lockRoot.gameObject.AddComponent<Image>(); dimImg.color = new Color(Deep.r, Deep.g, Deep.b, 0.55f); dimImg.raycastTarget = false;
+            var padlock = Rect("Padlock", lockRoot, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 6), new Vector2(250, 250));
+            var pl = padlock.gameObject.AddComponent<Image>(); pl.sprite = IconSprite("lock"); pl.color = Paper; pl.preserveAspect = true; pl.raycastTarget = false;
+            var bossRt = Rect("Boss", padlock, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -40), new Vector2(104, 104));
+            seriesBoss[i] = bossRt.gameObject.AddComponent<Image>(); seriesBoss[i].preserveAspect = true; seriesBoss[i].raycastTarget = false;
+            seriesLocks[i] = lockRoot.gameObject;
+            var foot = Rect("Foot", rt, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 14), new Vector2(cardW - 28, 92));
+            foot.pivot = new Vector2(0.5f, 0);
+            Design.AsRow(foot, Design.Ink700).raycastTarget = false;
+            var st = Rect("Star", foot, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(30, 0), new Vector2(50, 50));
+            var si2 = st.gameObject.AddComponent<Image>(); si2.sprite = IconSprite("star"); si2.color = Accent; si2.preserveAspect = true; si2.raycastTarget = false;
+            seriesStars[i] = st.gameObject;
+            seriesFoots[i] = Label("Foot", foot, strong, "", 32, Paper, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(92, 0), new Vector2(cardW - 130, 60));
+            seriesFoots[i].enableAutoSizing = true; seriesFoots[i].fontSizeMin = 20; seriesFoots[i].fontSizeMax = 32;
         }
+        Label("Caption", pick, body, "Choose the race series you want to play.", 34, Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(1600, 50));
+        var detail = Rect("Detail", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
         // left: the cup, how far through it you are, the boss's prize, and who is driving
-        var info = Rect("Card", screen.transform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(64, 40), new Vector2(700, 760));
+        var info = Rect("Card", detail, new Vector2(0, 0), new Vector2(0, 0), new Vector2(64, 40), new Vector2(700, 720));
         info.pivot = Vector2.zero;
         Design.AsCard(info, Panel);
         var cupName = Label("CupName", info, display, "ROOKIE RUN", 64, Paper, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(44, -40), new Vector2(620, 80));
@@ -182,10 +216,10 @@ public static partial class MenuSetup
         UnityEditor.Events.UnityEventTools.AddPersistentListener(change.onClick, panel.ChangeDriver);
 
         // right: the five events
-        var list = Rect("List", screen.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-64, 40), new Vector2(1420, 760));
+        var list = Rect("List", detail, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-64, 40), new Vector2(1420, 720));
         list.pivot = new Vector2(1, 0);
         Design.AsCard(list, Panel);
-        const int count = 5; const float rowH = 128f, gap = 14f;
+        const int count = 5; const float rowH = 122f, gap = 12f;
         var rows = new GameObject[count]; var titles = new TMP_Text[count]; var modes = new TMP_Text[count]; var tracks = new TMP_Text[count];
         var stars = new Image[count * 3]; var playBacks = new Image[count]; var plays = new Button[count];
         for (int i = 0; i < count; i++)
@@ -243,8 +277,6 @@ public static partial class MenuSetup
         new SerializedObject(panel).Do(s =>
         {
             s.FindProperty("roster").objectReferenceValue = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
-            Fill(s.FindProperty("tabBacks"), tabBacks.Cast<Object>().ToArray());
-            Fill(s.FindProperty("tabLabels"), tabLabels.Cast<Object>().ToArray());
             s.FindProperty("total").objectReferenceValue = total;
             s.FindProperty("cupName").objectReferenceValue = cupName;
             s.FindProperty("cupState").objectReferenceValue = cupState;
@@ -264,6 +296,18 @@ public static partial class MenuSetup
             s.FindProperty("cardBest").objectReferenceValue = cBest;
             Fill(s.FindProperty("cardStars"), cardStars.Cast<Object>().ToArray());
             s.FindProperty("prizeLabel").objectReferenceValue = prize;
+            s.FindProperty("pick").objectReferenceValue = pick.gameObject;
+            s.FindProperty("detail").objectReferenceValue = detail.gameObject;
+            Fill(s.FindProperty("seriesPics"), seriesPics.Cast<Object>().ToArray());
+            Fill(s.FindProperty("seriesBoss"), seriesBoss.Cast<Object>().ToArray());
+            Fill(s.FindProperty("seriesLocks"), seriesLocks.Cast<Object>().ToArray());
+            Fill(s.FindProperty("seriesStars"), seriesStars.Cast<Object>().ToArray());
+            Fill(s.FindProperty("seriesFoots"), seriesFoots.Cast<Object>().ToArray());
+            Fill(s.FindProperty("trackArt"), Tracks.All.Select(t => AssetDatabase.LoadAssetAtPath<Sprite>(Art + $"Textures/UI/Tracks/{t.id}.png")).Cast<Object>().ToArray());
+            var driverIds = rosterDb != null ? rosterDb.characters.Where(c => c != null).Select(c => c.driverId).ToArray() : new string[0];
+            var ids = s.FindProperty("portraitIds"); ids.arraySize = driverIds.Length;
+            for (int i = 0; i < driverIds.Length; i++) ids.GetArrayElementAtIndex(i).stringValue = driverIds[i];
+            Fill(s.FindProperty("portraits"), driverIds.Select(id => AssetDatabase.LoadAssetAtPath<Sprite>(PortraitSetup.Dir + id + ".png")).Cast<Object>().ToArray());
             s.FindProperty("tabOn").colorValue = Design.Ink600;
             s.FindProperty("tabOff").colorValue = new Color(0, 0, 0, 0);
             s.FindProperty("textOn").colorValue = Paper;
