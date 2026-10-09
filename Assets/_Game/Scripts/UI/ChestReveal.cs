@@ -267,6 +267,7 @@ namespace KartCup
             {
                 case "item": int k = System.Array.IndexOf(itemIds, r.id); icon.sprite = k >= 0 && k < itemIcons.Length ? itemIcons[k] : kartIcon; break;
                 case "trial": icon.sprite = kartIcon; break;
+                case "gems": icon.sprite = paintIcon; icon.color = new Color(1f, 0.69f, 0.15f); break;   // the gold swatch stands for gems
                 default: icon.sprite = paintIcon; icon.color = Paints.Find(r.id)?.color ?? Color.white; break;
             }
         }

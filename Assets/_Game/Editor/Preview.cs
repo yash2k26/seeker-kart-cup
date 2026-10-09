@@ -176,7 +176,8 @@ public static class MenuPreview
         var roster = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
         var skus = (karts != null ? karts.karts.Where(k => k != null && !string.IsNullOrEmpty(k.sku)).Select(k => k.sku) : Enumerable.Empty<string>())
                    .Concat(Paints.All.Where(p => !string.IsNullOrEmpty(p.sku)).Select(p => p.sku)).Concat(Inventory.Packs.Select(p => p.sku))
-                   .Concat(roster != null ? roster.characters.Where(c => c != null && !c.IsFree).Select(c => c.sku) : Enumerable.Empty<string>());
+                   .Concat(roster != null ? roster.characters.Where(c => c != null && !c.IsFree).Select(c => c.sku) : Enumerable.Empty<string>())
+                   .Concat(GemsPanel.Packs.Select(p => p.sku));
         foreach (var sku in skus.Distinct())
         {
             bool skrOnly = sku == "paint.rally";
@@ -263,6 +264,8 @@ public static class MenuPreview
             if (i == 9) foreach (var weekly in Object.FindObjectsByType<WeeklyPanel>(FindObjectsSortMode.None)) weekly.ShowInEditor();
             if (i == 10) foreach (var tour in Object.FindObjectsByType<TourPanel>(FindObjectsSortMode.None)) tour.ShowInEditor(1);
             if (i == 11) foreach (var a in Object.FindObjectsByType<AchievementsPanel>(FindObjectsSortMode.None)) a.ShowInEditor();
+            if (i == 12) foreach (var g in Object.FindObjectsByType<GemsPanel>(FindObjectsSortMode.None)) g.ShowInEditor(1);
+            foreach (var g in Object.FindObjectsByType<GemChip>(FindObjectsInactive.Include, FindObjectsSortMode.None)) g.ShowInEditor();
             if (i != 7 && carousel != null) carousel.SetVisible(true);
             foreach (var img in Object.FindObjectsByType<Image>(FindObjectsSortMode.None))
                 if (img.name == "Single" || img.name == "Cell0")

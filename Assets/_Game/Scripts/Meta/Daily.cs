@@ -49,6 +49,7 @@ namespace KartCup
             if (!met || Done) return LastPaid = false;
             PlayerPrefs.SetInt(Key, Today); PlayerPrefs.Save();
             Chests.Give(Chests.Tier.Silver);
+            Gems.Earn(15, "daily");
             Chests.AddStars(3);
             KartApi.Event("daily", new { day = c.day, place });
             Achievements.Add(Achievements.Stat.DailyDone);

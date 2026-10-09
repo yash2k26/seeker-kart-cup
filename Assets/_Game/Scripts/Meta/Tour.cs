@@ -120,6 +120,7 @@ namespace KartCup
                     bool recruited = !string.IsNullOrEmpty(cup.bossSku) && !Unlocks.Has(cup.bossSku);
                     if (recruited) Unlocks.Earn(cup.bossSku);   // the boss drives for you now (Beach Buggy's recruit)
                     Chests.Give(Chests.Tier.Treasure);
+                    Gems.Earn(50, "boss");
                     string who = ev.title.Replace("BOSS: ", "");
                     r.prize = (recruited ? $"{who} JOINS YOUR ROSTER  ·  " : "") + $"{paint?.name ?? "A PAINT"} IS YOURS  ·  + GOLDEN TREASURE CHEST";
                 }

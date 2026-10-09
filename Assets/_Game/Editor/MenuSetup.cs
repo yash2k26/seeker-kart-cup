@@ -63,12 +63,13 @@ public static partial class MenuSetup
         var weeklyScreen = WeeklyScreen(safe);
         var tourScreen = TourScreen(safe);
         var achievementsScreen = AchievementsScreen(safe);
+        var gemsScreen = GemsScreen(safe);
 
         var so = new SerializedObject(flow);
         so.FindProperty("roster").objectReferenceValue = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
         so.FindProperty("playLabel").objectReferenceValue = title.transform.Find("Plate/Actions/Play/PlayFace/PlayLabel")?.GetComponent<TMP_Text>();
         var panels = so.FindProperty("panels");
-        panels.arraySize = 12;
+        panels.arraySize = 13;
         panels.GetArrayElementAtIndex(0).objectReferenceValue = title;
         panels.GetArrayElementAtIndex(1).objectReferenceValue = select;
         panels.GetArrayElementAtIndex(2).objectReferenceValue = board;
@@ -81,6 +82,7 @@ public static partial class MenuSetup
         panels.GetArrayElementAtIndex(9).objectReferenceValue = weeklyScreen;
         panels.GetArrayElementAtIndex(10).objectReferenceValue = tourScreen;
         panels.GetArrayElementAtIndex(11).objectReferenceValue = achievementsScreen;
+        panels.GetArrayElementAtIndex(12).objectReferenceValue = gemsScreen;
         so.ApplyModifiedPropertiesWithoutUndo();
 
         Curtain();
@@ -426,6 +428,7 @@ public static partial class MenuSetup
 
         var cog = IconButton("Settings", corner, "icon_cog", new Vector2(1, 1), new Vector2(-64, -32), new Vector2(104, 104));
         Wire(cog, nameof(ScreenFlow.ShowSettings));
+        GemChip(corner, new Vector2(-600, -32));   // the balance, left of SIGN IN; tap for the gem shop
 
         // NEW VERSION, bottom right over the street: hidden until the download host has a newer build (AppUpdate)
         var update = Button("Update", screen.transform, "NEW VERSION", Slate, Paper, 32,
@@ -467,6 +470,8 @@ public static partial class MenuSetup
         new SerializedObject(swipe).Do(s => s.FindProperty("carousel").objectReferenceValue = carousel);
 
         Header(screen.transform, "CHOOSE YOUR DRIVER", nameof(ScreenFlow.ShowTitle), "STEP 1 OF 2");
+        var gemCorner = Rect("GemCorner", screen.transform, new Vector2(1, 1), new Vector2(1, 1), Vector2.zero, Vector2.zero);
+        GemChip(gemCorner, new Vector2(-64, -150));   // under STEP 1 OF 2: recruiting is paid in gems
 
         var card = Rect("Card", screen.transform, Vector2.zero, new Vector2(0, 1), Vector2.zero, Vector2.zero);
         card.pivot = new Vector2(0, 0.5f);
@@ -1228,6 +1233,75 @@ public static partial class MenuSetup
     }
 
     /// A row-shaped chooser: tap cycles its value. One label per intent, no dropdown widget.
+    /// The gem balance as a tappable chip (GemChip keeps the text current); top-right anchored.
+    static Button GemChip(RectTransform parent, Vector2 pos)
+    {
+        var b = Button("Gems", parent, "20 GEMS", new Color(Slate.r, Slate.g, Slate.b, 0.92f), Accent, 32, new Vector2(1, 1), pos, new Vector2(260, 96));
+        var chip = b.gameObject.AddComponent<GemChip>();
+        new SerializedObject(chip).Do(s => s.FindProperty("label").objectReferenceValue = b.GetComponentInChildren<TMP_Text>());
+        Wire(b, nameof(ScreenFlow.ShowGems));
+        return b;
+    }
+
+    /// The gem shop: balance, three packs, the three pay buttons (ItemsScreen's shape).
+    static GameObject GemsScreen(RectTransform parent)
+    {
+        var screen = Rect("Gems", parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject;
+        var panel = screen.AddComponent<GemsPanel>();
+        Header(screen.transform, "GEMS", nameof(ScreenFlow.BackFromGems));
+        var card = Rect("Card", screen.transform, Vector2.zero, new Vector2(0, 1), Vector2.zero, Vector2.zero);
+        card.pivot = new Vector2(0, 0.5f);
+        card.offsetMin = new Vector2(64, 64); card.offsetMax = new Vector2(744, -172);
+        Design.AsCard(card, Panel);
+
+        var balance = Label("Balance", card, display, "YOU HAVE  20  GEMS", 60, Accent, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(48, -40), new Vector2(624, 72));
+        var blurb = Label("Blurb", card, body, "", 26, Muted, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(48, -124), new Vector2(608, 84));
+        blurb.textWrappingMode = TextWrappingModes.Normal;
+
+        var packs = GemsPanel.Packs;
+        var rows = new Button[packs.Length]; var rowLabels = new TMP_Text[packs.Length]; var rowPrices = new TMP_Text[packs.Length];
+        for (int i = 0; i < packs.Length; i++)
+        {
+            var rt = Rect("Row" + i, card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -236 - i * 76), new Vector2(600, 64));
+            rt.pivot = new Vector2(0, 1);
+            Design.AsRow(rt, Design.Ink700);
+            rows[i] = rt.gameObject.AddComponent<Button>();
+            rt.gameObject.AddComponent<PressFeel>();
+            UnityEditor.Events.UnityEventTools.AddIntPersistentListener(rows[i].onClick, panel.Focus, i);
+            var glyph = Rect("Glyph", rt, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(40, 0), new Vector2(40, 40));
+            var glyphImg = glyph.gameObject.AddComponent<Image>();
+            glyphImg.sprite = Design.Icon("trophy"); glyphImg.color = Accent; glyphImg.preserveAspect = true; glyphImg.raycastTarget = false;
+            rowLabels[i] = Label("Label", rt, strong, packs[i].name, 28, Paper, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(76, 0), new Vector2(380, 44));
+            rowPrices[i] = Label("Price", rt, body, "", 26, Muted, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-20, 0), new Vector2(200, 44));
+        }
+
+        var secondary = Button("Secondary", card, "PAY", Slate, Paper, 36, new Vector2(0.5f, 0), new Vector2(0, 168), new Vector2(584, 96));
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(secondary.onClick, panel.Secondary);
+        var tertiary = Button("Tertiary", card, "PAY ORE", Slate, Paper, 36, new Vector2(0.5f, 0), new Vector2(150, 168), new Vector2(284, 96));
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(tertiary.onClick, panel.Tertiary);
+        tertiary.gameObject.SetActive(false);
+        var primary = Button("Primary", card, "BUY", Accent, Paper, 46, new Vector2(0.5f, 0), new Vector2(0, 48), new Vector2(584, 112));
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(primary.onClick, panel.Primary);
+
+        var so = new SerializedObject(panel);
+        Fill(so.FindProperty("rows"), rows.Cast<Object>().ToArray());
+        Fill(so.FindProperty("rowLabels"), rowLabels.Cast<Object>().ToArray());
+        Fill(so.FindProperty("rowPrices"), rowPrices.Cast<Object>().ToArray());
+        so.FindProperty("balanceLabel").objectReferenceValue = balance;
+        so.FindProperty("blurbLabel").objectReferenceValue = blurb;
+        so.FindProperty("primaryLabel").objectReferenceValue = primary.GetComponentInChildren<TMP_Text>();
+        so.FindProperty("secondaryLabel").objectReferenceValue = secondary.GetComponentInChildren<TMP_Text>();
+        so.FindProperty("tertiaryLabel").objectReferenceValue = tertiary.GetComponentInChildren<TMP_Text>();
+        so.FindProperty("primaryButton").objectReferenceValue = primary;
+        so.FindProperty("secondaryButton").objectReferenceValue = secondary;
+        so.FindProperty("tertiaryButton").objectReferenceValue = tertiary;
+        so.FindProperty("rowIdle").colorValue = Design.Ink700;
+        so.FindProperty("rowFocus").colorValue = Design.Ink600;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        panel.ShowInEditor(1);
+        return screen;
+    }
+
     static Button Chip(string name, RectTransform card, string caption, Vector2 offset, out TMP_Text label)
     {
         var rt = Rect(name, card, new Vector2(0.5f, 1), new Vector2(0.5f, 1), offset, new Vector2(520, 92));

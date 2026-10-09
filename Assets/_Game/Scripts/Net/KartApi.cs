@@ -203,10 +203,14 @@ namespace KartCup
                 return Outcome.Refused;
             }
             catch (Exception x) { Debug.LogWarning("[purchase] will retry: " + x.Message); return Outcome.Pending; }   // offline, 5xx, expired session
-            if (Take(e.sig) && Inventory.BySku(e.sku) is { } pack)   // item packs are counted on the phone
+            if (Take(e.sig))   // item packs and gem packs are counted on the phone, once per payment
             {
-                Inventory.Add(pack.id, pack.qty);
-                if (string.IsNullOrEmpty(Inventory.Loadout)) Inventory.Loadout = pack.id;
+                if (Inventory.BySku(e.sku) is { } pack)
+                {
+                    Inventory.Add(pack.id, pack.qty);
+                    if (string.IsNullOrEmpty(Inventory.Loadout)) Inventory.Loadout = pack.id;
+                }
+                else if (e.sku.StartsWith("gems.") && int.TryParse(e.sku.Substring(5), out var gems)) Gems.Earn(gems, "bought");
             }
             return Outcome.Granted;
         }

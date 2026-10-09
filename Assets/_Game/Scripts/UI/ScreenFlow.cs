@@ -18,7 +18,7 @@ namespace KartCup
         CharacterCarousel carousel;
         [SerializeField] TMP_Text playLabel;      // says CONTINUE CUP when one is half-run
 
-        const int Select = 1, Track = 4, Rooms = 5, Lobby = 6, Garage = 7, Items = 8, WeeklyScreen = 9, TourScreen = 10, AchievementsScreen = 11;
+        const int Select = 1, Track = 4, Rooms = 5, Lobby = 6, Garage = 7, Items = 8, WeeklyScreen = 9, TourScreen = 10, AchievementsScreen = 11, GemsScreen = 12;
         // How deep each panel sits under the title: going deeper slides in from the right, coming back from the left.
         static readonly int[] Depth = { 0, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1 };
 
@@ -125,7 +125,7 @@ namespace KartCup
         public void ShowTrack()
         {
             if (Time.unscaledTime - lastShow < 0.3f) return;   // NEXT overlaps PLAY: a double tap must not skip character select
-            if (current == Select) { carousel ??= FindFirstObjectByType<CharacterCarousel>(); if (carousel != null && carousel.Locked) { carousel.Unlock("SKR"); return; } }   // a judge not yet bought or beaten
+            if (current == Select) { carousel ??= FindFirstObjectByType<CharacterCarousel>(); if (carousel != null && carousel.Locked) { carousel.Recruit(); return; } }   // a judge not yet recruited or beaten
             if (current == Select && roster != null) Voices.Say(roster.At(CharacterDatabase.SelectedIndex)?.driverId, "go");   // the chosen driver is in
             if (backToTour) { backToTour = false; Show(TourScreen); return; }        // the driver was changed from the Tour
             Show(Track);
@@ -136,6 +136,10 @@ namespace KartCup
         public void ShowItems() => Show(Items);
         public void ShowWeekly() => Show(WeeklyScreen);
         public void ShowTour() => Show(TourScreen);
+        int gemsFrom;
+        /// The gem shop, from the title's chip, the driver card or a short balance; BACK returns to wherever that was.
+        public void ShowGems() { if (current != GemsScreen) gemsFrom = current; Show(GemsScreen); }
+        public void BackFromGems() => Show(gemsFrom == GemsScreen ? 0 : gemsFrom);
         public void ShowAchievements() => Show(AchievementsScreen);
 
         bool backToTour;

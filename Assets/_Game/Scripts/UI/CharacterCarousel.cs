@@ -130,21 +130,23 @@ namespace KartCup
             if (button != null) button.gameObject.SetActive(!string.IsNullOrEmpty(text));
         }
 
-        /// CHOOSE TRACK on a locked judge, or a tap on the SOL/ORE half-row: buy them. Beating them in the Tour is the free way.
-        public async void Unlock(string currency)
+        /// CHOOSE TRACK on a locked judge: recruit them with gems (Beach Buggy's recruit), or go and get gems. Beating them
+        /// in the Tour is the free way.
+        public void Recruit()
         {
             var def = roster != null ? roster.At(index) : null;
-            if (def == null || !Locked || busy) return;
-            if (WalletFlow.Instance == null) { message = "Wallet not ready"; Show(); return; }
-            busy = true; message = "Opening wallet…"; Show();
-            bool ok = await WalletFlow.Instance.Buy(def.sku, currency);
-            busy = false; message = WalletFlow.Instance.LastStatus;
-            if (ok) { CharacterDatabase.SelectedIndex = index; Haptics.Play(Haptics.Kind.Win); AudioDirector.Instance?.Confirm(); Greet(0.2f); }
+            if (def == null || !Locked) return;
+            int price = Gems.PriceOf(def);
+            if (!Gems.Spend(price, def.sku)) { ScreenFlow.Instance?.ShowGems(); return; }
+            Unlocks.Earn(def.sku);
+            CharacterDatabase.SelectedIndex = index;
+            message = $"<color=#FFB126>{def.displayName.ToUpperInvariant()} JOINS YOUR ROSTER</color>";
+            Haptics.Play(Haptics.Kind.Win); AudioDirector.Instance?.Confirm(); Greet(0.2f);
+            KartApi.Event("recruit", new { driver = def.displayName, price });
             Show();
         }
-        bool busy;
-        public void Secondary() => Unlock("SOL");
-        public void Tertiary() => Unlock("ORE");
+        public void Secondary() => ScreenFlow.Instance?.ShowGems();
+        public void Tertiary() => ScreenFlow.Instance?.ShowGems();
 
         /// The garage borrows the podium: hide our kart (and stop turning it) while it is open, bring it back after.
         public void SetVisible(bool on)
@@ -154,7 +156,7 @@ namespace KartCup
             if (backdrop != null) backdrop.Spot = on && bay != null && gameObject.activeInHierarchy ? bay : null;
         }
         /// The select screen opened again: the camera back to the driver on show.
-        public void Refocus() { if (backdrop != null && bay != null) backdrop.Spot = bay; }
+        public void Refocus() { if (backdrop != null && bay != null) backdrop.Spot = bay; Show(); }   // and the card: the gem balance may have changed
 
         void Show()
         {
@@ -183,16 +185,14 @@ namespace KartCup
             // the driver's special, as Beach Buggy's driver screen names it under the character
             var special = Ability.For(def.displayName);
             bool locked = Locked;
-            var item = locked ? KartApi.Cfg?.Item(def.sku) : null;
+            int price = Gems.PriceOf(def);
             // two lines fit above the stat rows: the blurb and the special, or (locked) the one line that says how to get them
             string second = message ?? $"<color=#FFB126>{special.name}</color>  <size=90%>{special.line}</size>";
-            if (blurbLabel != null) blurbLabel.text = locked && message == null ? $"<color=#FFB126>LOCKED</color>  Beat {def.displayName} in Kartel Tour, or unlock now."
+            if (blurbLabel != null) blurbLabel.text = locked && message == null ? $"<color=#FFB126>LOCKED</color>  Beat {def.displayName} in Kartel Tour, or recruit them. You have {Gems.Balance} gems."
                                                     : $"{def.blurb}\n{second}";
-            if (nextLabel != null) nextLabel.text = !locked ? "CHOOSE TRACK" : item != null ? $"UNLOCK  ·  {WalletFlow.Amount(item.price.GetValueOrDefault("SKR"), "SKR")}" : KartApi.Cfg == null ? "CONNECT TO BUY" : "…";
-            string sol = item != null ? WalletFlow.Amount(item.price.GetValueOrDefault("SOL"), "SOL") : "";
-            string ore = item != null && KartApi.Cfg != null && KartApi.Cfg.TakesOre ? WalletFlow.Amount(item.price.GetValueOrDefault("ORE"), "ORE") : "";
-            SetButton(secondaryLabel, secondaryButton, locked && sol != "" ? $"PAY {sol}" : "");
-            SetButton(tertiaryLabel, tertiaryButton, locked && ore != "" ? $"PAY {ore}" : "");
+            if (nextLabel != null) nextLabel.text = locked ? $"RECRUIT  ·  {price} GEMS" : "CHOOSE TRACK";
+            SetButton(secondaryLabel, secondaryButton, locked ? (Gems.Balance >= price ? $"GET MORE GEMS  ·  {Gems.Balance}" : $"GET GEMS  ·  YOU HAVE {Gems.Balance}") : "");
+            SetButton(tertiaryLabel, tertiaryButton, "");
             UiMotion.Beside(secondaryButton, tertiaryButton);
             speedBar?.Set(def.speed);
             accelBar?.Set(def.accel);

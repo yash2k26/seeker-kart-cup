@@ -57,6 +57,7 @@ namespace KartCup
             if (Weekly.Racing) { TimeTrial(who); return; }
             Cup.Record(order.Select(r => r.characterIndex).ToList());
             bool newBest = Tracks.RecordBest(Cup.TrackId, who.finishTime);
+            Gems.Podium(place);   // and gems (ChestBadge shows both on the card)
             Chests.Earn(place);   // a podium earns a chest (ChestBadge shows it on the card)
             if (RaceMode.EventId == "daily") Daily.Record(place); else if (RaceMode.InEvent) Tour.Record(RaceMode.EventId, place);   // TourResult shows it
 
@@ -221,7 +222,7 @@ namespace KartCup
             if (key != ceremonyFor)
             {
                 ceremonyFor = key;
-                if (!room.IsPaid) Chests.Earn(mine != null && !mine.dnf ? place : 0);   // never from a paid room
+                if (!room.IsPaid) { Gems.Podium(mine != null && !mine.dnf ? place : 0); Chests.Earn(mine != null && !mine.dnf ? place : 0); }   // never from a paid room
                 bool cupPodium = final && !single;
                 var top = cupPodium && r.standings != null
                     ? r.standings.Take(3).Select(s => (s.id, s.name)).ToList()

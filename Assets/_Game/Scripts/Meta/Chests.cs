@@ -136,9 +136,13 @@ namespace KartCup
                     if (paint != null) list.Add(paint); else { Add(list, TestDrive(t)); Add(list, TestDrive(t)); }
                     break;
             }
+            // gems in every chest (9 Oct 2026): the currency that recruits the judges
+            var (lo, hi) = t switch { Tier.Wood => (5, 10), Tier.Silver => (15, 25), Tier.Gold => (40, 60), _ => (80, 120) };
+            int gems = Random.Range(lo, hi + 1);
+            list.Add(new Reward { kind = "gems", id = "gems", qty = gems, rarity = t, label = $"+{gems} GEMS" });
             // the same thing twice reads as one bigger pile; the best is revealed last
             return list.GroupBy(r => r.kind + r.id).Select(g => { var r = g.First(); r.qty = g.Sum(x => x.qty); r.label = Label(r); return r; })
-                       .OrderBy(r => r.kind == "paint" ? 2 : r.kind == "trial" ? 1 : 0).ToList();
+                       .OrderBy(r => r.kind == "gems" ? 3 : r.kind == "paint" ? 2 : r.kind == "trial" ? 1 : 0).ToList();
         }
 
         static void Add(List<Reward> list, Reward r) { if (r != null) list.Add(r); }
@@ -181,6 +185,7 @@ namespace KartCup
             switch (r.kind)
             {
                 case "item": Inventory.Add(r.id, r.qty); break;
+                case "gems": Gems.Earn(r.qty, "chest"); break;
                 case "trial": KartDatabase.GrantTrial(r.id); break;
                 case "paint": if (Paints.Find(r.id) is { } p) Unlocks.Earn(p.sku); break;
             }
