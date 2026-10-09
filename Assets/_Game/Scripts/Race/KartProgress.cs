@@ -33,12 +33,28 @@ namespace KartCup
             var race = RaceManager.Instance;
             if (remote || race == null || finished || race.state == RaceManager.State.Countdown) return;
             int count = race.checkpoints.Length;
-            int expected = (checkpointIndex + 1) % count;
-            if (cp.index != expected) return;                      // cutting the course or driving backwards
+            // How far ahead of the last gate this one is (1 = the next). A gate behind you, or the same one again, is
+            // driving backwards and does nothing. A gate a few ahead means the ones between were missed (a corner cut
+            // across the grass past a gate's end, a respawn): they count as passed. Strict order used to drop them, and
+            // then refuse every gate after: the lap never completed and the race never ended (10 Oct 2026).
+            int ahead = GatesAhead(cp.index, checkpointIndex, count);
+            if (ahead == 0 || ahead > Window(count)) return;
+            if (ahead > 1 && isPlayer) Debug.Log($"[race] {racerName} skipped {ahead - 1} gate(s) before gate {cp.index}");
+            for (int k = 1; k <= ahead && !finished; k++) Advance((checkpointIndex + 1) % count, race);
+        }
 
-            checkpointIndex = cp.index;
+        /// Gates from `last` forward to `gate` (1 = the next one; 0 = the same gate or one behind it). Before the start
+        /// line has been crossed (`last` -1) only the line itself counts.
+        public static int GatesAhead(int gate, int last, int count) => last < 0 ? (gate == 0 ? 1 : 0) : ((gate - last) % count + count) % count;
+        /// How many gates ahead still counts: a cut corner, not a lap's worth of shortcut.
+        public static int Window(int count) => Mathf.Max(3, count / 6);
+
+        /// One gate, in order: an intermediate gate is reported to the session; the start line completes a lap.
+        void Advance(int gate, RaceManager race)
+        {
+            checkpointIndex = gate;
             // The Worker counts the intermediate gates per lap; the start line is reported through OnLap instead.
-            if (cp.index != 0) { if (isPlayer) RaceSession.Instance?.OnCheckpoint(); return; }
+            if (gate != 0) { if (isPlayer) RaceSession.Instance?.OnCheckpoint(); return; }
 
             if (lap > 0) lapTimes.Add(race.Now - lapStart);         // crossing the line completes a lap
             if (lap > 0 && isPlayer) RaceSession.Instance?.OnLap();
