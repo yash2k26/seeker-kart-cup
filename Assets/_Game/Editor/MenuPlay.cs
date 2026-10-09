@@ -65,7 +65,8 @@ public static class MenuPlay
             (56.0, () => { Debug.Log($"[menuplay] chest earned: {Chests.LastEarn.tier} (+{Chests.LastEarn.stars} stars), waiting {Chests.Pending}"); Shot("results", ui: true); }),
             (56.2, () => Object.FindFirstObjectByType<ChestBadge>()?.Open()), (57.4, () => Shot("chest-drop", ui: true)),
             (57.6, () => ChestReveal.Instance?.Tap()), (58.0, () => ChestReveal.Instance?.Tap()), (58.4, () => ChestReveal.Instance?.Tap()),
-            (61.0, () => Shot("chest-cards", ui: true)),
+            (58.62, () => Shot("chest-burst", ui: true)), (59.15, () => Shot("chest-fly", ui: true)), (59.6, () => Shot("chest-fly2", ui: true)),
+            (62.2, () => Shot("chest-cards", ui: true)),
         };
         if (stage < steps.Length) { if (t >= steps[stage].at) steps[stage++].act(); return; }
         EditorApplication.update -= Tick;

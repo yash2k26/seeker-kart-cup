@@ -38,6 +38,9 @@ namespace KartCup
 
         int taps;
         bool busy, opened;
+        Image back; Color backColor;          // the dim backdrop: it flashes the chest's colour on the burst
+        float raySpin = 18f;                  // deg/s; the burst spins the beams up and they settle
+        Tween hintPulse;
 
         void Awake()
         {
@@ -45,6 +48,8 @@ namespace KartCup
             Instance = this;
             DontDestroyOnLoad(gameObject);
             Chests.Karts = karts;
+            back = transform.Find("Back")?.GetComponent<Image>();
+            if (back != null) backColor = back.color;
             Hide(instant: true);
         }
 
@@ -52,7 +57,8 @@ namespace KartCup
 
         void Update()
         {
-            if (rays != null && rays.gameObject.activeSelf) rays.Rotate(0f, 0f, -18f * Time.unscaledDeltaTime);
+            raySpin = Mathf.Lerp(raySpin, 18f, 1f - Mathf.Exp(-2.2f * Time.unscaledDeltaTime));
+            if (rays != null && rays.gameObject.activeSelf) rays.Rotate(0f, 0f, -raySpin * Time.unscaledDeltaTime);
             // the sparkles twinkle round an opened chest, each on its own beat
             for (int i = 0; i < sparkles.Length; i++)
                 if (sparkles[i] != null && sparkles[i].gameObject.activeSelf)
@@ -129,31 +135,48 @@ namespace KartCup
                 glowImage.color = Fade(tierColors[(int)tier], 0.15f);
                 Effects(false, (int)tier);
                 chest.gameObject.SetActive(true);
-                chest.localScale = Vector3.one; chest.localRotation = Quaternion.identity;
-                // it drops in with a thump
-                chest.anchoredPosition = new Vector2(0, 900);
-                yield return Tween.UIAnchoredPosition(chest, new Vector2(0, 60), 0.45f, Ease.OutBounce, useUnscaledTime: true).ToYieldInstruction();
-                Haptics.Play(Haptics.Kind.Tick); AudioDirector.Instance?.Click();
+                chest.localRotation = Quaternion.identity;
+                // it falls in, gathering speed, and lands with a thump: a squash, a jolt through the light, dust of its colour
+                chest.anchoredPosition = new Vector2(0, 900); chest.localScale = Vector3.one * 0.55f;
+                Tween.Scale(chest, Vector3.one, 0.4f, Ease.InQuad, useUnscaledTime: true);
+                yield return Tween.UIAnchoredPositionY(chest, 60f, 0.4f, Ease.InQuad, useUnscaledTime: true).ToYieldInstruction();
+                Haptics.Play(Haptics.Kind.Land); AudioDirector.Instance?.Hit();
+                chest.localScale = new Vector3(1.24f, 0.74f, 1f);
+                Tween.Scale(chest, Vector3.one, 0.55f, Ease.OutElastic, useUnscaledTime: true);
+                Jolt(12f, 0.3f);
+                glowImage.color = Fade(tierColors[(int)tier], 0.4f); glow.localScale = Vector3.one * 0.5f;
+                Tween.Scale(glow, Vector3.one, 0.5f, Ease.OutQuad, useUnscaledTime: true);
+                Tween.Color(glowImage, Fade(tierColors[(int)tier], 0.15f), 0.7f, useUnscaledTime: true);
+                hint.transform.localScale = Vector3.one;
+                hintPulse = Tween.Scale(hint.transform, Vector3.one * 1.07f, 0.55f, Ease.InOutSine, cycles: -1, cycleMode: CycleMode.Yoyo, useUnscaledTime: true);
                 busy = false;
-                while (!opened) yield return null;              // Tap() shakes it three times, then opens it
+                while (!opened) yield return null;              // Tap() strains it three times, then it bursts
 
                 // what is inside, one card at a time, the best last
                 busy = true;
                 var got = Chests.Open();
                 var rewards = got?.rewards ?? new List<Chests.Reward>();
                 hint.text = "";
-                for (int i = 0; i < rewards.Count && i < cards.Length; i++)
+                int count = Mathf.Min(rewards.Count, cards.Length);
+                for (int i = 0; i < count; i++)
                 {
                     Card(i, rewards[i]);
-                    Place(i, Mathf.Min(rewards.Count, cards.Length));
-                    var t = cards[i].transform;
-                    t.localScale = new Vector3(0f, 1f, 1f);
+                    Place(i, count);
+                    var rt = (RectTransform)cards[i].transform;
+                    var to = rt.anchoredPosition;
+                    // out of the chest: small, askew, flying to its place and landing with a little overshoot
+                    rt.anchoredPosition = chest.anchoredPosition + new Vector2(0f, -30f);
+                    rt.localScale = Vector3.one * 0.15f; rt.localRotation = Quaternion.Euler(0, 0, Random.Range(-28f, 28f));
                     cards[i].SetActive(true);
-                    yield return Tween.Scale(t, Vector3.one, 0.22f, Ease.OutBack, useUnscaledTime: true).ToYieldInstruction();
-                    Haptics.Play(Haptics.Kind.Tick); AudioDirector.Instance?.Click();
-                    yield return new WaitForSecondsRealtime(0.12f);
+                    Tween.UIAnchoredPosition(rt, to, 0.36f, Ease.OutBack, useUnscaledTime: true);
+                    Tween.LocalRotation(rt, Vector3.zero, 0.36f, Ease.OutBack, useUnscaledTime: true);
+                    Tween.PunchScale(chest, new Vector3(-0.05f, 0.06f, 0f), 0.2f, frequency: 4, useUnscaledTime: true);   // the chest coughs one up
+                    bool last = i == count - 1;
+                    yield return Tween.Scale(rt, Vector3.one, 0.36f, Ease.OutBack, useUnscaledTime: true).ToYieldInstruction();
+                    if (last) { Haptics.Play(Haptics.Kind.Win); AudioDirector.Instance?.Confirm(); Tween.PunchScale(rt, Vector3.one * 0.18f, 0.45f, frequency: 5, useUnscaledTime: true); Tween.PunchScale(glow, Vector3.one * 0.2f, 0.4f, frequency: 4, useUnscaledTime: true); }
+                    else { Haptics.Play(Haptics.Kind.Pickup); AudioDirector.Instance?.PositionUp(); }
+                    yield return new WaitForSecondsRealtime(last ? 0.2f : 0.05f);
                 }
-                if (tier >= Chests.Tier.Gold) { Haptics.Play(Haptics.Kind.Win); AudioDirector.Instance?.Confirm(); }
                 collectButton.SetActive(true);
                 collectLabel.text = Chests.Pending > 0 ? $"NEXT CHEST  ({Chests.Pending})" : "COLLECT";
                 busy = false;
@@ -182,28 +205,51 @@ namespace KartCup
             if (busy || opened || Chests.Next == null || hint.text.Length == 0) return;
             taps++;
             var tier = (int)Chests.Next.Value;
-            float strength = 6f + taps * 6f;
-            Tween.PunchLocalRotation(chest, new Vector3(0, 0, strength), 0.3f, frequency: 12, useUnscaledTime: true);
-            glowImage.color = Fade(tierColors[tier], 0.15f + taps * 0.22f);
-            Tween.Scale(glow, Vector3.one * (1f + taps * 0.12f), 0.25f, Ease.OutQuad, useUnscaledTime: true);
-            Haptics.Play(Haptics.Kind.Tick); AudioDirector.Instance?.Click();
+            // the lid strains harder each time: a hop, a squeeze, a rattle, more of its colour leaking out
+            Tween.PunchLocalRotation(chest, new Vector3(0, 0, 7f + 7f * taps), 0.35f, frequency: 9 + 3 * taps, useUnscaledTime: true);
+            Tween.PunchScale(chest, new Vector3(0.07f * taps, -0.06f * taps, 0f), 0.32f, frequency: 7, useUnscaledTime: true);
+            if (taps < 3)
+                Tween.UIAnchoredPositionY(chest, 60f + 28f * taps, 0.11f, Ease.OutQuad, useUnscaledTime: true)
+                     .Chain(Tween.UIAnchoredPositionY(chest, 60f, 0.26f, Ease.OutBounce, useUnscaledTime: true));
+            glowImage.color = Fade(tierColors[tier], 0.15f + taps * 0.25f);
+            Tween.Scale(glow, Vector3.one * (1f + taps * 0.14f), 0.25f, Ease.OutQuad, useUnscaledTime: true);
+            Tween.PunchScale(glow, Vector3.one * 0.12f, 0.3f, frequency: 4, useUnscaledTime: true);
+            Haptics.Play(taps < 3 ? Haptics.Kind.TierUp : Haptics.Kind.Hit); AudioDirector.Instance?.TierUp(taps);
+            if (taps == 2) for (int i = 0; i < sparkles.Length; i++) if (sparkles[i] != null) sparkles[i].gameObject.SetActive(i < 3);   // the first glints escape
             hint.text = taps < 3 ? new string('●', taps) + new string('○', 3 - taps) : "";
             if (taps >= 3) StartCoroutine(Burst(tier));
+        }
+
+        /// A jolt through the light and the lettering: the chest itself is left to its own tweens.
+        void Jolt(float strength, float seconds)
+        {
+            Tween.ShakeLocalPosition(glow, new Vector3(strength, strength * 0.7f, 0f), seconds, frequency: 14, useUnscaledTime: true);
+            if (rays != null && rays.gameObject.activeSelf) Tween.ShakeLocalPosition(rays, new Vector3(strength, strength * 0.7f, 0f), seconds, frequency: 14, useUnscaledTime: true);
+            Tween.ShakeLocalPosition(tierLabel.transform, new Vector3(strength * 0.6f, strength * 0.4f, 0f), seconds, frequency: 14, useUnscaledTime: true);
         }
 
         IEnumerator Burst(int tier)
         {
             busy = true;
-            yield return new WaitForSecondsRealtime(0.25f);
+            hintPulse.Stop(); hint.transform.localScale = Vector3.one;
+            // it draws itself in...
+            yield return Tween.Scale(chest, new Vector3(0.84f, 1.16f, 1f), 0.13f, Ease.InQuad, useUnscaledTime: true).ToYieldInstruction();
+            // ...and goes off: the lid, a flash of its colour across the screen, a jolt, the beams spinning up
             chestImage.sprite = openSprites[tier];
-            Tween.PunchScale(chest, Vector3.one * 0.25f, 0.4f, frequency: 6, useUnscaledTime: true);
-            glowImage.color = Fade(tierColors[tier], 0.95f);
-            glow.localScale = Vector3.one * 1.8f;
-            Tween.Scale(glow, Vector3.one * 1.2f, 0.6f, Ease.OutQuad, useUnscaledTime: true);
-            Haptics.Play(Haptics.Kind.Win); AudioDirector.Instance?.Confirm();
-            Effects(true, tier);
+            chest.localScale = new Vector3(1.32f, 0.72f, 1f);
+            Tween.Scale(chest, Vector3.one, 0.6f, Ease.OutElastic, useUnscaledTime: true);
+            if (back != null) { back.color = Fade(tierColors[tier], tier >= 2 ? 0.9f : 0.75f); Tween.Color(back, backColor, 0.45f, Ease.OutQuad, useUnscaledTime: true); }
+            glowImage.color = Color.white; glow.localScale = Vector3.one * 2.6f;
+            Tween.Color(glowImage, Fade(tierColors[tier], 0.95f), 0.35f, useUnscaledTime: true);
+            Tween.Scale(glow, Vector3.one * 1.25f, 0.7f, Ease.OutQuad, useUnscaledTime: true);
+            Effects(true, tier); raySpin = 220f;
+            Jolt(16f + 4f * tier, 0.4f);
+            Haptics.Play(Haptics.Kind.Win); AudioDirector.Instance?.Confirm(); AudioDirector.Instance?.TierUp(4);
             CoinBurst(tier);
-            yield return Tween.UIAnchoredPosition(chest, new Vector2(0, 210), 0.35f, Ease.OutQuad, useUnscaledTime: true).ToYieldInstruction();
+            yield return new WaitForSecondsRealtime(0.3f);
+            // up it hops to make room for what was inside
+            yield return Tween.UIAnchoredPositionY(chest, 236f, 0.26f, Ease.OutQuad, useUnscaledTime: true).ToYieldInstruction();
+            Tween.UIAnchoredPositionY(chest, 210f, 0.3f, Ease.OutBounce, useUnscaledTime: true);
             opened = true;
         }
 
@@ -237,15 +283,16 @@ namespace KartCup
                 if (c == null) continue;
                 c.gameObject.SetActive(i < n);
                 if (i >= n) continue;
-                c.anchoredPosition = new Vector2(Random.Range(-60f, 60f), 120f);
-                c.localScale = Vector3.one * Random.Range(0.6f, 1.1f);
-                var to = new Vector2(Random.Range(-720f, 720f), Random.Range(-260f, 360f));
-                float t = Random.Range(0.7f, 1.2f);
-                Tween.UIAnchoredPosition(c, to, t, Ease.OutQuad, useUnscaledTime: true);
-                Tween.LocalRotation(c, new Vector3(0, 0, Random.Range(-540f, 540f)), t, useUnscaledTime: true);
+                c.anchoredPosition = new Vector2(Random.Range(-50f, 50f), 140f);
+                c.localScale = Vector3.one * Random.Range(0.6f, 1.15f);
+                float t = Random.Range(0.8f, 1.3f), x = Random.Range(-820f, 820f), peak = 140f + Random.Range(180f, 520f);
+                Tween.UIAnchoredPositionX(c, x, t, Ease.Linear, useUnscaledTime: true);                     // sideways at a steady speed...
+                Tween.UIAnchoredPositionY(c, peak, t * 0.42f, Ease.OutQuad, useUnscaledTime: true)           // ...up, slowing...
+                     .Chain(Tween.UIAnchoredPositionY(c, -420f, t * 0.58f, Ease.InQuad, useUnscaledTime: true));   // ...and down, gathering speed: gravity
+                Tween.LocalRotation(c, new Vector3(0, 0, Random.Range(-720f, 720f)), t, useUnscaledTime: true);
                 var img = c.GetComponent<Image>();
                 img.color = Color.white;
-                Tween.Alpha(img, 0f, 0.35f, startDelay: t - 0.3f, useUnscaledTime: true);
+                Tween.Alpha(img, 0f, 0.3f, startDelay: t - 0.3f, useUnscaledTime: true);
             }
         }
 
