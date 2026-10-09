@@ -14,6 +14,10 @@ namespace KartCup
         [SerializeField] Transform meet;
         [SerializeField] Vector3 eye = new Vector3(1.5f, 3.4f, -20.5f), aim = new Vector3(-2f, 2.8f, 0f);   // a little above head height, looking down a touch: the home stage sits under the row, not inside it
         [SerializeField] float travel = 2.6f, period = 44f;
+        // The hub's pose (10 Oct 2026, Beach Buggy's): straight in front of the home stage, a touch above it and looking
+        // down, with a short dolly either way. The eye/aim dolly along the meet is what the title does without a stage.
+        [SerializeField] Vector3 homeEye = new Vector3(0f, 3.2f, -15f), homeAim = new Vector3(0f, 1.4f, 0f);
+        [SerializeField] float homeTravel = 1.0f;
         // Select-screen pose. Geometry, not taste: at fov 30 on a 2.22 screen the kart lands at 0.65 width, 0.56 height.
         [SerializeField] float focusAngle = 25f, focusRadius = 12.5f, focusHeight = 4.7f, focusLook = 1.5f, focusYaw = 7f;
         // The driver screen's pose: a person, not a kart, so much closer and lower (Beach Buggy's driver fills the frame).
@@ -80,10 +84,11 @@ namespace KartCup
             }
             if (meet != null && blend < 1f)
             {
-                float x = Mathf.Sin(Time.time * 2f * Mathf.PI / period) * travel;
-                float home = Home != null ? Mathf.Clamp(meet.InverseTransformPoint(Home.position).x, -9f, 9f) : 0f;   // the dolly runs past the chosen driver, the hoarding still in frame
-                var p = meet.TransformPoint(eye + new Vector3(x + home, 0f, 0f));
-                var r = Quaternion.LookRotation(meet.TransformPoint(aim + new Vector3(x * 0.35f + home, 0f, 0f)) - p);   // the aim trails the camera: a track, with a little pan
+                float x = Mathf.Sin(Time.time * 2f * Mathf.PI / period) * (Home != null ? homeTravel : travel);
+                Vector3 p, at;
+                if (Home != null) { p = Home.position + meet.rotation * (homeEye + new Vector3(x, 0f, 0f)); at = Home.position + meet.rotation * (homeAim + new Vector3(x * 0.35f, 0f, 0f)); }
+                else { p = meet.TransformPoint(eye + new Vector3(x, 0f, 0f)); at = meet.TransformPoint(aim + new Vector3(x * 0.35f, 0f, 0f)); }
+                var r = Quaternion.LookRotation(at - p);   // the aim trails the camera: a track, with a little pan
                 float t = Mathf.SmoothStep(0f, 1f, blend);
                 pos = Vector3.Lerp(p, pos, t); rot = Quaternion.Slerp(r, rot, t);
             }

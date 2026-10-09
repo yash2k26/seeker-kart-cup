@@ -42,7 +42,9 @@ public static class MenuMeet
             var act = Business.TryGetValue(who, out var b) ? b : kartActs[i % kartActs.Length].Item1;
             float yaw = ByKart(act) ? kartActs.First(k => k.Item1 == act).Item2 : 0f;
             float x = (i - (names.Length - 1) / 2f) * Spacing;
-            if (x > 12f) x += 3.5f;   // the two bays right of the home stage (x 11.2) step along the street: a clear pocket behind the hero
+            // the home stage (x 11.2) has the middle of the title to itself: the three bays right of it step 7 m along the
+            // street, the two left of it 3 m the other way, so the camera (straight in front of the stage) sees them at the edges
+            if (x > 8f) x += 7f; else if (x > 0f) x -= 3f;
             return (who, new Vector3(x, 0f, i % 2 == 0 ? NearZ : FarZ), yaw, act);
         }).ToArray();
     }
@@ -73,7 +75,6 @@ public static class MenuMeet
         var plinth = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Object.DestroyImmediate(plinth.GetComponent<Collider>());
         plinth.name = "Plinth"; plinth.transform.SetParent(stage, false); plinth.transform.localPosition = new Vector3(0, -0.08f, 0); plinth.transform.localScale = new Vector3(4.4f, 0.08f, 4.4f);   // radius 2.2 m: clear of Chase's kart and Maroo's bench
         plinth.GetComponent<MeshRenderer>().sharedMaterial = Mat("Turntable") ?? Solid("Plinth", new Color(0.16f, 0.17f, 0.19f), 0.38f);
-        var aim = new GameObject("HomeAim").transform; aim.SetParent(root, false); aim.localPosition = new Vector3(8.5f, 0f, -5f);   // MenuBackdrop clamps the dolly's offset to 9 m
         Spot(root, "HomeKey", new Vector3(8f, 7.5f, -12.5f), new Vector3(11.2f, 1.5f, -5f), new Color(1f, 0.9f, 0.76f), 190f, 50f);
         // The lamps stand behind the karts and rim them; the faces need light from the camera's side. A warm key from
         // high on the left, a cool fill low on the right: the film's meet.

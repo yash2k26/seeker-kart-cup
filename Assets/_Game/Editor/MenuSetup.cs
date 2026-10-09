@@ -378,49 +378,43 @@ public static partial class MenuSetup
     {
         var screen = Rect("Title", parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject;
 
-        // Behind the title is the street meet (MenuMeet): the drivers by their karts, the teaser on the hoarding.
-        // A scrim, not a card: the title has to stay legible over it without boxing it in.
-        var plate = Rect("Plate", screen.transform, new Vector2(0, 0), new Vector2(0.47f, 1f), Vector2.zero, Vector2.zero);
-        // The scrim is its own layer behind the content: overhanging the plate itself would drag every child
-        // label with it, because they are anchored to the plate's corners.
-        var scrim = Rect("Scrim", plate, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-        scrim.offsetMin = new Vector2(-320, -320); scrim.offsetMax = new Vector2(260, 320);   // cover the camera cutout, and reach past the wordmark
-        var fade = scrim.gameObject.AddComponent<Image>();
-        fade.sprite = FadeSprite();
-        fade.color = Deep;
-        fade.raycastTarget = false;
+        // Beach Buggy's hub (10 Oct 2026, the user's reference): the chosen driver and kart dead centre on the street
+        // (HomeStage), the counters in a bar along the top, one row of big labelled doors along the bottom with PLAY at
+        // the right. No plate: nothing boxes the hero in. "Plate" stays as the full-screen container the rewards and
+        // the flow look things up in, and "Actions" as the row PopIn assembles.
+        var plate = Rect("Plate", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        // a soft shade under the doors and under the counters, so both read on any street (the ramp is dark at the bottom)
+        foreach (var (name, top) in new[] { ("ShadeBottom", false), ("ShadeTop", true) })
+        {
+            var shade = Rect(name, plate, new Vector2(0, top ? 1 : 0), new Vector2(1, top ? 1 : 0), new Vector2(0, top ? -130 : 150), new Vector2(0, 400));
+            if (top) shade.localScale = new Vector3(1, -1, 1);
+            var img = shade.gameObject.AddComponent<Image>(); img.sprite = FadeSprite(vertical: true); img.color = Deep; img.raycastTarget = false;
+        }
 
-        var kicker = Label("Kicker", plate, body, "BEACH GRAND PRIX", 36, Accent, TextAlignmentOptions.Left,
-                           new Vector2(0, 1), new Vector2(120, -168), new Vector2(1240, 60));
-        kicker.characterSpacing = 14f;                       // an eyebrow reads as a label, not a sentence
+        // the lockup, small, where Beach Buggy keeps BACK: the brand, not a headline
+        var lockup = UiSprite(Art + "Textures/UI/kartel_lockup.png");
+        if (lockup == null) Debug.LogWarning("[menu] no kartel_lockup.png: run tools/brand/make_lockup.py");
+        var logo = Rect("Logo", plate, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -14), new Vector2(380, 139));
+        logo.pivot = new Vector2(0, 1);
+        var mark = logo.gameObject.AddComponent<Image>();
+        mark.sprite = lockup; mark.preserveAspect = true; mark.raycastTarget = false;
 
-        // One word, so one line: sized to fill the block the old two-line lockup held, between the kicker and the sub.
-        Label("Title1", plate, display, "KARTEL", 320, Paper, TextAlignmentOptions.Left,
-              new Vector2(0, 1), new Vector2(112, -216), new Vector2(1100, 366));
-        Label("Sub", plate, body, "Race the island. Put your lap on-chain.", 38, Muted,
-              TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(120, -576), new Vector2(1000, 60));
-
-        // The actions assemble themselves when the title opens (PopIn): PLAY first, then the three doors under it.
+        // the doors along the bottom, in the order you reach for them, and PLAY big at the right (Beach Buggy's Choose Series)
         var actions = Rect("Actions", plate, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         actions.gameObject.AddComponent<PopIn>();
-        var play = Button("Play", actions, "PLAY", Accent, Paper, 76,
-                          new Vector2(0, 0), new Vector2(120, 272), new Vector2(640, 164), icon: "play");
+        var doors = new (string name, string icon, string caption, string method)[]
+        {
+            ("Driver", "user", "DRIVER", nameof(ScreenFlow.ShowSelect)), ("Garage", "kart", "KART", nameof(ScreenFlow.ShowGarage)),
+            ("Items", "rocket", "ITEMS", nameof(ScreenFlow.ShowItems)), ("Online", "globe", "ONLINE", nameof(ScreenFlow.ShowRooms)),
+            ("Tour", "flag", "TOUR", nameof(ScreenFlow.ShowTour)),
+        };
+        for (int i = 0; i < doors.Length; i++)
+            Wire(Tile(doors[i].name, actions, doors[i].icon, doors[i].caption, new Vector2(0, 0), new Vector2(64 + i * 262, 48), new Vector2(236, 212), glyph: 96f), doors[i].method);
+        var play = Button("Play", actions, "PLAY", Accent, Paper, 76, new Vector2(1, 0), new Vector2(-64, 48), new Vector2(640, 212), icon: "play");
         Wire(play, nameof(ScreenFlow.Play));
         Shine(play);
 
-        // Under it, the hub's doors in the order you reach for them (10 Oct 2026, Beach Buggy's single-player screen): who
-        // you drive as, what you drive, what you carry, who you race, and the Tour (TitleRewards adds it at the end).
-        // PLAY itself goes straight to the track: the pair on the home stage are the ones you race.
-        var driverBtn = Tile("Driver", actions, "user", "DRIVER", new Vector2(0, 0), new Vector2(120, 64), new Vector2(200, 176));
-        Wire(driverBtn, nameof(ScreenFlow.ShowSelect));
-        var garageBtn = Tile("Garage", actions, "kart", "KART", new Vector2(0, 0), new Vector2(340, 64), new Vector2(200, 176));
-        Wire(garageBtn, nameof(ScreenFlow.ShowGarage));
-        var itemsBtn = Tile("Items", actions, "rocket", "ITEMS", new Vector2(0, 0), new Vector2(560, 64), new Vector2(200, 176));
-        Wire(itemsBtn, nameof(ScreenFlow.ShowItems));
-        var online = Tile("Online", actions, "globe", "ONLINE", new Vector2(0, 0), new Vector2(780, 64), new Vector2(200, 176));
-        Wire(online, nameof(ScreenFlow.ShowRooms));
-
-        // Top right, out of the film's way: who you are (sign in) and the settings.
+        // Top right: who you are (sign in), the gems, the two counters (ranking, awards) and the settings.
         var corner = Rect("Corner", screen.transform, new Vector2(1, 1), new Vector2(1, 1), Vector2.zero, Vector2.zero);
         var wallet = new GameObject("WalletFlow").AddComponent<WalletFlow>();
         var chipBtn = Button("Profile", corner, "SIGN IN", new Color(Slate.r, Slate.g, Slate.b, 0.92f), Paper, 34,
@@ -437,19 +431,17 @@ public static partial class MenuSetup
             s.FindProperty("toastGroup").objectReferenceValue = toastGroup;
         });
         UnityEditor.Events.UnityEventTools.AddPersistentListener(chipBtn.onClick, chip.Tap);
-
         var cog = IconButton("Settings", corner, "icon_cog", new Vector2(1, 1), new Vector2(-64, -32), new Vector2(104, 104));
         Wire(cog, nameof(ScreenFlow.ShowSettings));
-        GemChip(corner, new Vector2(-600, -32));   // the balance, left of SIGN IN; tap for the gem shop
-        // the counters, as Beach Buggy keeps them along the top: the times to beat and what is done
+        GemChip(corner, new Vector2(-600, -32));
         var boardBtn = IconButton("Board", corner, "trophy", new Vector2(1, 1), new Vector2(-880, -32), new Vector2(104, 104));
         Wire(boardBtn, nameof(ScreenFlow.ShowLeaderboard));
         var awardsBtn = IconButton("Awards", corner, "star", new Vector2(1, 1), new Vector2(-1000, -32), new Vector2(104, 104));
         Wire(awardsBtn, nameof(ScreenFlow.ShowAchievements));
 
-        // NEW VERSION, bottom right over the street: hidden until the download host has a newer build (AppUpdate)
+        // NEW VERSION, right of the hero: hidden until the download host has a newer build (AppUpdate)
         var update = Button("Update", screen.transform, "NEW VERSION", Slate, Paper, 32,
-                            new Vector2(1, 0), new Vector2(-64, 56), new Vector2(600, 104), icon: "download");
+                            new Vector2(1, 0), new Vector2(-64, 360), new Vector2(600, 104), icon: "download");
         var appUpdate = screen.AddComponent<AppUpdate>();
         new SerializedObject(appUpdate).Do(s =>
         {
@@ -459,20 +451,7 @@ public static partial class MenuSetup
         UnityEditor.Events.UnityEventTools.AddPersistentListener(update.onClick, appUpdate.Open);
         update.gameObject.SetActive(false);
 
-        // The wordmark is the film's own lockup (tools/brand/make_lockup.py lifts it from the teaser's title frames):
-        // the gold letters on their violet shell, the tagline in its badge. It stands in for the typeset title and the
-        // eyebrow over it, and the on-chain line moves up under it.
-        foreach (var typeset in new[] { "Title1", "Title2", "Kicker" })
-            if (plate.Find(typeset) is Transform old) Object.DestroyImmediate(old.gameObject);
-        var lockup = UiSprite(Art + "Textures/UI/kartel_lockup.png");
-        if (lockup == null) Debug.LogWarning("[menu] no kartel_lockup.png: run tools/brand/make_lockup.py");
-        var logo = Rect("Logo", plate, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -84), new Vector2(1120, 410));
-        logo.pivot = new Vector2(0, 1);
-        var mark = logo.gameObject.AddComponent<Image>();
-        mark.sprite = lockup; mark.preserveAspect = true; mark.raycastTarget = false;
-        plate.Find("Sub").GetComponent<RectTransform>().anchoredPosition = new Vector2(120, -512);
         TitleRewards(screen, plate);
-
         return screen;
     }
 
@@ -1470,7 +1449,7 @@ public static partial class MenuSetup
     }
 
     /// A pressable tile with a glyph over its name: the title's doors (online, garage, ranking).
-    static Button Tile(string name, Transform parent, string icon, string caption, Vector2 anchor, Vector2 offset, Vector2 dims)
+    static Button Tile(string name, Transform parent, string icon, string caption, Vector2 anchor, Vector2 offset, Vector2 dims, float glyph = 72f)
     {
         var rt = Rect(name, parent, anchor, anchor, offset, dims);
         rt.pivot = anchor;
@@ -1478,9 +1457,9 @@ public static partial class MenuSetup
         var button = rt.gameObject.AddComponent<Button>();
         var feel = rt.gameObject.AddComponent<PressFeel>();
         var face = Face(name, rt, lip);
-        var glyph = Rect(name + "Icon", face, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -22), new Vector2(72, 72));
-        glyph.pivot = new Vector2(0.5f, 1);
-        var img = glyph.gameObject.AddComponent<Image>();
+        var glyphRt = Rect(name + "Icon", face, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -22), new Vector2(glyph, glyph));
+        glyphRt.pivot = new Vector2(0.5f, 1);
+        var img = glyphRt.gameObject.AddComponent<Image>();
         img.sprite = IconSprite(icon); img.color = Paper; img.preserveAspect = true; img.raycastTarget = false;
         var label = Label(name + "Label", face, display, caption, 34, Paper, TextAlignmentOptions.Center,
                           new Vector2(0.5f, 0), new Vector2(0, 18), new Vector2(dims.x - 20, 44));

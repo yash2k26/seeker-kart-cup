@@ -23,7 +23,7 @@ public static partial class MenuSetup
     {
         // Today's challenge and this week's, side by side where the on-chain line was: the two reasons to come back
         if (plate.Find("Sub") is Transform sub) Object.DestroyImmediate(sub.gameObject);
-        var (dailyCard, dailyButton, dailyHead, dailyLine) = EventCard("Daily", plate, new Vector2(120, -500), "flag");
+        var (dailyCard, dailyButton, dailyHead, dailyLine) = EventCard("Daily", plate, new Vector2(64, -300), "flag");   // the left edge, clear of the hero
         var daily = plate.gameObject.AddComponent<DailyCard>();
         var doneTick = Rect("Done", dailyCard, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-16, -14), new Vector2(40, 40));
         doneTick.pivot = new Vector2(1, 1);
@@ -36,7 +36,7 @@ public static partial class MenuSetup
         });
         UnityEditor.Events.UnityEventTools.AddPersistentListener(dailyButton.onClick, daily.Tap);
 
-        var (card, button, head, line) = EventCard("Weekly", plate, new Vector2(600, -500), "trophy");
+        var (card, button, head, line) = EventCard("Weekly", plate, new Vector2(64, -440), "trophy");
         // on the plate, not the card: the card is what it hides, and a hidden card would never run again
         var weekly = plate.gameObject.AddComponent<WeeklyCard>();
         new SerializedObject(weekly).Do(s =>
@@ -48,32 +48,26 @@ public static partial class MenuSetup
         UnityEditor.Events.UnityEventTools.AddPersistentListener(button.onClick, weekly.Tap);
         card.gameObject.SetActive(false);                 // until the Worker answers
 
-        // the Tour beside the title's three doors
-        if (plate.Find("Actions") is RectTransform actions)
-        {
-            var tour = Tile("Tour", actions, "flag", "TOUR", new Vector2(0, 0), new Vector2(1000, 64), new Vector2(200, 176));   // the fifth door (achievements moved to the top bar)
-            Wire(tour, nameof(ScreenFlow.ShowTour));
-        }
-
-        // the chest: what is waiting (bobbing, with a count), or the golden one the stars fill toward
-        var tile = Rect("Chest", screen.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-64, 96), new Vector2(232, 232));
-        tile.pivot = new Vector2(1, 0);
+        // the chest in the top bar (Beach Buggy's gift box): what is waiting (bobbing, with a count), or the golden one the stars fill toward
+        var tile = Rect("Chest", screen.transform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(704, -16), new Vector2(124, 108));
+        tile.pivot = new Vector2(0, 1);
         Design.AsTile(tile, Deep, 28f, out float tlip);
         var tbutton = tile.gameObject.AddComponent<Button>();
         var tfeel = tile.gameObject.AddComponent<PressFeel>();
         var tface = Face("Chest", tile, tlip);
-        var bob = Rect("Bob", tface, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 4), new Vector2(200, 200));
+        var bob = Rect("Bob", tface, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 2), new Vector2(92, 92));
         var chestImg = bob.gameObject.AddComponent<Image>();
         chestImg.preserveAspect = true; chestImg.raycastTarget = false;
         var closed = ChestSprites(false);
         chestImg.sprite = closed[3];
-        var badge = Rect("Count", tile, new Vector2(1, 1), new Vector2(1, 1), new Vector2(14, 14), new Vector2(68, 68));
+        var badge = Rect("Count", tile, new Vector2(1, 1), new Vector2(1, 1), new Vector2(12, 12), new Vector2(52, 52));
         badge.pivot = new Vector2(1, 1);
         Design.AsPill(badge, Design.Tiers[0]).raycastTarget = false;
-        var count = Label("CountLabel", badge, display, "1", 38, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 2), new Vector2(68, 68));
+        var count = Label("CountLabel", badge, display, "1", 30, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 2), new Vector2(52, 52));
         tfeel.Configure(Design.TileDown, tface, tlip * (Design.TileLip - 3f) / Design.TileLip);
-        var meter = Rect("Meter", screen.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-64, 40), new Vector2(232, 40));
-        meter.pivot = new Vector2(1, 0);
+        // the star meter beside it (Beach Buggy's trophy counter): how far to the next golden chest
+        var meter = Rect("Meter", screen.transform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(448, -40), new Vector2(232, 56));
+        meter.pivot = new Vector2(0, 1);
         Design.AsPill(meter, Deep).raycastTarget = false;
         var fillRt = Rect("Fill", meter, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         fillRt.offsetMin = new Vector2(4, 4); fillRt.offsetMax = new Vector2(-4, -4);
@@ -82,7 +76,7 @@ public static partial class MenuSetup
         var star = Rect("Star", meter, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(26, 0), new Vector2(34, 34));
         var starImg = star.gameObject.AddComponent<Image>();
         starImg.sprite = IconSprite("star"); starImg.color = Paper; starImg.preserveAspect = true; starImg.raycastTarget = false;
-        var meterText = Label("MeterLabel", meter, strong, "0/15", 26, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(12, 1), new Vector2(200, 40));
+        var meterText = Label("MeterLabel", meter, strong, "0/15", 28, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(12, 1), new Vector2(200, 44));
         var chestButton = tile.gameObject.AddComponent<ChestButton>();
         new SerializedObject(chestButton).Do(s =>
         {
@@ -94,8 +88,17 @@ public static partial class MenuSetup
             Fill(s.FindProperty("closedSprites"), closed.Cast<Object>().ToArray());
         });
         UnityEditor.Events.UnityEventTools.AddPersistentListener(tbutton.onClick, chestButton.Tap);
-        if (screen.transform.Find("Update") is RectTransform update) update.anchoredPosition = new Vector2(-64, 360);
-        DailyWheel(screen);   // the daily wheel beside the chest (MenuSetup.Spin.cs)
+        DailyWheel(screen);   // the daily wheel (MenuSetup.Spin.cs), then into the top bar beside the chest: the wheel at the left, the timer at the right
+        if (screen.transform.Find("Spin") is RectTransform spin)
+        {
+            spin.anchorMin = spin.anchorMax = spin.pivot = new Vector2(0, 1); spin.anchoredPosition = new Vector2(852, -16); spin.sizeDelta = new Vector2(216, 108);
+            if (spin.Find("SpinFace/Wheel") is RectTransform wheel) { wheel.anchorMin = wheel.anchorMax = new Vector2(0, 0.5f); wheel.pivot = new Vector2(0.5f, 0.5f); wheel.anchoredPosition = new Vector2(50, 0); wheel.sizeDelta = new Vector2(76, 76); }
+            if (spin.Find("SpinFace/Line") is RectTransform timer)
+            {
+                timer.anchorMin = timer.anchorMax = new Vector2(1, 0.5f); timer.pivot = new Vector2(1, 0.5f); timer.anchoredPosition = new Vector2(-12, 0); timer.sizeDelta = new Vector2(112, 48);
+                var t = timer.GetComponent<TMP_Text>(); t.fontSize = 22; t.enableAutoSizing = true; t.fontSizeMin = 16; t.fontSizeMax = 22;
+            }
+        }
 
         // the toast: one line, one action, under the profile chip, over the hoarding
         var toastRoot = Rect("Toast", screen.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-64, -156), new Vector2(1060, 108));

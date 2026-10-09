@@ -40,15 +40,15 @@ namespace KartCup
                 var colour = paint != null ? paint.color : Paints.ColorFor(def, kartId);
                 kart = CharacterCarousel.Mount(prefab, null, stage, colour, false);
                 if (paint != null ? paint.gold : Paints.GoldOn(kartId)) CharacterDef.Paint(kart, colour, gold: true);
-                // right of the plinth's centre, nose three-quarters to the camera; the driver stands at its left front wheel
-                kart.transform.localPosition += new Vector3(0.9f, 0f, 0.3f);
-                kart.transform.localRotation = Quaternion.Euler(0f, 226f, 0f);
+                // Beach Buggy's pair: the kart left of the plinth's centre, nose to the front-left; the driver at the right, facing you
+                kart.transform.localPosition += new Vector3(-1.4f, 0f, 0.3f);
+                kart.transform.localRotation = Quaternion.Euler(0f, 212f, 0f);
                 foreach (var r in kart.GetComponentsInChildren<Renderer>()) if (r.name != "BlobShadow") r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
             }
             if (def != null && carousel != null && (driver = carousel.StandFor(def, stage)) != null)
             {
-                driver.transform.localPosition += new Vector3(-1.5f, 0f, -0.6f);
-                driver.transform.localRotation = Quaternion.Euler(0f, 195f, 0f);
+                driver.transform.localPosition += new Vector3(1.5f, 0f, -0.3f);
+                driver.transform.localRotation = Quaternion.Euler(0f, 190f, 0f);
                 foreach (var r in driver.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
                 var head = driver.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "head");
                 driver.AddComponent<MeetActor>().Bind(driver.GetComponent<Animation>(), head, System.Array.Empty<string>(), false);   // watches the camera, as the street does

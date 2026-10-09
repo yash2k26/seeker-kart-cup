@@ -37,7 +37,7 @@ namespace KartCup
         {
             Instance = this;
             backdrop = FindFirstObjectByType<MenuBackdrop>();
-            if (backdrop != null) backdrop.Home = backdrop.Meet != null ? backdrop.Meet.Find("HomeAim") : null;   // the title's dolly runs past the home stage
+            if (backdrop != null) backdrop.Home = backdrop.Meet != null ? backdrop.Meet.Find("HomeStage") : null;   // the title's camera stands in front of the home stage
             RoomClient.LoadRequested += OnLoadRequested;
             RoomClient.RoomChanged += OnRoomChanged;
             Application.deepLinkActivated += OnDeepLink;

@@ -215,7 +215,7 @@ public static class MenuPreview
             foreach (var smr in anim.GetComponentsInChildren<SkinnedMeshRenderer>()) smr.updateWhenOffscreen = true;
         }
         var backdrop = Object.FindFirstObjectByType<MenuBackdrop>();
-        if (backdrop != null && backdrop.Meet != null) backdrop.Home = backdrop.Meet.Find("HomeAim");   // ScreenFlow.Awake does this at runtime: the title's dolly past the home stage
+        if (backdrop != null && backdrop.Meet != null) backdrop.Home = backdrop.Meet.Find("HomeStage");   // ScreenFlow.Awake does this at runtime: the title's camera in front of the home stage
         // nor does the hoarding's film: a still of it (Builds/teaser-frame.png, any frame of the teaser) on its render texture
         var film = AssetDatabase.LoadAssetAtPath<RenderTexture>("Assets/_Game/Video/TeaserRT.renderTexture");
         if (film != null && File.Exists("Builds/teaser-frame.png"))
