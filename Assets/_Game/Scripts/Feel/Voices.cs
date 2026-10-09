@@ -13,9 +13,13 @@ namespace KartCup
         /// driver, what they said, how long it takes to say
         public static event System.Action<string, string, float> Spoke;
 
+        /// 9 Oct 2026, the user: "remove hey, heya and everything else of the characters". Off everywhere: no line is
+        /// played and nothing raises Spoke, so no speech bubble either. The bank and the callers stay for the day it comes back.
+        public static bool Enabled = false;
+
         public static float Say(string driver, string kind)
         {
-            if (string.IsNullOrEmpty(driver)) return 0f;
+            if (!Enabled || string.IsNullOrEmpty(driver)) return 0f;
             if (bank == null) bank = Resources.Load<DriverVoices>("DriverVoices");
             if (bank == null) return 0f;
             var pool = new List<DriverVoices.Line>();
