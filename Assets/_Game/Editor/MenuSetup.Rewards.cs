@@ -51,11 +51,8 @@ public static partial class MenuSetup
         // the Tour beside the title's three doors
         if (plate.Find("Actions") is RectTransform actions)
         {
-            var tour = Tile("Tour", actions, "flag", "TOUR", new Vector2(0, 0), new Vector2(780, 64), new Vector2(200, 176));
+            var tour = Tile("Tour", actions, "flag", "TOUR", new Vector2(0, 0), new Vector2(1000, 64), new Vector2(200, 176));   // the fifth door (achievements moved to the top bar)
             Wire(tour, nameof(ScreenFlow.ShowTour));
-            // and the achievements (Beach Buggy's trophy counter, as a door): what is done, what each pays
-            var awards = Tile("Awards", actions, "star", "AWARDS", new Vector2(0, 0), new Vector2(1000, 64), new Vector2(200, 176));
-            Wire(awards, nameof(ScreenFlow.ShowAchievements));
         }
 
         // the chest: what is waiting (bobbing, with a count), or the golden one the stars fill toward

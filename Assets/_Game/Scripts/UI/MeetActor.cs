@@ -19,13 +19,13 @@ namespace KartCup
         float nextFidget, nextGlance;
         bool watching = true;
 
-#if UNITY_EDITOR
         public void Bind(Animation a, Transform headBone, string[] others, bool busy)
         {
             anim = a; head = headBone; fidgets = others; glances = busy;
             if (head != null) rest = head.localRotation;
         }
 
+#if UNITY_EDITOR
         /// Previews: LateUpdate never runs in edit mode. The head as the title has it, the camera standing at `camera`.
         public void FaceInEditor(Transform camera) { cam = camera; if (head == null) return; look = Want(); Turn(); }
 #endif

@@ -64,6 +64,15 @@ public static partial class MenuSetup
         var tourScreen = TourScreen(safe);
         var achievementsScreen = AchievementsScreen(safe);
         var gemsScreen = GemsScreen(safe);
+        // the title's hero: the chosen driver by the chosen kart on the street's home stage
+        var home = title.AddComponent<HomeStage>();
+        new SerializedObject(home).Do(s =>
+        {
+            s.FindProperty("carousel").objectReferenceValue = carousel;
+            s.FindProperty("karts").objectReferenceValue = AssetDatabase.LoadAssetAtPath<KartDatabase>("Assets/_Game/Data/Karts.asset");
+            s.FindProperty("roster").objectReferenceValue = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
+            Fill(s.FindProperty("kartPrefabs"), KartSetup.Karts.Select(k => AssetDatabase.LoadAssetAtPath<GameObject>(Prefabs + $"Karts/Kart_{k}.prefab")).Where(k => k != null).Cast<Object>().ToArray());
+        });
 
         var so = new SerializedObject(flow);
         so.FindProperty("roster").objectReferenceValue = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
@@ -399,14 +408,17 @@ public static partial class MenuSetup
         Wire(play, nameof(ScreenFlow.Play));
         Shine(play);
 
-        // Under it, the three doors that make it a game between people: race friends, the garage they see you in, and
-        // the times to beat. Tiles with a glyph each, so they read at a glance and never compete with PLAY.
-        var online = Tile("Online", actions, "globe", "ONLINE", new Vector2(0, 0), new Vector2(120, 64), new Vector2(200, 176));
-        Wire(online, nameof(ScreenFlow.ShowRooms));
-        var garageBtn = Tile("Garage", actions, "kart", "GARAGE", new Vector2(0, 0), new Vector2(340, 64), new Vector2(200, 176));
+        // Under it, the hub's doors in the order you reach for them (10 Oct 2026, Beach Buggy's single-player screen): who
+        // you drive as, what you drive, what you carry, who you race, and the Tour (TitleRewards adds it at the end).
+        // PLAY itself goes straight to the track: the pair on the home stage are the ones you race.
+        var driverBtn = Tile("Driver", actions, "user", "DRIVER", new Vector2(0, 0), new Vector2(120, 64), new Vector2(200, 176));
+        Wire(driverBtn, nameof(ScreenFlow.ShowSelect));
+        var garageBtn = Tile("Garage", actions, "kart", "KART", new Vector2(0, 0), new Vector2(340, 64), new Vector2(200, 176));
         Wire(garageBtn, nameof(ScreenFlow.ShowGarage));
-        var boardBtn = Tile("Board", actions, "trophy", "RANKING", new Vector2(0, 0), new Vector2(560, 64), new Vector2(200, 176));
-        Wire(boardBtn, nameof(ScreenFlow.ShowLeaderboard));
+        var itemsBtn = Tile("Items", actions, "rocket", "ITEMS", new Vector2(0, 0), new Vector2(560, 64), new Vector2(200, 176));
+        Wire(itemsBtn, nameof(ScreenFlow.ShowItems));
+        var online = Tile("Online", actions, "globe", "ONLINE", new Vector2(0, 0), new Vector2(780, 64), new Vector2(200, 176));
+        Wire(online, nameof(ScreenFlow.ShowRooms));
 
         // Top right, out of the film's way: who you are (sign in) and the settings.
         var corner = Rect("Corner", screen.transform, new Vector2(1, 1), new Vector2(1, 1), Vector2.zero, Vector2.zero);
@@ -429,6 +441,11 @@ public static partial class MenuSetup
         var cog = IconButton("Settings", corner, "icon_cog", new Vector2(1, 1), new Vector2(-64, -32), new Vector2(104, 104));
         Wire(cog, nameof(ScreenFlow.ShowSettings));
         GemChip(corner, new Vector2(-600, -32));   // the balance, left of SIGN IN; tap for the gem shop
+        // the counters, as Beach Buggy keeps them along the top: the times to beat and what is done
+        var boardBtn = IconButton("Board", corner, "trophy", new Vector2(1, 1), new Vector2(-880, -32), new Vector2(104, 104));
+        Wire(boardBtn, nameof(ScreenFlow.ShowLeaderboard));
+        var awardsBtn = IconButton("Awards", corner, "star", new Vector2(1, 1), new Vector2(-1000, -32), new Vector2(104, 104));
+        Wire(awardsBtn, nameof(ScreenFlow.ShowAchievements));
 
         // NEW VERSION, bottom right over the street: hidden until the download host has a newer build (AppUpdate)
         var update = Button("Update", screen.transform, "NEW VERSION", Slate, Paper, 32,

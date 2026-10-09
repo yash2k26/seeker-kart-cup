@@ -41,7 +41,9 @@ public static class MenuMeet
         {
             var act = Business.TryGetValue(who, out var b) ? b : kartActs[i % kartActs.Length].Item1;
             float yaw = ByKart(act) ? kartActs.First(k => k.Item1 == act).Item2 : 0f;
-            return (who, new Vector3((i - (names.Length - 1) / 2f) * Spacing, 0f, i % 2 == 0 ? NearZ : FarZ), yaw, act);
+            float x = (i - (names.Length - 1) / 2f) * Spacing;
+            if (x > 12f) x += 3.5f;   // the two bays right of the home stage (x 11.2) step along the street: a clear pocket behind the hero
+            return (who, new Vector3(x, 0f, i % 2 == 0 ? NearZ : FarZ), yaw, act);
         }).ToArray();
     }
 
@@ -63,6 +65,16 @@ public static class MenuMeet
             // only reach the middle of the row
             Spot(root, "BayKey_" + c.who, c.at + new Vector3(-2.5f, 6.5f, -7.5f), c.at + new Vector3(0f, 1.4f, 0f), new Color(1f, 0.88f, 0.72f), 110f, 48f);
         }
+        // The home stage (10 Oct 2026, Beach Buggy's hub): a plinth in the near lane's gap between Chase and Maroo, where
+        // the title shows the chosen driver beside the chosen kart (HomeStage fills it at runtime; Mount grounds tyres at
+        // the stage's height, so the stage sits on the plinth's top face). The title's dolly centres on HomeAim, well left
+        // of it, so the pair stand in the right half of the screen, 16 m off, with the hoarding centred behind them.
+        var stage = new GameObject("HomeStage").transform; stage.SetParent(root, false); stage.localPosition = new Vector3(11.2f, RoadY + 0.16f, -5f);   // the pocket where both lanes have a gap behind it (Chase | Maroo, Beeman | Andrew)
+        var plinth = GameObject.CreatePrimitive(PrimitiveType.Cylinder); Object.DestroyImmediate(plinth.GetComponent<Collider>());
+        plinth.name = "Plinth"; plinth.transform.SetParent(stage, false); plinth.transform.localPosition = new Vector3(0, -0.08f, 0); plinth.transform.localScale = new Vector3(4.4f, 0.08f, 4.4f);   // radius 2.2 m: clear of Chase's kart and Maroo's bench
+        plinth.GetComponent<MeshRenderer>().sharedMaterial = Mat("Turntable") ?? Solid("Plinth", new Color(0.16f, 0.17f, 0.19f), 0.38f);
+        var aim = new GameObject("HomeAim").transform; aim.SetParent(root, false); aim.localPosition = new Vector3(8.5f, 0f, -5f);   // MenuBackdrop clamps the dolly's offset to 9 m
+        Spot(root, "HomeKey", new Vector3(8f, 7.5f, -12.5f), new Vector3(11.2f, 1.5f, -5f), new Color(1f, 0.9f, 0.76f), 190f, 50f);
         // The lamps stand behind the karts and rim them; the faces need light from the camera's side. A warm key from
         // high on the left, a cool fill low on the right: the film's meet.
         Spot(root, "MeetKey", new Vector3(-10f, 10f, -17f), new Vector3(2f, 2f, 0f), new Color(1f, 0.86f, 0.68f), 230f, 52f);
@@ -106,8 +118,11 @@ public static class MenuMeet
         var halo = Mat("Lamp_Halo");
         var colour = halo != null ? halo.GetColor("_Color") : new Color(1f, 0.62f, 0.28f);
         var heads = new List<Vector3>();
-        foreach (float x in new[] { -24f, 11.9f })      // one in frame on the right, one out of it on the left: its halo would sit behind the wordmark
-            heads.Add(TrackSetup.LampPost(root, "Lamp", root.TransformPoint(new Vector3(x, 0.2f, HalfRoad + 0.9f)), root.rotation * Quaternion.Euler(0, 180f, 0), Mat("Lamp_Pole"), Mat("Lamp_Glow"), colour));
+        // one out of frame on the left (its halo would sit behind the wordmark); the right one behind the hoarding's plane since
+        // 10 Oct 2026, so its head hides behind the screen and its halo stays out of the title's top bar, while its light
+        // still rims the far lane from behind
+        foreach (var (x, z) in new[] { (-24f, HalfRoad + 0.9f), (9f, HalfRoad + 6.5f) })
+            heads.Add(TrackSetup.LampPost(root, "Lamp", root.TransformPoint(new Vector3(x, 0.2f, z)), root.rotation * Quaternion.Euler(0, 180f, 0), Mat("Lamp_Pole"), Mat("Lamp_Glow"), colour));
         if (halo == null) { Debug.LogWarning("[menu] no lamp halo: build the race scenes first"); return; }
         var glow = new GameObject("LampGlows");
         glow.transform.SetParent(root, false);

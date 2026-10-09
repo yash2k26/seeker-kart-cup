@@ -215,6 +215,7 @@ public static class MenuPreview
             foreach (var smr in anim.GetComponentsInChildren<SkinnedMeshRenderer>()) smr.updateWhenOffscreen = true;
         }
         var backdrop = Object.FindFirstObjectByType<MenuBackdrop>();
+        if (backdrop != null && backdrop.Meet != null) backdrop.Home = backdrop.Meet.Find("HomeAim");   // ScreenFlow.Awake does this at runtime: the title's dolly past the home stage
         // nor does the hoarding's film: a still of it (Builds/teaser-frame.png, any frame of the teaser) on its render texture
         var film = AssetDatabase.LoadAssetAtPath<RenderTexture>("Assets/_Game/Video/TeaserRT.renderTexture");
         if (film != null && File.Exists("Builds/teaser-frame.png"))
@@ -257,6 +258,7 @@ public static class MenuPreview
                 ((GameObject)panels.GetArrayElementAtIndex(j).objectReferenceValue).SetActive(i == j);
             if (backdrop != null) backdrop.Snap(i == 1 || i == 7 || i == 8, close: i == 1);     // LateUpdate never runs in edit mode either; the driver screen frames close
             // OnEnable does not run in edit mode: hand the sample/preview content to the panels that need it.
+            if (i == 0) foreach (var h in Object.FindObjectsByType<HomeStage>(FindObjectsInactive.Include, FindObjectsSortMode.None)) h.ShowInEditor();
             if (i == 6) foreach (var lobby in Object.FindObjectsByType<LobbyPanel>(FindObjectsSortMode.None)) lobby.RefreshSample();
             if (i == 7) foreach (var garage in Object.FindObjectsByType<GaragePanel>(FindObjectsSortMode.None)) garage.ShowInEditor(KartSetup.Karts.Length - 1);
             if (i == 7 && backdrop != null) backdrop.Snap(true);   // the framing GaragePanel just fitted to its kart

@@ -37,7 +37,7 @@ namespace KartCup
         {
             Instance = this;
             backdrop = FindFirstObjectByType<MenuBackdrop>();
-            if (backdrop != null && roster != null) backdrop.Home = backdrop.BayOf(roster.Selected?.displayName);   // the title shows your driver
+            if (backdrop != null) backdrop.Home = backdrop.Meet != null ? backdrop.Meet.Find("HomeAim") : null;   // the title's dolly runs past the home stage
             RoomClient.LoadRequested += OnLoadRequested;
             RoomClient.RoomChanged += OnRoomChanged;
             Application.deepLinkActivated += OnDeepLink;
@@ -67,11 +67,12 @@ namespace KartCup
 
         static bool Resuming => Cup.Active && Cup.RaceIndex > 0;
 
-        /// The title's primary button. New cup goes through character select; a cup in flight goes straight to the grid.
+        /// The title's primary button. A cup in flight goes straight to the grid; otherwise to the track pick: the driver and
+        /// kart on the home stage are the ones you race (the DRIVER tile changes them), Beach Buggy's hub.
         public void Play()
         {
             if (Resuming) ContinueCup();
-            else ShowSelect();
+            else ShowTrack();
         }
 
         void Update()

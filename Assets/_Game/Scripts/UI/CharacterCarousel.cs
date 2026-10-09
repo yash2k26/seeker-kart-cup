@@ -171,7 +171,6 @@ namespace KartCup
             if (bay != null)
             {   // the street: the camera goes to the driver where they stand with their kart; the turntable stays empty
                 backdrop.Spot = bay;
-                if (!Locked && CharacterDatabase.SelectedIndex == index) backdrop.Home = bay;
                 if (Application.isPlaying) bay.GetComponentInChildren<MeetActor>()?.Fidget();
             }
             else if (standing && driverPrefab != null && podium != null) current = StandUp(driverPrefab, Application.isPlaying);
@@ -235,6 +234,32 @@ namespace KartCup
             {
                 Tween.Scale(d.transform, d.transform.localScale * 0.7f, d.transform.localScale, 0.28f, Ease.OutBack);
                 Invoke(nameof(Wave), 0.2f);
+            }
+            return d;
+        }
+
+        /// The driver on their feet at `parent`'s origin, their own idle take playing: the title's home stage borrows the
+        /// select screen's clips and lifts. Nothing of the turntable's own state is touched.
+        public GameObject StandFor(CharacterDef def, Transform parent)
+        {
+            var prefab = def != null ? driverPrefabs.FirstOrDefault(d => d.name.EndsWith(def.driverId)) ?? driverPrefabs.FirstOrDefault() : null;
+            if (prefab == null || parent == null) return null;
+            int i = System.Array.IndexOf(driverPrefabs, prefab);
+            var idle = i >= 0 && i < idleClips.Length ? idleClips[i] : null;
+            float lift = i >= 0 && i < standLifts.Length ? standLifts[i] : 0f;
+            var d = Instantiate(prefab, parent);
+            float scale = standScale / Mathf.Max(0.0001f, parent.lossyScale.x);
+            d.transform.localRotation = Quaternion.identity; d.transform.localScale = Vector3.one * scale; d.transform.localPosition = Vector3.up * (lift * scale);
+            foreach (var pose in d.GetComponentsInChildren<BlockyDriverPose>(true)) { if (pose.Wheel != null) pose.Wheel.gameObject.SetActive(false); pose.enabled = false; }
+            foreach (var t in d.GetComponentsInChildren<Transform>(true)) if (t != d.transform && t.name.ToLowerInvariant().Contains("steering")) t.gameObject.SetActive(false);
+            foreach (var smr in d.GetComponentsInChildren<SkinnedMeshRenderer>(true)) smr.updateWhenOffscreen = true;
+            var anim = d.GetComponent<Animation>() ?? d.AddComponent<Animation>();
+            anim.cullingType = AnimationCullingType.AlwaysAnimate;
+            if (idle != null)
+            {
+                if (anim.GetClip(idle.name) == null) anim.AddClip(idle, idle.name);
+                anim.clip = idle; idle.SampleAnimation(d, 0f);
+                if (Application.isPlaying) anim.Play(idle.name);
             }
             return d;
         }
