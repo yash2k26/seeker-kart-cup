@@ -55,16 +55,24 @@ namespace KartCup
             Vector3 Flat(Vector3 v) { v.y = 0f; return v; }
             var dir = Flat(target - kart.transform.position).normalized;
             var startRot = kart.transform.rotation; var aim = Quaternion.LookRotation(dir, Vector3.up);
-            float speed = 0f, turn = 0f;
+            // round on the spot first (a slide while turning read as the kart skating), then straight at the camera.
+            // The wheels roll about the kart's axle (KartWheel points a wheel's own forward along the axle, so a local X
+            // spin tilts it instead): world-space, about transform.right, forward positive.
+            for (float turn = 0f; turn < 1f && kart != null; turn = Mathf.MoveTowards(turn, 1f, Time.deltaTime / 0.35f))
+            {
+                kart.transform.rotation = Quaternion.Slerp(startRot, aim, Mathf.SmoothStep(0f, 1f, turn));
+                yield return null;
+            }
+            if (kart != null) kart.transform.rotation = aim;
+            float speed = 0f;
             Haptics.Play(Haptics.Kind.Boost); AudioDirector.Instance?.Confirm();
             while (kart != null)
             {
                 float dt = Time.deltaTime;
-                turn = Mathf.MoveTowards(turn, 1f, dt / 0.35f);
-                kart.transform.rotation = Quaternion.Slerp(startRot, aim, Mathf.SmoothStep(0f, 1f, turn));
                 speed = Mathf.Min(speed + 30f * dt, 28f);
                 kart.transform.position += dir * speed * dt;
-                foreach (var w in wheels) if (w != null) w.Rotate(Vector3.right, speed * dt * 140f, Space.Self);
+                float deg = speed * dt / 0.35f * Mathf.Rad2Deg;   // a 0.35 m wheel: distance over radius, in degrees
+                foreach (var w in wheels) if (w != null) w.Rotate(kart.transform.right, deg, Space.World);
                 var toCam = Flat(target - kart.transform.position);
                 if (toCam.magnitude < 2.4f || Vector3.Dot(dir, toCam) < 0f) break;
                 yield return null;
