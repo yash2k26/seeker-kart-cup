@@ -153,6 +153,10 @@ def dissolve_slivers(bpy, V, F, part, plane, labels):
     n0 = len(bm.faces)
     bmesh.ops.dissolve_degenerate(bm, dist=1e-4, edges=bm.edges[:])
     bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 3])
+    left = [f for f in bm.faces if f.calc_area() < AREA_MIN]
+    if left:          # a sliver whose edges are all longer than 1e-4 (Him's: 3e-4 to 6e-4): its own edges, looser
+        bmesh.ops.dissolve_degenerate(bm, dist=2e-3, edges=list({e for f in left for e in f.edges}))
+        bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 3])
     closed = all(len(e.link_faces) == 2 for e in bm.edges)
     bm.verts.index_update(); bm.faces.ensure_lookup_table()
     V2 = np.array([v.co[:] for v in bm.verts]); F2 = np.array([[v.index for v in f.verts] for f in bm.faces])
