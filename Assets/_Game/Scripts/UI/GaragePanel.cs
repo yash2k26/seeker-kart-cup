@@ -20,7 +20,7 @@ namespace KartCup
         [SerializeField] Button primaryButton, secondaryButton, tertiaryButton;   // tertiary: PAY in ORE, the right half of the SOL row
         [SerializeField] Image[] swatches = System.Array.Empty<Image>();   // 0 = driver colour, then Paints.All
         [SerializeField] StatBar[] powerBars = System.Array.Empty<StatBar>();   // SPEED, TURBO, GRIP, ARMOR, ATTACK
-        [SerializeField] float baseYaw = 65f, spin = 14f;   // same turntable as CharacterCarousel
+        [SerializeField] float baseYaw = 65f, spin = 24f;   // the turntable, turning visibly: a kart with nobody in it is a showroom piece
 
         GameObject current;
         int index;
@@ -110,10 +110,10 @@ namespace KartCup
 
             if (current != null) Destroy(current);
             var kartPrefab = kartPrefabs.FirstOrDefault(k => k.name == "Kart_" + def.id) ?? kartPrefabs.FirstOrDefault();
-            var driverPrefab = character != null ? driverPrefabs.FirstOrDefault(d => d.name.EndsWith(character.driverId)) : null;
             var paint = FocusedPaint;
             var colour = paint != null ? paint.color : Paints.ColorFor(character, def.id);
-            if (kartPrefab != null && podium != null) current = CharacterCarousel.Mount(kartPrefab, driverPrefab ?? driverPrefabs.FirstOrDefault(), podium, colour, Application.isPlaying);
+            // the kart alone on the turntable (9 Oct 2026, user: "kart selection shouldn't have characters on it"): the driver is chosen a screen earlier
+            if (kartPrefab != null && podium != null) current = CharacterCarousel.Mount(kartPrefab, null, podium, colour, Application.isPlaying);
             if (current != null && (paint != null ? paint.gold : Paints.GoldOn(def.id))) CharacterDef.Paint(current, colour, gold: true);   // 24k is a metal
             Frame(current);
 
