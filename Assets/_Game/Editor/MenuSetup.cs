@@ -529,7 +529,7 @@ public static partial class MenuSetup
         var catcher = Rect("SwipeCatcher", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         catcher.gameObject.AddComponent<Image>().color = Color.clear;
         var swipe = catcher.gameObject.AddComponent<SwipeSelect>();
-        new SerializedObject(swipe).Do(s => s.FindProperty("carousel").objectReferenceValue = carousel);
+        new SerializedObject(swipe).Do(s => { s.FindProperty("carousel").objectReferenceValue = carousel; s.FindProperty("flick").boolValue = false; });
 
         Header(screen.transform, "CHOOSE YOUR DRIVER", nameof(ScreenFlow.ShowTitle), "STEP 1 OF 2");
         var gemCorner = Rect("GemCorner", screen.transform, new Vector2(1, 1), new Vector2(1, 1), Vector2.zero, Vector2.zero);
@@ -693,7 +693,7 @@ public static partial class MenuSetup
         var catcher = Rect("SwipeCatcher", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         catcher.gameObject.AddComponent<Image>().color = Color.clear;
         var swipe = catcher.gameObject.AddComponent<SwipeSelect>();
-        new SerializedObject(swipe).Do(s => s.FindProperty("carousel").objectReferenceValue = carousel);
+        new SerializedObject(swipe).Do(s => s.FindProperty("carousel").objectReferenceValue = carousel);   // the track cards keep their flick
 
         Header(screen.transform, "CHOOSE A TRACK", nameof(ScreenFlow.ShowSelect), "STEP 2 OF 2");
 
@@ -1154,7 +1154,7 @@ public static partial class MenuSetup
         var catcher = Rect("SwipeCatcher", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         catcher.gameObject.AddComponent<Image>().color = Color.clear;
         var swipe = catcher.gameObject.AddComponent<SwipeSelect>();
-        new SerializedObject(swipe).Do(s => s.FindProperty("carousel").objectReferenceValue = garage);
+        new SerializedObject(swipe).Do(s => { s.FindProperty("carousel").objectReferenceValue = garage; s.FindProperty("flick").boolValue = false; });
 
         ShopHeader(screen.transform, "GARAGE", 0);
         var card = Rect("Card", screen.transform, Vector2.zero, new Vector2(0, 1), Vector2.zero, Vector2.zero);

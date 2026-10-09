@@ -27,6 +27,9 @@ namespace KartCup
         [SerializeField] Carousel carousel;
         [SerializeField] float flickPixels = 90f;      // at 420 dpi; scaled below
         [SerializeField] float degreesPerPixel = 0.25f;
+        /// A flick steps to the next one. Off on the driver and kart screens (10 Oct 2026, the user: a drag to look a
+        /// kart over kept switching karts); the arrows and the roster strip step there, the drag only turns.
+        [SerializeField] bool flick = true;
 
         float startX;
 
@@ -45,9 +48,10 @@ namespace KartCup
         {
             if (carousel == null) return;
             carousel.Dragging = false;
+            if (!flick) return;
             float dx = e.position.x - startX;
-            float flick = flickPixels * DpiScale();
-            if (Mathf.Abs(dx) <= flick) return;
+            float threshold = flickPixels * DpiScale();
+            if (Mathf.Abs(dx) <= threshold) return;
             if (dx < 0) carousel.Next(); else carousel.Previous();
             Haptics.Play(Haptics.Kind.Tick);          // a flick has no button to click for it
             AudioDirector.Instance?.Click();

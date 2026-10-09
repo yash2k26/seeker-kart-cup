@@ -38,7 +38,20 @@ namespace KartCup
             var engine = ka != null && ka.engineSnd != null ? ka.engineSnd : sources.FirstOrDefault(a => a.name == "EngineSnd");
             var tyres = sources.FirstOrDefault(a => a.name == "TireSnd");
             var oneShot = ka != null && ka.oneShotSource != null ? ka.oneShotSource : sources.FirstOrDefault(a => a.name == "OneShotSnd");
-            var smoke = kart.GetComponentsInChildren<ParticleSystem>(true).Where(ps => ps.name.StartsWith("DriftParticles")).ToArray();
+            var sparks = kart.GetComponentsInChildren<ParticleSystem>(true).Where(ps => ps.name.StartsWith("DriftParticles")).ToArray();   // the kit's drift sparks
+            // Tyre smoke: the kit has none (its drift systems are sparks), so the dark exhaust puffs are cloned onto the two
+            // rear wheels, bigger and longer-lived, and emitted by hand through the turn and the first stretch of the run.
+            var dark = kart.GetComponentsInChildren<ParticleSystem>(true).FirstOrDefault(ps => ps.name.StartsWith("ExhaustDark"));
+            var rear = kart.GetComponentsInChildren<KartWheel>(true).OrderBy(w => kart.transform.InverseTransformPoint(w.transform.position).z).Take(2).ToArray();
+            var smoke = new System.Collections.Generic.List<ParticleSystem>();
+            if (dark != null)
+                foreach (var w in rear)
+                {
+                    var puff = Instantiate(dark.gameObject, w.transform).GetComponent<ParticleSystem>();
+                    puff.name = "TyreSmoke"; puff.transform.localPosition = new Vector3(0f, -0.2f, -0.3f); puff.transform.localRotation = Quaternion.identity;
+                    var main = puff.main; main.startSizeMultiplier *= 3f; main.startLifetimeMultiplier *= 1.6f; main.simulationSpace = ParticleSystemSimulationSpace.World;
+                    puff.gameObject.SetActive(true); smoke.Add(puff);
+                }
             var exhaust = kart.GetComponentsInChildren<ParticleSystem>(true).Where(ps => ps.name.StartsWith("ExhaustParticles") || ps.name.StartsWith("BoostParticles")).ToArray();
             void Start(AudioSource a, AudioClip clip, float volume, float pitch, bool loop)
             {
@@ -78,13 +91,20 @@ namespace KartCup
             var dir = Flat(target - kart.transform.position).normalized;
             var startRot = kart.transform.rotation; var aim = Quaternion.LookRotation(dir, Vector3.up);
             Start(tyres, ka != null && ka.defaultTireSnd != null ? ka.defaultTireSnd : screechClip, 0.8f, 1.05f, true);
-            foreach (var ps in smoke) { ps.gameObject.SetActive(true); ps.Play(true); }
+            // The kit's drift systems emit 15 a second, a haze over a long slide: a turn this short needs its smoke emitted
+            // by hand, a cloud at the launch and a stream through the run.
+            foreach (var ps in smoke) { ps.Play(true); ps.Emit(16); }
+            foreach (var ps in sparks) { ps.gameObject.SetActive(true); ps.Play(true); }
             for (float turn = 0f; turn < 1f && kart != null; turn = Mathf.MoveTowards(turn, 1f, Time.deltaTime / 0.22f))
             {
                 kart.transform.rotation = Quaternion.Slerp(startRot, aim, Mathf.SmoothStep(0f, 1f, turn));
                 if (engine != null) engine.pitch = Mathf.Lerp(0.6f, 1.1f, turn);   // revving up for the launch
+                foreach (var ps in smoke) ps.Emit(Mathf.CeilToInt(180f * Time.deltaTime));
+                foreach (var ps in sparks) ps.Emit(Mathf.CeilToInt(120f * Time.deltaTime));
                 yield return null;
             }
+            foreach (var ps in smoke) ps.Emit(30);   // the wheels light up as it goes
+            foreach (var ps in sparks) ps.Emit(30);
             if (kart != null) kart.transform.rotation = aim;
             float speed = 0f, ran = 0f;
             Haptics.Play(Haptics.Kind.Boost);
@@ -99,7 +119,9 @@ namespace KartCup
                 foreach (var w in wheels) if (w != null) w.Rotate(kart.transform.right, deg, Space.World);
                 if (engine != null) engine.pitch = Mathf.Lerp(1.1f, 1.75f, speed / 34f);
                 if (tyres != null && ran > 0.35f && tyres.isPlaying) { tyres.volume = Mathf.MoveTowards(tyres.volume, 0f, dt * 3f); if (tyres.volume <= 0f) tyres.Stop(); }   // the wheels hook up: the screech dies
-                if (ran > 0.45f) foreach (var ps in smoke) if (ps.isEmitting) ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+                if (ran <= 0.5f) { foreach (var ps in smoke) ps.Emit(Mathf.CeilToInt(160f * (1f - ran / 0.5f) * dt)); foreach (var ps in sparks) ps.Emit(Mathf.CeilToInt(80f * (1f - ran / 0.5f) * dt)); }   // thinning as the wheels hook up
+                else { foreach (var ps in smoke) if (ps.isEmitting) ps.Stop(true, ParticleSystemStopBehavior.StopEmitting); foreach (var ps in sparks) if (ps.isEmitting) ps.Stop(true, ParticleSystemStopBehavior.StopEmitting); }
+                foreach (var ps in exhaust) ps.Emit(Mathf.CeilToInt(90f * dt));
                 var toCam = Flat(target - kart.transform.position);
                 if (toCam.magnitude < 2.4f || Vector3.Dot(dir, toCam) < 0f) break;
                 yield return null;
