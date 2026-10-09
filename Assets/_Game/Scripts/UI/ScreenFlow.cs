@@ -20,7 +20,7 @@ namespace KartCup
         Transform homeStage;
         [SerializeField] TMP_Text playLabel;      // says CONTINUE CUP when one is half-run
 
-        const int Select = 1, Track = 4, Rooms = 5, Lobby = 6, Garage = 7, Items = 8, WeeklyScreen = 9, TourScreen = 10, AchievementsScreen = 11, GemsScreen = 12, Front = 13;
+        const int Select = 1, Track = 4, Rooms = 5, Lobby = 6, Garage = 7, Items = 8, WeeklyScreen = 9, TourScreen = 10, AchievementsScreen = 11, GemsScreen = 12, Front = 13, Connect = 14;
         // How deep each panel sits under the title: going deeper slides in from the right, coming back from the left.
         static readonly int[] Depth = { 0, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1 };
 
@@ -58,7 +58,7 @@ namespace KartCup
             if (IsMenu) { Weekly.Racing = false; RaceMode.Clear(); }   // back from a time trial or an event
             // the front door at launch; back from a race, the hub, or the series a series race came from
             int first = startPanel;
-            if (IsMenu) { if (booted) first = TourPanel.Reopen >= 0 ? TourScreen : 0; booted = true; }
+            if (IsMenu) { if (booted) first = TourPanel.Reopen >= 0 ? TourScreen : 0; else if (ConnectPanel.Due) first = Connect; booted = true; }   // the wallet first, once
             Show(first, silent: true);
             // A cup already under way turns the front door into a continue: the character is settled, so re-picking
             // one would just throw the standings away.
@@ -88,6 +88,7 @@ namespace KartCup
             // and leave it to PauseMenu, so the panel check comes first.
             if (!IsMenu || Keyboard.current == null || !Keyboard.current.escapeKey.wasPressedThisFrame) return;
             if (current == Lobby) { AudioDirector.Instance?.Back(); LeaveRoom(); Show(Rooms, silent: false); }        // back out of a lobby = leave it
+            else if (current == Connect) { AudioDirector.Instance?.Back(); FindFirstObjectByType<ConnectPanel>()?.Guest(); }   // back here is "play as guest"
             else if (current == Front) Application.Quit();
             else if (current == TourScreen && (FindFirstObjectByType<TourPanel>()?.Back() ?? false)) AudioDirector.Instance?.Back();   // a series' events step back to the cards
             else if (current > 0) { AudioDirector.Instance?.Back(); Show(current == Track ? Select : current == Items ? Garage : 0, silent: false); }   // back retraces one step: track to select, items to karts

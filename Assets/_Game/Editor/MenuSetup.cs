@@ -65,6 +65,7 @@ public static partial class MenuSetup
         var achievementsScreen = AchievementsScreen(safe);
         var gemsScreen = GemsScreen(safe);
         var front = FrontScreen(safe);
+        var connect = ConnectScreen(safe);
         // the title's hero: the chosen driver by the chosen kart on the street's home stage
         var home = title.AddComponent<HomeStage>();
         new SerializedObject(home).Do(s =>
@@ -83,7 +84,7 @@ public static partial class MenuSetup
         so.FindProperty("roster").objectReferenceValue = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
         so.FindProperty("playLabel").objectReferenceValue = title.transform.Find("Plate/Actions/Quick/QuickFace/QuickLabel")?.GetComponent<TMP_Text>();   // the quick-race door says CONTINUE CUP mid-cup
         var panels = so.FindProperty("panels");
-        panels.arraySize = 14;
+        panels.arraySize = 15;
         panels.GetArrayElementAtIndex(0).objectReferenceValue = title;
         panels.GetArrayElementAtIndex(1).objectReferenceValue = select;
         panels.GetArrayElementAtIndex(2).objectReferenceValue = board;
@@ -98,6 +99,7 @@ public static partial class MenuSetup
         panels.GetArrayElementAtIndex(11).objectReferenceValue = achievementsScreen;
         panels.GetArrayElementAtIndex(12).objectReferenceValue = gemsScreen;
         panels.GetArrayElementAtIndex(13).objectReferenceValue = front;
+        panels.GetArrayElementAtIndex(14).objectReferenceValue = connect;   // shown once at first launch (ConnectPanel.Due)
         so.FindProperty("startPanel").intValue = 13;   // the front door first; PLAY opens the hub
         so.ApplyModifiedPropertiesWithoutUndo();
 
@@ -405,6 +407,49 @@ public static partial class MenuSetup
         var play = Button("Play", actions, "PLAY", Accent, Paper, 76, new Vector2(1, 0), new Vector2(-64, 48), new Vector2(640, 212), icon: "play");
         Wire(play, nameof(ScreenFlow.ShowTitle));
         Shine(play);
+        return screen;
+    }
+
+    /// First launch (10 Oct 2026): connect the Seeker wallet, or play as a guest. The street behind, a dark wash over it,
+    /// the lockup, one line on why, three perks that are true today, a big CONNECT and a small guest link.
+    static GameObject ConnectScreen(RectTransform parent)
+    {
+        var screen = Rect("Connect", parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject;
+        var panel = screen.AddComponent<ConnectPanel>();
+        var wash = Rect("Wash", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(600, 600));
+        wash.gameObject.AddComponent<Image>().color = new Color(Deep.r, Deep.g, Deep.b, 0.78f);
+        var logo = Rect("Logo", screen.transform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -40), new Vector2(760, 280));
+        logo.pivot = new Vector2(0.5f, 1);
+        var mark = logo.gameObject.AddComponent<Image>(); mark.sprite = UiSprite(Art + "Textures/UI/kartel_lockup.png"); mark.preserveAspect = true; mark.raycastTarget = false;
+        Label("Title", screen.transform, display, "CONNECT YOUR SEEKER WALLET", 84, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -330), new Vector2(2000, 100));
+        Label("Why", screen.transform, body, "One tap and a fingerprint: Seed Vault is built into your Seeker.", 36, Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -436), new Vector2(1800, 50));
+        var perks = new (string icon, string text)[]
+        {
+            ("star", $"+{ConnectPanel.StarterGems} STARTER GEMS"), ("user", "YOUR .SKR NAME ON THE GRID"), ("kart", "SEEKER EDITION KART FOR GENESIS HOLDERS"),
+        };
+        for (int i = 0; i < perks.Length; i++)
+        {
+            var row = Rect("Perk" + i, screen.transform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2((i - 1) * 640, -540), new Vector2(600, 110));
+            row.pivot = new Vector2(0.5f, 1);
+            Design.AsRow(row, Design.Ink700).raycastTarget = false;
+            var ic = Rect("Icon", row, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(60, 0), new Vector2(64, 64));
+            var ii = ic.gameObject.AddComponent<Image>(); ii.sprite = IconSprite(perks[i].icon); ii.color = Accent; ii.preserveAspect = true; ii.raycastTarget = false;
+            var t = Label("Text", row, strong, perks[i].text, 30, Paper, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(116, 0), new Vector2(460, 90));
+            t.enableAutoSizing = true; t.fontSizeMin = 20; t.fontSizeMax = 30; t.textWrappingMode = TextWrappingModes.Normal;
+        }
+        var connect = Button("Connect", screen.transform, "CONNECT", Accent, Paper, 72, new Vector2(0.5f, 0), new Vector2(0, 190), new Vector2(760, 170), icon: "user");
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(connect.onClick, panel.Connect);
+        Shine(connect);
+        var guest = Label("Guest", screen.transform, strong, "Play as guest", 40, Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 90), new Vector2(600, 80));
+        guest.raycastTarget = true;
+        var gb = guest.gameObject.AddComponent<Button>(); gb.transition = Selectable.Transition.None;
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(gb.onClick, panel.Guest);
+        var status = Label("Status", screen.transform, body, "", 30, Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(1800, 44));
+        new SerializedObject(panel).Do(s =>
+        {
+            s.FindProperty("status").objectReferenceValue = status;
+            s.FindProperty("connectLabel").objectReferenceValue = connect.GetComponentInChildren<TMP_Text>();
+        });
         return screen;
     }
 
