@@ -73,6 +73,10 @@ public static partial class MenuSetup
             s.FindProperty("karts").objectReferenceValue = AssetDatabase.LoadAssetAtPath<KartDatabase>("Assets/_Game/Data/Karts.asset");
             s.FindProperty("roster").objectReferenceValue = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
             Fill(s.FindProperty("kartPrefabs"), KartSetup.Karts.Select(k => AssetDatabase.LoadAssetAtPath<GameObject>(Prefabs + $"Karts/Kart_{k}.prefab")).Where(k => k != null).Cast<Object>().ToArray());
+            const string kitAudio = "Assets/ThirdParty/PowerslideKartPhysics/Audio/";   // the drive-off's sound, when a kart's own KartAudio lacks one
+            s.FindProperty("engineClip").objectReferenceValue = AssetDatabase.LoadAssetAtPath<AudioClip>(kitAudio + "Engines/Engine1.wav");
+            s.FindProperty("screechClip").objectReferenceValue = AssetDatabase.LoadAssetAtPath<AudioClip>(kitAudio + "Kart/TireScreech.wav");
+            s.FindProperty("launchClip").objectReferenceValue = AssetDatabase.LoadAssetAtPath<AudioClip>(kitAudio + "Kart/BoostStart.wav");
         });
 
         var so = new SerializedObject(flow);

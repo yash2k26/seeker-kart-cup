@@ -25,19 +25,37 @@ namespace KartCup
             StartCoroutine(Drive(done));
         }
 
+        [SerializeField] AudioClip engineClip, screechClip, launchClip;   // the kit's, as fallbacks: a kart's own KartAudio usually carries them
+
         IEnumerator Drive(System.Action done)
         {
             Driving = true;
             var cam = Camera.main;
             var seat = kart.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "DriverSeat");
-            // 1. the hop: up and over, into the seat; then the seated driver takes over
+            // the kart's own sound and smoke, which the garage display had switched off (CharacterCarousel.Mount)
+            var ka = kart.GetComponentInChildren<KartAudio>(true);
+            var sources = kart.GetComponentsInChildren<AudioSource>(true);
+            var engine = ka != null && ka.engineSnd != null ? ka.engineSnd : sources.FirstOrDefault(a => a.name == "EngineSnd");
+            var tyres = sources.FirstOrDefault(a => a.name == "TireSnd");
+            var oneShot = ka != null && ka.oneShotSource != null ? ka.oneShotSource : sources.FirstOrDefault(a => a.name == "OneShotSnd");
+            var smoke = kart.GetComponentsInChildren<ParticleSystem>(true).Where(ps => ps.name.StartsWith("DriftParticles")).ToArray();
+            var exhaust = kart.GetComponentsInChildren<ParticleSystem>(true).Where(ps => ps.name.StartsWith("ExhaustParticles") || ps.name.StartsWith("BoostParticles")).ToArray();
+            void Start(AudioSource a, AudioClip clip, float volume, float pitch, bool loop)
+            {
+                if (a == null) return;
+                a.enabled = true; a.gameObject.SetActive(true);
+                if (a.clip == null) a.clip = clip;
+                a.loop = loop; a.volume = volume; a.pitch = pitch;
+                if (a.clip != null && !a.isPlaying) a.Play();
+            }
+            // 1. the hop: up and over, into the seat; the engine catches as the driver lands
             if (driver != null && seat != null)
             {
                 Vector3 from = driver.transform.position; Quaternion fromRot = driver.transform.rotation;
                 Haptics.Play(Haptics.Kind.Tick); AudioDirector.Instance?.Click();
-                for (float t = 0f; t < 0.55f && driver != null; t += Time.deltaTime)
+                for (float t = 0f; t < 0.4f && driver != null; t += Time.deltaTime)
                 {
-                    float u = Mathf.Clamp01(t / 0.55f);
+                    float u = Mathf.Clamp01(t / 0.4f);
                     var p = Vector3.Lerp(from, seat.position, u); p.y += Mathf.Sin(u * Mathf.PI) * 1.7f;
                     driver.transform.position = p; driver.transform.rotation = Quaternion.Slerp(fromRot, seat.rotation, u);
                     yield return null;
@@ -46,33 +64,42 @@ namespace KartCup
                 var prefab = carousel != null ? carousel.DriverPrefabFor(roster != null ? roster.Selected : null) : null;
                 if (prefab != null && kart != null) { var d = Instantiate(prefab, seat); d.transform.localPosition = Vector3.zero; d.transform.localRotation = Quaternion.identity; }
                 Haptics.Play(Haptics.Kind.Land);
-                yield return new WaitForSeconds(0.12f);
             }
             if (kart == null) { Driving = false; done?.Invoke(); yield break; }
-            // 2. round to face the camera, then go: faster and faster until the nose is in the lens
+            Start(engine, engineClip, 0.9f, 0.6f, true);
+            yield return new WaitForSeconds(0.05f);
+            // 2. round on the spot, tyres screeching and smoking (a slide while turning read as the kart skating), then
+            // straight at the camera, faster and faster until the nose is in the lens. The wheels roll about the kart's
+            // axle (KartWheel points a wheel's own forward along the axle, so a local X spin tilts it): world-space,
+            // about transform.right, forward positive.
             var wheels = kart.GetComponentsInChildren<KartWheel>().Select(w => w.visualWheel).Where(w => w != null).ToArray();
             Vector3 target = cam != null ? cam.transform.position : kart.transform.position + kart.transform.forward * 20f;
             Vector3 Flat(Vector3 v) { v.y = 0f; return v; }
             var dir = Flat(target - kart.transform.position).normalized;
             var startRot = kart.transform.rotation; var aim = Quaternion.LookRotation(dir, Vector3.up);
-            // round on the spot first (a slide while turning read as the kart skating), then straight at the camera.
-            // The wheels roll about the kart's axle (KartWheel points a wheel's own forward along the axle, so a local X
-            // spin tilts it instead): world-space, about transform.right, forward positive.
-            for (float turn = 0f; turn < 1f && kart != null; turn = Mathf.MoveTowards(turn, 1f, Time.deltaTime / 0.35f))
+            Start(tyres, ka != null && ka.defaultTireSnd != null ? ka.defaultTireSnd : screechClip, 0.8f, 1.05f, true);
+            foreach (var ps in smoke) { ps.gameObject.SetActive(true); ps.Play(true); }
+            for (float turn = 0f; turn < 1f && kart != null; turn = Mathf.MoveTowards(turn, 1f, Time.deltaTime / 0.22f))
             {
                 kart.transform.rotation = Quaternion.Slerp(startRot, aim, Mathf.SmoothStep(0f, 1f, turn));
+                if (engine != null) engine.pitch = Mathf.Lerp(0.6f, 1.1f, turn);   // revving up for the launch
                 yield return null;
             }
             if (kart != null) kart.transform.rotation = aim;
-            float speed = 0f;
-            Haptics.Play(Haptics.Kind.Boost); AudioDirector.Instance?.Confirm();
+            float speed = 0f, ran = 0f;
+            Haptics.Play(Haptics.Kind.Boost);
+            if (oneShot != null) { oneShot.enabled = true; oneShot.gameObject.SetActive(true); var launch = ka != null && ka.boostStartSnd != null ? ka.boostStartSnd : launchClip; if (launch != null) oneShot.PlayOneShot(launch, 0.9f); }
+            foreach (var ps in exhaust) { ps.gameObject.SetActive(true); ps.Play(true); }
             while (kart != null)
             {
-                float dt = Time.deltaTime;
-                speed = Mathf.Min(speed + 30f * dt, 28f);
+                float dt = Time.deltaTime; ran += dt;
+                speed = Mathf.Min(speed + 45f * dt, 34f);
                 kart.transform.position += dir * speed * dt;
                 float deg = speed * dt / 0.35f * Mathf.Rad2Deg;   // a 0.35 m wheel: distance over radius, in degrees
                 foreach (var w in wheels) if (w != null) w.Rotate(kart.transform.right, deg, Space.World);
+                if (engine != null) engine.pitch = Mathf.Lerp(1.1f, 1.75f, speed / 34f);
+                if (tyres != null && ran > 0.35f && tyres.isPlaying) { tyres.volume = Mathf.MoveTowards(tyres.volume, 0f, dt * 3f); if (tyres.volume <= 0f) tyres.Stop(); }   // the wheels hook up: the screech dies
+                if (ran > 0.45f) foreach (var ps in smoke) if (ps.isEmitting) ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
                 var toCam = Flat(target - kart.transform.position);
                 if (toCam.magnitude < 2.4f || Vector3.Dot(dir, toCam) < 0f) break;
                 yield return null;
