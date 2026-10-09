@@ -36,6 +36,14 @@ namespace KartCup
         [SerializeField] string[] portraitIds = System.Array.Empty<string>();
         [SerializeField] Sprite[] portraits = System.Array.Empty<Sprite>();
         bool picking = true;
+        /// Set by the race results' CONTINUE: the menu opens on this series' events.
+        public static int Reopen = -1;
+        // inside a series: a tile an event, a bar along the bottom
+        [SerializeField] GameObject[] tiles = System.Array.Empty<GameObject>(), tileLocks = System.Array.Empty<GameObject>();
+        [SerializeField] TMP_Text[] tileNums = System.Array.Empty<TMP_Text>(), tileGates = System.Array.Empty<TMP_Text>();
+        [SerializeField] Image[] tileStars = System.Array.Empty<Image>(), tileBoss = System.Array.Empty<Image>();
+        [SerializeField] TMP_Text seriesTitle, seriesTotal;
+        [SerializeField] Image cardPic;
         int pendingRow = -1;
 
         int cup = -1;
@@ -44,6 +52,7 @@ namespace KartCup
         {
             if (cup < 0) cup = Enumerable.Range(0, Tour.Cups.Length).Where(Tour.Open).DefaultIfEmpty(0).Max();   // the furthest open cup
             picking = true;
+            if (Reopen >= 0) { cup = Mathf.Clamp(Reopen, 0, Tour.Cups.Length - 1); picking = false; Reopen = -1; }
             Show();
         }
 
@@ -67,7 +76,7 @@ namespace KartCup
         public void Play(int row)
         {
             var c = Tour.Cups[cup];
-            if (!Tour.Open(cup) || row >= c.events.Length) { Haptics.Play(Haptics.Kind.Tick); AudioDirector.Instance?.Error(); return; }
+            if (row >= c.events.Length || !Tour.EventOpen(cup, row)) { Haptics.Play(Haptics.Kind.Tick); AudioDirector.Instance?.Error(); return; }
             if (card == null) { ScreenFlow.Instance?.StartTourEvent(c.events[row], c); return; }
             pendingRow = row;
             ShowCard(c, row);
@@ -90,26 +99,25 @@ namespace KartCup
 
         void ShowCard(Tour.CupDef c, int row)
         {
+            // Beach Buggy's event card: the circuit at the left, the mode, stars, goal and reward in the middle, the best
+            // time and the rule at the right, PLAY at the bottom right
             var e = c.events[row];
-            bool duel = e.mode == RaceMode.Kind.Duel, boss = row == c.events.Length - 1;
-            var rival = duel && roster != null && e.rival >= 0 ? roster.At(e.rival) : null;
+            bool boss = row == c.events.Length - 1;
+            var rival = e.mode == RaceMode.Kind.Duel && roster != null && e.rival >= 0 ? roster.At(e.rival) : null;
             int got = Tour.Stars(e.id);
+            var track = Tracks.At(e.track);
             if (cardMode != null) cardMode.text = boss ? "BOSS DUEL" : RaceMode.Name(e.mode);
             if (cardTitle != null) cardTitle.text = e.title.ToUpperInvariant();
-            if (cardTrack != null) cardTrack.text = Tracks.At(e.track).name.ToUpperInvariant() + "  ·  " + c.name;
-            if (cardRule != null) cardRule.text = e.mode switch
-            {
-                RaceMode.Kind.Duel => rival != null ? $"One on one against {rival.displayName}. First over the line wins." : "One on one. First over the line wins.",
-                RaceMode.Kind.Elimination => "The last kart is knocked out every 15 seconds. Be the last one left.",
-                _ => "Race the other drivers to the finish line.",
-            };
-            if (cardGoal != null) cardGoal.text = duel ? "WIN THE DUEL  ·  3 STARS" : "1ST  3 STARS   ·   2ND  2   ·   3RD  1";
+            if (cardTrack != null) cardTrack.text = track.name.ToUpperInvariant();
+            if (cardPic != null) { cardPic.sprite = e.track < trackArt.Length ? trackArt[e.track] : null; cardPic.enabled = cardPic.sprite != null; }
+            if (cardRule != null) cardRule.text = Tour.Rule(e, rival?.displayName);
+            if (cardGoal != null) cardGoal.text = Tour.Goal(e);
             var paint = boss ? Paints.All.FirstOrDefault(p => p.sku == c.bossPaint) : null;
-            if (cardPrize != null) cardPrize.text = boss ? (Tour.BossBeaten(cup) ? $"{paint?.name}  ·  WON" : $"{paint?.name ?? "A PAINT"}  +  GOLDEN CHEST") : got >= Tour.StarsPerEvent ? "ALL STARS WON" : "STARS TOWARD THE NEXT CUP";
-            float best = Tracks.Best(Tracks.At(e.track).id);
-            if (cardBest != null) cardBest.text = best > 0f ? $"YOUR BEST  {RaceHud.Clock(best)}" : "NO BEST YET";
+            if (cardPrize != null) cardPrize.text = boss ? (Tour.BossBeaten(cup) ? "WON" : $"{paint?.name ?? "PAINT"}") : got >= Tour.StarsPerEvent ? "ALL STARS" : "5 GEMS";
+            float best = Tracks.Best(track.id);
+            if (cardBest != null) cardBest.text = best > 0f ? RaceHud.Clock(best) : "--:--";
             for (int k = 0; k < cardStars.Length; k++)
-                if (cardStars[k] != null) { cardStars[k].color = (duel ? got > 0 : k < got) ? starOn : starOff; cardStars[k].gameObject.SetActive(!duel || k == 1); }
+                if (cardStars[k] != null) { cardStars[k].color = k < got ? starOn : starOff; cardStars[k].gameObject.SetActive(true); }
         }
 
         public void ChangeDriver() => ScreenFlow.Instance?.ChangeDriverFromTour();
@@ -150,6 +158,29 @@ namespace KartCup
                         : $"{k.name}\n<size=62%>LOCKED  ·  {k.gate} STARS TO OPEN</size>";
                 }
             }
+            // inside the series: the tiles and the bar
+            for (int i = 0; i < tiles.Length; i++)
+            {
+                bool has = i < c.events.Length;
+                if (tiles[i] != null) tiles[i].SetActive(has);
+                if (!has) continue;
+                var e = c.events[i]; int got = Tour.Stars(e.id); bool evOpen = Tour.EventOpen(cup, i), boss = i == c.events.Length - 1;
+                if (i < tileNums.Length && tileNums[i] != null) { tileNums[i].text = (i + 1).ToString(); tileNums[i].gameObject.SetActive(!boss && evOpen); }
+                if (i < tileBoss.Length && tileBoss[i] != null)
+                {
+                    var bossDef = roster != null && c.boss >= 0 && c.boss < roster.characters.Length ? roster.characters[c.boss] : null;
+                    int p = bossDef != null ? System.Array.IndexOf(portraitIds, bossDef.driverId) : -1;
+                    tileBoss[i].sprite = p >= 0 && p < portraits.Length ? portraits[p] : null;
+                    tileBoss[i].enabled = boss && tileBoss[i].sprite != null;
+                    tileBoss[i].color = evOpen ? Color.white : new Color(0.35f, 0.32f, 0.5f);
+                }
+                if (i < tileLocks.Length && tileLocks[i] != null) tileLocks[i].SetActive(!evOpen);
+                if (i < tileGates.Length && tileGates[i] != null) tileGates[i].text = Tour.EventGate(i).ToString();
+                for (int k = 0; k < 3; k++)
+                    if (i * 3 + k < tileStars.Length && tileStars[i * 3 + k] != null) tileStars[i * 3 + k].color = k < got ? starOn : starOff;
+            }
+            if (seriesTitle != null) seriesTitle.text = c.name;
+            if (seriesTotal != null) seriesTotal.text = $"{Tour.CupStars(cup)} / {c.events.Length * Tour.StarsPerEvent}";
             if (total != null) total.text = $"{Tour.Total} / {Tour.MaxStars}";
             if (cupName != null) cupName.text = c.name;
             if (cupState != null)

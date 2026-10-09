@@ -87,6 +87,17 @@ namespace KartCup
         public static int Total => S.best.Sum(e => e.stars);
         public static int CupStars(int cup) => Cups[cup].events.Sum(e => Stars(e.id));
         public static bool Open(int cup) => Total >= Cups[cup].gate;
+        /// Inside a series (Beach Buggy's): the first two events are open, the rest open as the series' own stars come in.
+        public static readonly int[] EventGates = { 0, 0, 1, 3, 6 };
+        public static int EventGate(int i) => EventGates[Mathf.Clamp(i, 0, EventGates.Length - 1)];
+        public static bool EventOpen(int cup, int i) => Open(cup) && CupStars(cup) >= EventGate(i);
+        public static string Goal(Event e) => e.mode switch { RaceMode.Kind.Duel => "WIN", RaceMode.Kind.Elimination => "LAST ONE IN", _ => "1ST" };
+        public static string Rule(Event e, string rival) => e.mode switch
+        {
+            RaceMode.Kind.Duel => rival != null ? $"One on one against {rival}. First over the line wins." : "One on one. First over the line wins.",
+            RaceMode.Kind.Elimination => "The last kart is knocked out every 15 seconds. Be the last one left.",
+            _ => "Race the other drivers to the finish line.",
+        };
         public static bool BossBeaten(int cup) => Stars(Cups[cup].events[^1].id) > 0;
         public static (CupDef cup, Event ev) Find(string id)
         {
@@ -95,7 +106,7 @@ namespace KartCup
         }
 
         /// What the last Tour race earned, for the results card (TourResult).
-        public sealed class Result { public string title; public int stars, gained; public string unlocked, prize; }
+        public sealed class Result { public string id, title; public int stars, gained, place; public float time; public string unlocked, prize; }
         public static Result Last { get; private set; }
         public static void ClearLast() => Last = null;
 
@@ -107,13 +118,13 @@ namespace KartCup
         }
 
         /// The race is over: keep the best stars, open what they open, pay a beaten boss.
-        public static Result Record(string id, int place)
+        public static Result Record(string id, int place, float time = 0f)
         {
             var (cup, ev) = Find(id);
             if (ev == null) return null;
             int stars = ev.mode == RaceMode.Kind.Duel ? (place == 1 ? 3 : 0) : place >= 1 && place <= 3 ? 4 - place : 0;
             int before = Stars(id), totalBefore = Total;
-            var r = new Result { title = ev.title, stars = stars, gained = Mathf.Max(0, stars - before) };
+            var r = new Result { id = id, title = ev.title, stars = stars, gained = Mathf.Max(0, stars - before), place = place, time = time };
             if (stars > before)
             {
                 var e = S.best.FirstOrDefault(x => x.id == id);

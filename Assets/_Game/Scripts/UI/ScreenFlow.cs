@@ -56,7 +56,10 @@ namespace KartCup
         void Start()
         {
             if (IsMenu) { Weekly.Racing = false; RaceMode.Clear(); }   // back from a time trial or an event
-            Show(startPanel, silent: true);
+            // the front door at launch; back from a race, the hub, or the series a series race came from
+            int first = startPanel;
+            if (IsMenu) { if (booted) first = TourPanel.Reopen >= 0 ? TourScreen : 0; booted = true; }
+            Show(first, silent: true);
             // A cup already under way turns the front door into a continue: the character is settled, so re-picking
             // one would just throw the standings away.
             if (playLabel != null) playLabel.text = Resuming ? "CONTINUE CUP" : "PLAY";
@@ -68,6 +71,7 @@ namespace KartCup
         }
 
         static bool Resuming => Cup.Active && Cup.RaceIndex > 0;
+        static bool booted;
 
         /// The title's primary button. A cup in flight goes straight to the grid; otherwise to the track pick: the driver and
         /// kart on the home stage are the ones you race (the DRIVER tile changes them), Beach Buggy's hub.

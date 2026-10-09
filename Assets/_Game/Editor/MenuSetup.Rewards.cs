@@ -195,107 +195,113 @@ public static partial class MenuSetup
         }
         Label("Caption", pick, body, "Choose the race series you want to play.", 34, Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(1600, 50));
         var detail = Rect("Detail", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-
-        // left: the cup, how far through it you are, the boss's prize, and who is driving
-        var info = Rect("Card", detail, new Vector2(0, 0), new Vector2(0, 0), new Vector2(64, 40), new Vector2(700, 720));
-        info.pivot = Vector2.zero;
-        Design.AsCard(info, Panel);
-        var cupName = Label("CupName", info, display, "ROOKIE RUN", 64, Paper, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(44, -40), new Vector2(620, 80));
-        cupName.enableAutoSizing = true; cupName.fontSizeMin = 40; cupName.fontSizeMax = 64;
-        var cupState = Label("CupState", info, body, "", 28, Muted, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(46, -130), new Vector2(610, 90));
-        cupState.textWrappingMode = TextWrappingModes.Normal;
-        Label("PrizeCap", info, strong, "BOSS PRIZE", 24, Muted, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(46, -250), new Vector2(400, 34)).characterSpacing = 8f;
-        var swatch = Rect("Swatch", info, new Vector2(0, 1), new Vector2(0, 1), new Vector2(46, -296), new Vector2(110, 110));
-        swatch.pivot = new Vector2(0, 1);
-        var sw = Design.AsPill(swatch, Accent); sw.raycastTarget = false;
-        var prize = Label("Prize", info, strong, "", 30, Paper, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(180, -330), new Vector2(480, 80));
-        prize.textWrappingMode = TextWrappingModes.Normal; prize.enableAutoSizing = true; prize.fontSizeMin = 22; prize.fontSizeMax = 30;
-        var who = Label("Driver", info, strong, "", 30, Paper, TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(46, 190), new Vector2(610, 44));
-        who.characterSpacing = 4f;
-        var change = Button("Change", info, "CHANGE DRIVER", Slate, Paper, 34, new Vector2(0, 0), new Vector2(40, 40), new Vector2(420, 120), icon: "user");
-        UnityEditor.Events.UnityEventTools.AddPersistentListener(change.onClick, panel.ChangeDriver);
-
-        // right: the five events
-        var list = Rect("List", detail, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-64, 40), new Vector2(1420, 720));
-        list.pivot = new Vector2(1, 0);
-        Design.AsCard(list, Panel);
-        const int count = 5; const float rowH = 122f, gap = 12f;
-        var rows = new GameObject[count]; var titles = new TMP_Text[count]; var modes = new TMP_Text[count]; var tracks = new TMP_Text[count];
-        var stars = new Image[count * 3]; var playBacks = new Image[count]; var plays = new Button[count];
-        for (int i = 0; i < count; i++)
+        // Inside a series (Beach Buggy's): its events as tiles, three stars across each top, the number on a faint
+        // chequered flag; a locked one a padlock with the stars it needs (Tour.EventGates); the boss's tile wears the
+        // boss's face. A bar along the bottom: the series and its stars. A tap opens the event card.
+        int ev = 5; const float tileW = 300f, tileH = 230f, tileGap = 40f;
+        var tiles = new GameObject[ev]; var tileNums = new TMP_Text[ev]; var tileStars = new Image[ev * 3];
+        var tileLocks = new GameObject[ev]; var tileGates = new TMP_Text[ev]; var tileBoss = new Image[ev];
+        for (int i = 0; i < ev; i++)
         {
-            var rt = Rect("Event" + i, list, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -30 - i * (rowH + gap)), new Vector2(1360, rowH));
-            rt.pivot = new Vector2(0.5f, 1);
-            Design.AsRow(rt, Slate).raycastTarget = false;
-            var num = Rect("Num", rt, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(64, 0), new Vector2(76, 76));
-            Design.AsPill(num, Deep).raycastTarget = false;
-            Label("NumLabel", num, display, i == count - 1 ? "B" : (i + 1).ToString(), 40, i == count - 1 ? Accent : Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 2), new Vector2(76, 76));
-            titles[i] = Label("Title", rt, display, "", 40, Paper, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(124, 20), new Vector2(620, 52));
-            titles[i].enableAutoSizing = true; titles[i].fontSizeMin = 26; titles[i].fontSizeMax = 40;
-            modes[i] = Label("Mode", rt, strong, "", 24, Accent, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(126, -26), new Vector2(240, 34));
-            modes[i].characterSpacing = 6f;
-            tracks[i] = Label("Track", rt, body, "", 24, Muted, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(330, -26), new Vector2(360, 34));
-            for (int k = 0; k < 3; k++)
+            int row = i < 3 ? 0 : 1, col = row == 0 ? i : i - 3, inRow = row == 0 ? 3 : 2;
+            float x = (col - (inRow - 1) / 2f) * (tileW + tileGap), y = row == 0 ? 190f : -110f;
+            var rt = Rect("Event" + i, detail, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(x, y), new Vector2(tileW, tileH));
+            Design.AsCard(rt, Design.Ink700);
+            var b = rt.gameObject.AddComponent<Button>(); rt.gameObject.AddComponent<PressFeel>();
+            UnityEditor.Events.UnityEventTools.AddIntPersistentListener(b.onClick, panel.Play, i);
+            var flag = Rect("Flag", rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -16), new Vector2(170, 170));
+            var fi = flag.gameObject.AddComponent<Image>(); fi.sprite = IconSprite("flag"); fi.color = new Color(1f, 1f, 1f, 0.12f); fi.preserveAspect = true; fi.raycastTarget = false;
+            tileNums[i] = Label("Num", rt, display, (i + 1).ToString(), 128, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, -16), new Vector2(tileW, 160));
+            var bossRt = Rect("Boss", rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -16), new Vector2(160, 160));
+            tileBoss[i] = bossRt.gameObject.AddComponent<Image>(); tileBoss[i].preserveAspect = true; tileBoss[i].raycastTarget = false;
+            var lockRoot = Rect("Lock", rt, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            var padlock = Rect("Padlock", lockRoot, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -12), new Vector2(180, 180));
+            var pl = padlock.gameObject.AddComponent<Image>(); pl.sprite = IconSprite("lock"); pl.color = Paper; pl.preserveAspect = true; pl.raycastTarget = false;
+            var gateStar = Rect("GateStar", padlock, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-24, -30), new Vector2(46, 46));
+            var gs = gateStar.gameObject.AddComponent<Image>(); gs.sprite = IconSprite("star"); gs.color = Accent; gs.preserveAspect = true; gs.raycastTarget = false;
+            tileGates[i] = Label("Gate", padlock, display, "1", 48, Deep, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(24, -28), new Vector2(60, 60));
+            tileLocks[i] = lockRoot.gameObject;
+            for (int k = 0; k < 3; k++)   // over the top edge, as Beach Buggy hangs them
             {
-                var st = Rect("Star" + k, rt, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-440 + k * 64, 0), new Vector2(56, 56));
-                stars[i * 3 + k] = st.gameObject.AddComponent<Image>();
-                stars[i * 3 + k].sprite = IconSprite("star"); stars[i * 3 + k].raycastTarget = false;
+                var st = Rect("Star" + k, rt, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2((k - 1) * 72, 8), new Vector2(70, 70));
+                tileStars[i * 3 + k] = st.gameObject.AddComponent<Image>(); tileStars[i * 3 + k].sprite = IconSprite("star"); tileStars[i * 3 + k].raycastTarget = false;
             }
-            var play = Button("Play", rt, "PLAY", Slate, Paper, 36, new Vector2(1, 0.5f), new Vector2(-18, 0), new Vector2(210, 96), icon: "play");
-            plays[i] = play; playBacks[i] = play.GetComponent<Image>();
-            UnityEditor.Events.UnityEventTools.AddIntPersistentListener(play.onClick, panel.Play, i);
-            rows[i] = rt.gameObject;
+            tiles[i] = rt.gameObject;
         }
+        var bar2 = Rect("SeriesBar", detail, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, 30), new Vector2(0, 116));
+        bar2.pivot = new Vector2(0.5f, 0);
+        Design.AsRow(bar2, Design.Ink700).raycastTarget = false;
+        var seriesTitle = Label("Series", bar2, display, "ROOKIE RUN", 60, Paper, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(120, 0), new Vector2(1000, 96));
+        var seriesTotal = Label("Stars", bar2, display, "0 / 15", 60, Paper, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-200, 0), new Vector2(400, 96));
+        var barStar = Rect("Star", bar2, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-130, 0), new Vector2(84, 84));
+        var bsi = barStar.gameObject.AddComponent<Image>(); bsi.sprite = IconSprite("star"); bsi.color = Accent; bsi.preserveAspect = true; bsi.raycastTarget = false;
 
-        // Beach Buggy's event card: opens over the list when a PLAY is tapped; RACE starts it, the dim closes it
+        // The event card (Beach Buggy's): the circuit at the left, the mode with its stars, goal and reward in the middle,
+        // the best time and the rule at the right, PLAY at the bottom right. A tap on the dim closes it.
         var cardRoot = Rect("EventCard", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-        var cardDim = cardRoot.gameObject.AddComponent<Image>(); cardDim.color = new Color(Deep.r, Deep.g, Deep.b, 0.8f);
+        var cardDim = cardRoot.gameObject.AddComponent<Image>(); cardDim.color = new Color(Deep.r, Deep.g, Deep.b, 0.82f);
         var closeCard = cardRoot.gameObject.AddComponent<Button>(); closeCard.transition = Selectable.Transition.None;
         UnityEditor.Events.UnityEventTools.AddPersistentListener(closeCard.onClick, panel.CloseCard);
-        var ec = Rect("Card", cardRoot, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -24), new Vector2(1100, 840));
-        var ecImg = Design.AsCard(ec, Panel); ecImg.raycastTarget = true;   // taps on the card do not close it
-        var cMode = Label("Mode", ec, strong, "RACE", 30, Accent, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -40), new Vector2(900, 40)); cMode.characterSpacing = 10f;
-        var cTitle = Label("Title", ec, display, "", 80, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -86), new Vector2(1000, 100));
-        cTitle.enableAutoSizing = true; cTitle.fontSizeMin = 48; cTitle.fontSizeMax = 80;
-        var cTrack = Label("Track", ec, strong, "", 28, Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -190), new Vector2(1000, 40)); cTrack.characterSpacing = 4f;
+        var ec = Rect("Card", cardRoot, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 40), new Vector2(1640, 620));
+        Image Panel3(string name, Vector2 at, Vector2 size) { var r = Rect(name, ec, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), at, size); var img = Design.AsCard(r, Panel); img.raycastTarget = true; return img; }
+        var left = Panel3("Track", new Vector2(-600, -10), new Vector2(420, 480)).rectTransform;
+        var mid = Panel3("Middle", new Vector2(0, 0), new Vector2(700, 600)).rectTransform;
+        var right = Panel3("Best", new Vector2(600, -10), new Vector2(420, 480)).rectTransform;
+        var picMask = Rect("Picture", left, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -20), new Vector2(380, 230));
+        picMask.pivot = new Vector2(0.5f, 1); picMask.gameObject.AddComponent<RectMask2D>();
+        var cardArt = Rect("Art", picMask, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(460, 230));
+        var cPic = cardArt.gameObject.AddComponent<Image>(); cPic.raycastTarget = false;
+        var cTrack = Label("Track", left, display, "", 44, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -276), new Vector2(390, 60));
+        cTrack.enableAutoSizing = true; cTrack.fontSizeMin = 28; cTrack.fontSizeMax = 44;
+        var cTitle = Label("Title", left, strong, "", 30, Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -346), new Vector2(390, 44));
+        cTitle.enableAutoSizing = true; cTitle.fontSizeMin = 20; cTitle.fontSizeMax = 30;
+        var modeHead = Rect("Head", mid, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -18), new Vector2(640, 110));
+        modeHead.pivot = new Vector2(0.5f, 1);
+        Design.AsRow(modeHead, Design.Ink700).raycastTarget = false;
+        var cMode = Label("Mode", modeHead, display, "RACE", 66, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 2), new Vector2(620, 100));
         var cardStars = new Image[3];
         for (int k = 0; k < 3; k++)
         {
-            var st = Rect("Star" + k, ec, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2((k - 1) * 130, -310), new Vector2(110, 110));
+            var st = Rect("Star" + k, mid, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2((k - 1) * 170, k == 1 ? -210 : -230), new Vector2(k == 1 ? 170f : 150f, k == 1 ? 170f : 150f));
             cardStars[k] = st.gameObject.AddComponent<Image>(); cardStars[k].sprite = IconSprite("star"); cardStars[k].raycastTarget = false;
         }
-        var cRule = Label("Rule", ec, body, "", 32, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -400), new Vector2(940, 90));
+        var goalRow = Rect("GoalRow", mid, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 30), new Vector2(640, 170));
+        goalRow.pivot = new Vector2(0.5f, 0);
+        Design.AsRow(goalRow, Design.Ink700).raycastTarget = false;
+        Label("GoalCap", goalRow, strong, "GOAL", 30, Muted, TextAlignmentOptions.Center, new Vector2(0.25f, 1), new Vector2(0, -18), new Vector2(300, 40)).characterSpacing = 6f;
+        Label("RewardCap", goalRow, strong, "REWARD", 30, Muted, TextAlignmentOptions.Center, new Vector2(0.75f, 1), new Vector2(0, -18), new Vector2(300, 40)).characterSpacing = 6f;
+        var cGoal = Label("Goal", goalRow, display, "1ST", 64, Paper, TextAlignmentOptions.Center, new Vector2(0.25f, 0), new Vector2(0, 18), new Vector2(300, 90));
+        cGoal.enableAutoSizing = true; cGoal.fontSizeMin = 32; cGoal.fontSizeMax = 64;
+        var cPrize = Label("Reward", goalRow, display, "5 GEMS", 64, Accent, TextAlignmentOptions.Center, new Vector2(0.75f, 0), new Vector2(0, 18), new Vector2(300, 90));
+        cPrize.enableAutoSizing = true; cPrize.fontSizeMin = 28; cPrize.fontSizeMax = 64;
+        Label("BestCap", right, strong, "HIGH SCORE", 32, Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -36), new Vector2(390, 44)).characterSpacing = 6f;
+        var cBest = Label("BestTime", right, display, "--:--", 76, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -90), new Vector2(390, 96));
+        var cRule = Label("Rule", right, body, "", 32, Paper, TextAlignmentOptions.Top, new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(360, 220));
         cRule.textWrappingMode = TextWrappingModes.Normal;
-        var cGoal = Label("Goal", ec, strong, "", 28, Accent, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -490), new Vector2(940, 40));
-        var cPrize = Label("Prize", ec, strong, "", 26, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -536), new Vector2(940, 40));
-        var cBest = Label("Best", ec, body, "", 24, Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -578), new Vector2(940, 36));
-        var raceBtn = Button("Race", ec, "RACE", Accent, Paper, 56, new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(480, 128), icon: "flag");
+        var raceBtn = Button("Race", cardRoot, "PLAY", Accent, Paper, 64, new Vector2(1, 0), new Vector2(-64, 40), new Vector2(480, 150), icon: "flag");
         UnityEditor.Events.UnityEventTools.AddPersistentListener(raceBtn.onClick, panel.Race);
         Shine(raceBtn);
         cardRoot.gameObject.SetActive(false);
 
         new SerializedObject(panel).Do(s =>
         {
-            s.FindProperty("roster").objectReferenceValue = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
+            s.FindProperty("roster").objectReferenceValue = rosterDb;
             s.FindProperty("total").objectReferenceValue = total;
-            s.FindProperty("cupName").objectReferenceValue = cupName;
-            s.FindProperty("cupState").objectReferenceValue = cupState;
-            s.FindProperty("driver").objectReferenceValue = who;
-            Fill(s.FindProperty("rows"), rows.Cast<Object>().ToArray());
-            Fill(s.FindProperty("titles"), titles.Cast<Object>().ToArray());
-            Fill(s.FindProperty("modes"), modes.Cast<Object>().ToArray());
-            Fill(s.FindProperty("tracks"), tracks.Cast<Object>().ToArray());
-            Fill(s.FindProperty("stars"), stars.Cast<Object>().ToArray());
-            Fill(s.FindProperty("playBacks"), playBacks.Cast<Object>().ToArray());
-            Fill(s.FindProperty("plays"), plays.Cast<Object>().ToArray());
-            s.FindProperty("prizeSwatch").objectReferenceValue = sw;
+            Fill(s.FindProperty("tiles"), tiles.Cast<Object>().ToArray());
+            Fill(s.FindProperty("tileNums"), tileNums.Cast<Object>().ToArray());
+            Fill(s.FindProperty("tileStars"), tileStars.Cast<Object>().ToArray());
+            Fill(s.FindProperty("tileLocks"), tileLocks.Cast<Object>().ToArray());
+            Fill(s.FindProperty("tileGates"), tileGates.Cast<Object>().ToArray());
+            Fill(s.FindProperty("tileBoss"), tileBoss.Cast<Object>().ToArray());
+            s.FindProperty("seriesTitle").objectReferenceValue = seriesTitle;
+            s.FindProperty("seriesTotal").objectReferenceValue = seriesTotal;
             s.FindProperty("card").objectReferenceValue = cardRoot.gameObject;
+            s.FindProperty("cardPic").objectReferenceValue = cPic;
             s.FindProperty("cardMode").objectReferenceValue = cMode; s.FindProperty("cardTitle").objectReferenceValue = cTitle;
             s.FindProperty("cardTrack").objectReferenceValue = cTrack; s.FindProperty("cardRule").objectReferenceValue = cRule;
             s.FindProperty("cardGoal").objectReferenceValue = cGoal; s.FindProperty("cardPrize").objectReferenceValue = cPrize;
             s.FindProperty("cardBest").objectReferenceValue = cBest;
             Fill(s.FindProperty("cardStars"), cardStars.Cast<Object>().ToArray());
-            s.FindProperty("prizeLabel").objectReferenceValue = prize;
             s.FindProperty("pick").objectReferenceValue = pick.gameObject;
             s.FindProperty("detail").objectReferenceValue = detail.gameObject;
             Fill(s.FindProperty("seriesPics"), seriesPics.Cast<Object>().ToArray());
@@ -308,14 +314,8 @@ public static partial class MenuSetup
             var ids = s.FindProperty("portraitIds"); ids.arraySize = driverIds.Length;
             for (int i = 0; i < driverIds.Length; i++) ids.GetArrayElementAtIndex(i).stringValue = driverIds[i];
             Fill(s.FindProperty("portraits"), driverIds.Select(id => AssetDatabase.LoadAssetAtPath<Sprite>(PortraitSetup.Dir + id + ".png")).Cast<Object>().ToArray());
-            s.FindProperty("tabOn").colorValue = Design.Ink600;
-            s.FindProperty("tabOff").colorValue = new Color(0, 0, 0, 0);
-            s.FindProperty("textOn").colorValue = Paper;
-            s.FindProperty("textOff").colorValue = Muted;
             s.FindProperty("starOn").colorValue = Accent;
             s.FindProperty("starOff").colorValue = new Color(1f, 1f, 1f, 0.16f);
-            s.FindProperty("playNext").colorValue = Accent;
-            s.FindProperty("playIdle").colorValue = Slate;
         });
         return screen;
     }

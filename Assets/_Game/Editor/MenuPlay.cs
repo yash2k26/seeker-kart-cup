@@ -60,7 +60,7 @@ public static class MenuPlay
             (19.8, () => Object.FindFirstObjectByType<CharacterCarousel>().Pick(9)), (20.5, () => Shot("pick", ui: true)),
             (20.6, () => flow.ShowTitle()), (21.4, () => Shot("back", ui: true)),
             (21.6, () => flow.Play()), (22.7, () => flow.ShowTrack()), (23.9, () => Shot("track", ui: true)),
-            (24.1, () => flow.StartRace()), (24.22, () => Shot("curtain", ui: true)),
+            (24.1, () => flow.StartTourEvent(Tour.Cups[0].events[0], Tour.Cups[0])), (24.22, () => Shot("curtain", ui: true)),
             (31.9, () => { Debug.Log($"[menuplay] race scene: {UnityEngine.SceneManagement.SceneManager.GetActiveScene().name}, curtain alpha {LoadingCurtain.Instance?.GetComponent<CanvasGroup>()?.alpha}"); Shot("race", ui: true); }),
             // a win: the podium, then the card with the chest it earned, OPEN, three taps, what was inside
             (47.9, () => { var race = Object.FindFirstObjectByType<RaceManager>(); if (race != null && race.Player != null) race.Finish(race.Player); }),

@@ -59,7 +59,7 @@ namespace KartCup
             bool newBest = Tracks.RecordBest(Cup.TrackId, who.finishTime);
             Gems.Podium(place);   // and gems (ChestBadge shows both on the card)
             Chests.Earn(place);   // a podium earns a chest (ChestBadge shows it on the card)
-            if (RaceMode.EventId == "daily") Daily.Record(place); else if (RaceMode.InEvent) Tour.Record(RaceMode.EventId, place);   // TourResult shows it
+            if (RaceMode.EventId == "daily") Daily.Record(place); else if (RaceMode.InEvent) Tour.Record(RaceMode.EventId, place, who.finishTime);   // TourResult shows it
 
             bool single = Cup.IsSingleRace, final = Cup.IsFinalRace;
             int cupPlace = Cup.PlayerPlace;
@@ -333,6 +333,8 @@ namespace KartCup
 
         public void Secondary()
         {
+            // a series race's CONTINUE goes back to that series' events (Beach Buggy's)
+            if (!online && RaceMode.InEvent && Tour.Find(RaceMode.EventId).cup is { } series) TourPanel.Reopen = System.Array.IndexOf(Tour.Cups, series);
             if (!online) Cup.End();
             ScreenFlow.Instance?.BackToMenu();   // online: leaves the room on the way out
         }
