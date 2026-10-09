@@ -19,6 +19,7 @@ namespace KartCup
         ItemMount mount;
         int knownAmmo;
         bool wasDrifting; int driftTier;
+        Vector3 lastFwd;
 
         public void Bind(Kart k, BlockyDriverPose pose, bool player)
         {
@@ -94,9 +95,17 @@ namespace KartCup
                 heldItem = caster.item;
             }
             // a drift let go with at least one tier charged fires a boost (Achievements counts them)
+            if (isPlayer && kart.drifting && !wasDrifting) Haptics.Play(Haptics.Kind.Tick);   // the drift catching, felt
             if (isPlayer) { if (wasDrifting && !kart.drifting && driftTier > 0) Achievements.Add(Achievements.Stat.DriftBoosts); driftTier = kart.drifting ? kart.boostCount : 0; wasDrifting = kart.drifting; }
             if (isPlayer && CameraFeel.Instance != null && rb != null)
                 CameraFeel.Instance.SetSpeed01(rb.linearVelocity.magnitude / Mathf.Max(1f, kart.maxSpeed));
+            if (isPlayer && CameraFeel.Instance != null)
+            {
+                var heading = kart.rotator != null ? kart.rotator : kart.transform;
+                var fwd = Vector3.ProjectOnPlane(heading.forward, Vector3.up);
+                if (lastFwd != Vector3.zero && Time.deltaTime > 0f) CameraFeel.Instance.Turn(Vector3.SignedAngle(lastFwd, fwd, Vector3.up) / Time.deltaTime);
+                lastFwd = fwd;
+            }
         }
 
         public void OnBoostStart()
@@ -156,6 +165,7 @@ namespace KartCup
         {
             var kc = FindFirstObjectByType<KartCamera>();
             if (kc == null) yield break;
+            if (CameraFeel.Instance != null) CameraFeel.Instance.HoldSwing = true;   // the corner swing gives the orbit up
             kc.orbitOverride = true;
             for (float t = 0f; t < 1.8f; t += Time.deltaTime)
             {

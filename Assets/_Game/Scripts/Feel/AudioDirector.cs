@@ -167,6 +167,7 @@ namespace KartCup
         /// n counts 3, 2, 1 and then 0 for GO.
         public void Countdown(int n)
         {
+            Haptics.Play(n == 0 ? Haptics.Kind.Boost : Haptics.Kind.Tick);   // 3, 2, 1 felt; GO a kick
             Duck(n == 0 ? 1.2f : 1f);
             switch (n)
             {
@@ -179,6 +180,7 @@ namespace KartCup
 
         public void Lap(bool isFinalLap)
         {
+            Haptics.Play(Haptics.Kind.TierUp);
             Play(lapDone, 0.8f);
             if (isFinalLap) { Duck(2.2f); StartCoroutine(After(0.45f, finalLap, 1f)); }
         }
@@ -187,6 +189,7 @@ namespace KartCup
         /// The box's chime, then the item arriving on the kart: the pod clacking up, a bomb dropping into the cradle.
         public void Pickup(string item)
         {
+            Haptics.Play(Haptics.Kind.Pickup);
             Play(pickup, 0.85f, Random.Range(0.98f, 1.05f));
             var arrive = item == "Rocket" || item == "Homing Item" ? podUp : item == "Bomb" || item == "Sun Bomb" ? bombUp : null;
             if (arrive != null) StartCoroutine(After(0.16f, arrive, 0.8f));
@@ -194,6 +197,7 @@ namespace KartCup
 
         public void UseItem(string item)
         {
+            Haptics.Play(item == "Turbo" || item == "Nitro" ? Haptics.Kind.Boost : Haptics.Kind.Tick);
             int i = System.Array.IndexOf(itemNames, item);
             if (i >= 0 && i < itemClips.Length && itemClips[i] != null) Play(itemClips[i], 0.95f);
             else if (i < 0) Play(useItem, 0.85f);      // (a name mapped to no clip sounds from the world instead)
