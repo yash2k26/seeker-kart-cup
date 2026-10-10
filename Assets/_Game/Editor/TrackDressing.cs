@@ -217,6 +217,42 @@ public static partial class TrackSetup
         }
     }
 
+    /// Beach Buggy's corridor: the road runs THROUGH a place, with things a few metres off the kerb all the way round.
+    /// Soft things (grass, bushes, snow) close in, where a kart running wide brushes through them; solid ones from
+    /// `solidFrom` metres out, past the run-off the barriers deliberately leave. Noise makes thick and thin stretches
+    /// instead of a picket line; the inside of a tight corner stays open so its exit can be seen, and the start
+    /// straight keeps its grandstands' view. Only trunks collide: a tree and a boxy rock seven metres apart made a pocket
+    /// an AI kart wedged in (Frost Peak, 10 Oct), and a thin capsule is something a kart glances off.
+    static void Corridor(Transform root, string kit, (string name, float h0, float h1)[] soft,
+                         (string name, float h0, float h1, Solid solid)[] solid, float solidFrom = 6f, float density = 1f)
+    {
+        var rnd = new System.Random(V.seed * 31 + 7);   // its own stream: everything placed after it stays where it was
+        float edge = HalfWidth + Kerb;
+        int n = centre.Length, step = Samples(4f), startClear = Samples(45f), before = props, beforeTris = propTris;
+        for (int i = 0; i < n; i += step)
+            for (int side = -1; side <= 1; side += 2)
+            {
+                var c = CornerAt(i);
+                if (c.HasValue && side != c.Value.outside && Tight(c.Value)) continue;
+                float thick = Mathf.PerlinNoise(i * 0.045f + V.seed * 1.7f, side > 0 ? 2.1f : 5.3f);
+                if (rnd.NextDouble() < (0.25 + 0.6 * thick) * density)
+                {
+                    var (name, h0, h1) = soft[rnd.Next(soft.Length)];
+                    int j = Wrap(i + rnd.Next(step), n);
+                    Prop(root, kit, name, Beside(j, side, edge + 1f + (float)rnd.NextDouble() * 4f), (float)rnd.NextDouble() * 360f, Mathf.Lerp(h0, h1, (float)rnd.NextDouble()));
+                }
+                bool nearStart = i < startClear || i > n - startClear;
+                if (!nearStart && rnd.NextDouble() < (0.1 + 0.4 * thick) * density)
+                {
+                    var (name, h0, h1, how) = solid[rnd.Next(solid.Length)];
+                    int j = Wrap(i + rnd.Next(step), n);
+                    var go = Prop(root, kit, name, Beside(j, side, edge + solidFrom + (float)rnd.NextDouble() * 5f), (float)rnd.NextDouble() * 360f, Mathf.Lerp(h0, h1, (float)rnd.NextDouble()), how);
+                    PushClear(go, centre[j], right[j], side, Clear);
+                }
+            }
+        Debug.Log($"[track] corridor: {props - before} props / {propTris - beforeTris} tris");
+    }
+
     /// Start/finish: the Racing kit's overhead gantry across the chequer and a grandstand run beside the start straight.
     /// The gantry is stretched across the road only (its clear span is 1.0 of its 1.26 width, measured off the kit),
     /// with the height held at 12 m so it stays a gantry and not a bridge; its legs land half a metre outside the kerb.
@@ -393,6 +429,8 @@ public static partial class TrackSetup
         StartLine(root, 3, null);
         Groves(root, rnd, "Holiday", firs, 8f, 12f, Solid.Trunk, new[] { "rocks-small", "rocks-medium" }, 2.2f, Solid.Solid, 1.4f);
         Cover(root, rnd, "Holiday", new[] { "snow-flat", "snow-flat-large", "snow-pile" }, 90, 4f, 8f, 1f, 12f, byWidth: true);
+        Corridor(root, "Holiday", new[] { ("snow-pile", 0.7f, 1.3f), ("snow-pile", 0.5f, 0.9f), ("rocks-small", 0.4f, 0.6f) },
+                 new[] { ("tree-snow-a", 4f, 6.5f, Solid.Trunk), ("tree-snow-b", 3.5f, 6f, Solid.Trunk), ("tree-snow-c", 4f, 7f, Solid.Trunk), ("rocks-medium", 1.4f, 2.4f, Solid.None) }, density: 0.85f);
         Rhythm(root, "Holiday", "lantern", 40f, 3.4f, 1.6f);
         Rhythm(root, "Holiday", "candy-cane-red", 24f, 1.7f, 1.3f, phase: Samples(12f));
 
@@ -510,6 +548,10 @@ public static partial class TrackSetup
         Cover(root, rnd, "Nature", new[] { "mushroom_red", "mushroom_redGroup", "mushroom_tanGroup", "flower_redA", "flower_yellowB", "flower_purpleC" }, 60, 0.6f, 1.1f, 1.5f, 6f);
         Cover(root, rnd, "Nature", new[] { "grass", "grass_large", "plant_bush", "grass_leafs" }, 120, 0.6f, 1.1f, 1.2f, 10f);
         Cover(root, rnd, "Survival", new[] { "tree-autumn", "tree-autumn-tall" }, 26, 7f, 9.5f, 8f, 26f);
+        // toy scale: a 1 m bush is a tuft of grass from the chase camera, so the soft cover is shoulder-high to a driver
+        Corridor(root, "Nature", new[] { ("plant_bush", 1.3f, 2f), ("plant_bushLarge", 1.6f, 2.4f), ("plant_bushDetailed", 1.4f, 2.1f), ("grass_large", 0.9f, 1.3f), ("grass_leafsLarge", 1f, 1.4f), ("flower_yellowA", 0.7f, 1f) },
+                 new[] { ("tree_pineSmallA", 4.5f, 6.5f, Solid.Trunk), ("tree_pineSmallC", 4.5f, 6.5f, Solid.Trunk), ("tree_detailed_fall", 5f, 7.5f, Solid.Trunk), ("stump_roundDetailed", 1f, 1.4f, Solid.None), ("log_large", 1f, 1.3f, Solid.None), ("rock_smallC", 1.3f, 2f, Solid.None) },
+                 solidFrom: 5f, density: 1.5f);
 
         // A rock wall on the outside of the tightest corner: two staggered rows of big boulders. The kit's cliff
         // blocks are tiling cubes and read as a stack of crates from the road; the boulders read as a rock face.
