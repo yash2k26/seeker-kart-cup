@@ -35,7 +35,7 @@ namespace KartCup
         // roster indices (TrackSetup.Roster): 0 Toly 1 Mert 2 Akshay 3 Emmett 4 Bitsy 5 Pip 6 Chase 7 Beeman 8 Maroo 9 Andrew
         public static readonly CupDef[] Cups =
         {
-            new() { name = "ROOKIE RUN", kicker = "CUP 1", pace = 0.93f, fire = 0.6f, boss = 1, bossPaint = "boss.mert", bossSku = "driver.mert", events = new[]
+            new() { name = "ROOKIE RUN", kicker = "CUP 1", pace = 0.97f, fire = 0.85f, boss = 1, bossPaint = "boss.mert", bossSku = "driver.mert", events = new[]
             {
                 new Event { id = "c1e1", title = "Night Sprint", track = 0, mode = Race },
                 new Event { id = "c1e2", title = "Under the Lights", track = 3, mode = Race },
@@ -43,7 +43,7 @@ namespace KartCup
                 new Event { id = "c1e4", title = "Dusk Haze", track = 3, mode = Race, mist = true },
                 new Event { id = "c1b", title = "BOSS: MERT", track = 0, mode = Duel, rival = 1 },
             } },
-            new() { name = "COAST CUP", kicker = "CUP 2", pace = 0.98f, fire = 0.8f, boss = 2, bossPaint = "boss.akshay", bossSku = "driver.akshay", events = new[]
+            new() { name = "COAST CUP", kicker = "CUP 2", pace = 1.04f, fire = 1.0f, boss = 2, bossPaint = "boss.akshay", bossSku = "driver.akshay", events = new[]
             {
                 new Event { id = "c2e1", title = "Cold Start", track = 1, mode = Race },
                 new Event { id = "c2e2", title = "The Other Way", track = 0, mode = Race, reverse = true },
@@ -51,7 +51,7 @@ namespace KartCup
                 new Event { id = "c2e4", title = "Black Ice", track = 1, mode = Race, mist = true },
                 new Event { id = "c2b", title = "BOSS: AKSHAY", track = 1, mode = Duel, rival = 2 },
             } },
-            new() { name = "PRO SERIES", kicker = "CUP 3", pace = 1.02f, fire = 1.0f, boss = 6, bossPaint = "boss.chase", bossSku = "driver.chase", events = new[]
+            new() { name = "PRO SERIES", kicker = "CUP 3", pace = 1.08f, fire = 1.15f, boss = 6, bossPaint = "boss.chase", bossSku = "driver.chase", events = new[]
             {
                 new Event { id = "c3e1", title = "Pine Run", track = 2, mode = Race },
                 new Event { id = "c3e2", title = "Summit Reverse", track = 1, mode = Race, reverse = true },
@@ -59,7 +59,7 @@ namespace KartCup
                 new Event { id = "c3e4", title = "Backstretch", track = 3, mode = Race, reverse = true },
                 new Event { id = "c3b", title = "BOSS: CHASE", track = 2, mode = Duel, rival = 6 },
             } },
-            new() { name = "LEGENDS", kicker = "CUP 4", pace = 1.06f, fire = 1.15f, boss = 0, bossPaint = "boss.toly", bossSku = "driver.toly", events = new[]
+            new() { name = "LEGENDS", kicker = "CUP 4", pace = 1.12f, fire = 1.3f, boss = 0, bossPaint = "boss.toly", bossSku = "driver.toly", events = new[]
             {
                 new Event { id = "c4e1", title = "Midnight Grand", track = 0, mode = Race, laps = 2 },
                 new Event { id = "c4e2", title = "Back Through the Pines", track = 2, mode = Race, reverse = true },
@@ -69,7 +69,7 @@ namespace KartCup
             } },
             // 10 Oct 2026 (the user: "multiple series, tasks and races to clear each"): a fifth, the hardest field, Beeman
             // its boss. He is free already, so the prize is his paint and the chest.
-            new() { name = "GRAND TOUR", kicker = "CUP 5", pace = 1.10f, fire = 1.3f, boss = 7, bossPaint = "boss.beeman", bossSku = "", events = new[]
+            new() { name = "GRAND TOUR", kicker = "CUP 5", pace = 1.16f, fire = 1.45f, boss = 7, bossPaint = "boss.beeman", bossSku = "", events = new[]
             {
                 new Event { id = "c5e1", title = "Coast to Coast", track = 0, mode = Race, reverse = true, laps = 2 },
                 new Event { id = "c5e2", title = "Whiteout", track = 1, mode = Race, mist = true, reverse = true },
@@ -80,6 +80,14 @@ namespace KartCup
         };
         /// A boss's special charges this much faster than the player's (the card says so).
         public const float BossCharge = 1.5f;
+        /// How far above their cup's field a boss drives, and how keen they are to fire: the boss is the wall (10 Oct 2026,
+        /// the user: "it's easy to beat the boss and the next level is easy to reach"). The autopilot, a fair stand-in for a
+        /// tidy driver, beat Chase in a duel at the old +0.03. The edge grows a cup at a time: Mert is the first wall, Beeman
+        /// the last. Capped at BossTop: past about 1.18 a boss is too fast to stay on Pine Ridge's road and loses on its own
+        /// (Beeman at 1.25 lost a reversed two-lap duel to the autopilot); keener items and no mistakes carry it beyond.
+        public static float BossEdge(int cup) => 0.07f + 0.02f * cup;
+        public const float BossTop = 1.18f;
+        public static float BossFire(int cup) => 1.2f + 0.06f * cup;
         public const int StarsPerEvent = 3;
         public static int MaxStars => Cups.Sum(c => c.events.Length) * StarsPerEvent;
 
@@ -101,16 +109,25 @@ namespace KartCup
         public static int Stars(string id) => S.best.FirstOrDefault(e => e.id == id)?.stars ?? 0;
         public static int Total => S.best.Sum(e => e.stars);
         public static int CupStars(int cup) => Cups[cup].events.Sum(e => Stars(e.id));
-        /// Beach Buggy's ladder: the boss is the wall. A cup opens when the last one's boss is beaten, and that boss opens at
-        /// about half the cup's stars (EventGates), as Easy Street's does (8 of 15). Stars across the whole Tour used to
-        /// decide it (9/21/36/48), which by cup 4 asked for 80% of everything won.
+        /// Beach Buggy's ladder: the boss is the wall. A cup opens when the last one's boss is beaten. Inside a cup the events
+        /// open in order, each once the one before it has a podium, and only as the cup's stars come in (EventGates): the
+        /// boss at 9 of the 12 race stars, so mostly wins. (Half the stars, 6, was Easy Street's ratio, and the user found
+        /// both the boss and the next cup too easy to reach, 10 Oct 2026.)
         public static bool Open(int cup) => cup <= 0 || BossBeaten(cup - 1);
         /// What opens a closed cup: "BEAT MERT".
         public static string Opener(int cup) => cup <= 0 ? "" : Cups[cup - 1].events[^1].title.Replace("BOSS: ", "BEAT ");
         /// Inside a series (Beach Buggy's): the first two events are open, the rest open as the series' own stars come in.
-        public static readonly int[] EventGates = { 0, 0, 1, 3, 6 };
+        public static readonly int[] EventGates = { 0, 1, 3, 6, 9 };
         public static int EventGate(int i) => EventGates[Mathf.Clamp(i, 0, EventGates.Length - 1)];
-        public static bool EventOpen(int cup, int i) => Open(cup) && CupStars(cup) >= EventGate(i);
+        public static bool EventOpen(int cup, int i) => Open(cup) && (i == 0 || Stars(Cups[cup].events[i - 1].id) > 0) && CupStars(cup) >= EventGate(i);
+        /// Why a closed event is closed, in a line: "FINISH EVENT 2 ON THE PODIUM FIRST" or "3 MORE STARS TO OPEN".
+        public static string Needs(int cup, int i)
+        {
+            if (!Open(cup)) return $"{Opener(cup)} TO OPEN {Cups[cup].name}";
+            if (i > 0 && Stars(Cups[cup].events[i - 1].id) == 0) return $"FINISH EVENT {i} ON THE PODIUM FIRST";
+            int more = EventGate(i) - CupStars(cup);
+            return more > 0 ? $"{more} MORE STAR{(more > 1 ? "S" : "")} TO OPEN" : "";
+        }
         public static string ModeName(Event e) => RaceMode.Name(e.mode, e.items);
         /// The personal best an event's card shows: the one its own way of running the circuit keeps.
         public static string BestKey(Event e) => RaceMode.BestKey(Tracks.At(e.track).id, e.reverse, e.laps, e.items);
@@ -159,8 +176,11 @@ namespace KartCup
         {
             RaceMode.Clear();
             RaceMode.Current = e.mode; RaceMode.Rival = e.rival; RaceMode.EventId = e.id;
-            RaceMode.Difficulty = e.mode == RaceMode.Kind.Duel ? c.pace + 0.03f : c.pace;   // a boss drives a touch above their cup
-            RaceMode.Fire = c.fire;
+            bool boss = e.mode == RaceMode.Kind.Duel;
+            int index = System.Array.IndexOf(Cups, c);
+            RaceMode.Difficulty = boss ? Mathf.Min(c.pace + BossEdge(index), BossTop) : c.pace;
+            RaceMode.Fire = boss ? Mathf.Max(BossFire(index), c.fire + 0.3f) : c.fire;
+            RaceMode.Hazard = index;                                                          // the later cups lay more oil and more crossings
             RaceMode.BossCharge = e.mode == RaceMode.Kind.Duel ? BossCharge : 1f;          // ...and charges faster: a stated rule, never unlimited
             RaceMode.Rule = e.items; RaceMode.Laps = Mathf.Max(1, e.laps); RaceMode.Reverse = e.reverse; RaceMode.Mist = e.mist;
         }

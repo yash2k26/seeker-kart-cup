@@ -910,14 +910,18 @@ public static partial class TrackSetup
         var pauseBtn = IconButton("Pause", safe.transform, "icon_pause", new Vector2(0, 1), new Vector2(396, -28), new Vector2(104, 104));
         var big = Text("Big", safe.transform, display, "3", 240, paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 90), new Vector2(1400, 300));
         big.enabled = false;
-        // the start boost: a line under the countdown (StartBoost shows it only while 3-2-1 runs)
-        var startHint = Text("StartHint", safe.transform, body, "TAP DRIFT RIGHT ON GO FOR A BOOST", 34, sand, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, -95), new Vector2(1300, 50));
+        // the start boost: a line over the countdown on a plate of its own (StartBoost shows it only while 3-2-1 runs).
+        // Under the digit it lay across the player's kart and could not be read (10 Oct 2026).
+        var hintPlate = Rect("StartHintPlate", safe.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 380), new Vector2(880, 70));
+        Design.AsRow(hintPlate, new Color(Design.Ink900.r, Design.Ink900.g, Design.Ink900.b, 0.82f)).raycastTarget = false;
+        var startHint = Text("StartHint", hintPlate, body, "TAP DRIFT RIGHT ON GO FOR A BOOST", 34, sand, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(860, 60));
         var startBoost = canvasGo.AddComponent<StartBoost>();
-        new SerializedObject(startBoost).Do(b => b.FindProperty("hint").objectReferenceValue = startHint);
+        new SerializedObject(startBoost).Do(b => { b.FindProperty("hint").objectReferenceValue = startHint; b.FindProperty("plate").objectReferenceValue = hintPlate.gameObject; });
         // Under the position readout, on its plate. Track name only: the race number is cup state, and a single race has none.
         Text("Track", safe.transform, body, Tracks.At(Index).name.ToUpperInvariant(), 30,
              Design.Paper, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(56, -170), new Vector2(700, 40));
-        var fps = Text("Fps", safe.transform, body, "", 22, new Color(1, 1, 1, 0.30f), TextAlignmentOptions.BottomLeft, new Vector2(0, 0), new Vector2(52, 300), new Vector2(1200, 34));
+        // the FPS line (Settings, off by default): under the race bar, centred, where no button is (it sat under the ability's)
+        var fps = Text("Fps", safe.transform, body, "", 22, new Color(1, 1, 1, 0.45f), TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -112), new Vector2(1000, 30));
 
         // AUTO GAS (on by default): no GAS button, DRIFT in its corner. The setting can change mid-race (pause menu).
         var layout = canvasGo.AddComponent<ControlLayout>();
@@ -1000,7 +1004,8 @@ public static partial class TrackSetup
         // The race bar across the top (Beach Buggy's): START to FINISH with every racer's face riding along it.
         var barRt = Rect("RaceBar", safe.transform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -58), new Vector2(880, 12));
         Design.AsRow(barRt, new Color(Design.Paper.r, Design.Paper.g, Design.Paper.b, 0.45f)).raycastTarget = false;   // a light line: it must read over the night road
-        Text("Start", safe.transform, display, "START", 24, paper, TextAlignmentOptions.Right, new Vector2(0.5f, 1), new Vector2(-462, -46), new Vector2(140, 36));
+        // clear of the player's face at the start of the bar (72 px across, centred on its end): it covered the word
+        Text("Start", safe.transform, display, "START", 24, paper, TextAlignmentOptions.Right, new Vector2(0.5f, 1), new Vector2(-560, -46), new Vector2(140, 36));
         var flag = Rect("FinishFlag", safe.transform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(476, -42), new Vector2(44, 44));
         var flagImg = flag.gameObject.AddComponent<Image>(); flagImg.sprite = Design.Icon("flag"); flagImg.color = paper; flagImg.raycastTarget = false;
         var raceBar = barRt.gameObject.AddComponent<RaceProgressBar>();

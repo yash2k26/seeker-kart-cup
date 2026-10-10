@@ -14,7 +14,6 @@ namespace KartCup
         [SerializeField] Sprite[] art = System.Array.Empty<Sprite>();     // Tracks.All order; the track builder may not have run yet
         [SerializeField] Sprite[] maps = System.Array.Empty<Sprite>();
         [SerializeField] float[] lengths = System.Array.Empty<float>();   // metres a lap (worker/src/tracks.json, baked by MenuSetup)
-        [SerializeField] int laps = 2;
         [SerializeField] Image single;
         [SerializeField] GameObject grid;
         [SerializeField] Image[] cells = System.Array.Empty<Image>();
@@ -94,7 +93,7 @@ namespace KartCup
             if (blurbLabel != null) blurbLabel.text = gp
                 ? "Points across every track, in the order below. The grid reverses each race, so leading means starting from the back."
                 : def.blurb;
-            if (factsLabel != null) factsLabel.text = gp ? $"{Tracks.Count * laps} LAPS  ·  {TotalKm():0.0} KM" : $"{laps} LAPS  ·  {Km(index):0.0} KM";
+            if (factsLabel != null) factsLabel.text = gp ? $"{Tracks.Count * Tracks.Laps} RACES  ·  {TotalKm():0.0} KM" : $"{Tracks.Laps} LAP  ·  {Km(index):0.0} KM";
             if (difficultyRow != null) difficultyRow.SetActive(!gp);
             if (!gp) difficulty?.Set(def.difficulty - 3);          // StatBar lights 3 + value pips: 1..3 of a 3-pip row
             float best = gp ? 0f : Tracks.Best(def.id);
@@ -128,7 +127,7 @@ namespace KartCup
             }
         }
 
-        float Km(int i) => i >= 0 && i < lengths.Length ? lengths[i] * laps / 1000f : 0f;
+        float Km(int i) => i >= 0 && i < lengths.Length ? lengths[i] * Tracks.Laps / 1000f : 0f;
         float TotalKm() { float s = 0f; for (int i = 0; i < Tracks.Count; i++) s += Km(i); return s; }
         Sprite Art(int i) => i >= 0 && i < art.Length ? art[i] : null;
         Sprite Map(int i) => i >= 0 && i < maps.Length ? maps[i] : null;

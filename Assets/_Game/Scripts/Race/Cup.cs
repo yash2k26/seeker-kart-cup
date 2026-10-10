@@ -60,6 +60,16 @@ namespace KartCup
             Save();
         }
 
+        /// A Tour event or the Daily Challenge: the player starts at the back of the grid and has to come through the field
+        /// (Beach Buggy's). On pole, in clean air with the field queuing behind in traffic, even the autopilot won Rookie
+        /// Run's opener by seconds (10 Oct 2026).
+        public static void StartAtBack()
+        {
+            if (!grid.Remove(PlayerCharacter)) return;
+            grid.Add(PlayerCharacter);
+            Save();
+        }
+
         /// Called once when the player's race ends. `order` is character indices, finishing order first to last.
         public static void Record(IReadOnlyList<int> order)
         {

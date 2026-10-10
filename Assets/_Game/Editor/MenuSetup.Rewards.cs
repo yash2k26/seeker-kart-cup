@@ -201,6 +201,7 @@ public static partial class MenuSetup
         int ev = 5; const float tileW = 300f, tileH = 230f, tileGap = 40f;
         var tiles = new GameObject[ev]; var tileNums = new TMP_Text[ev]; var tileStars = new Image[ev * 3];
         var tileLocks = new GameObject[ev]; var tileGates = new TMP_Text[ev]; var tileBoss = new Image[ev];
+        var tileModes = new TMP_Text[ev]; var tileWheres = new TMP_Text[ev];
         for (int i = 0; i < ev; i++)
         {
             int row = i < 3 ? 0 : 1, col = row == 0 ? i : i - 3, inRow = row == 0 ? 3 : 2;
@@ -209,17 +210,23 @@ public static partial class MenuSetup
             Design.AsCard(rt, Design.Ink700);
             var b = rt.gameObject.AddComponent<Button>(); rt.gameObject.AddComponent<PressFeel>();
             UnityEditor.Events.UnityEventTools.AddIntPersistentListener(b.onClick, panel.Play, i);
-            var flag = Rect("Flag", rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -16), new Vector2(170, 170));
+            // the number (or the boss's face, or a padlock) in the top two thirds; what the event is under it, so the tiles
+            // say NITRO RUSH and PALM BAY · REVERSE before a tap (10 Oct 2026: the numbers alone said nothing)
+            var flag = Rect("Flag", rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 26), new Vector2(120, 120));
             var fi = flag.gameObject.AddComponent<Image>(); fi.sprite = IconSprite("flag"); fi.color = new Color(1f, 1f, 1f, 0.12f); fi.preserveAspect = true; fi.raycastTarget = false;
-            tileNums[i] = Label("Num", rt, display, (i + 1).ToString(), 128, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, -16), new Vector2(tileW, 160));
-            var bossRt = Rect("Boss", rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -16), new Vector2(160, 160));
+            tileNums[i] = Label("Num", rt, display, (i + 1).ToString(), 96, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 26), new Vector2(tileW, 110));
+            var bossRt = Rect("Boss", rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 26), new Vector2(116, 116));
             tileBoss[i] = bossRt.gameObject.AddComponent<Image>(); tileBoss[i].preserveAspect = true; tileBoss[i].raycastTarget = false;
+            tileModes[i] = Label("Mode", rt, display, "", 30, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 44), new Vector2(tileW - 24, 40));
+            tileModes[i].enableAutoSizing = true; tileModes[i].fontSizeMin = 16; tileModes[i].fontSizeMax = 30;
+            tileWheres[i] = Label("Where", rt, body, "", 22, Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 12), new Vector2(tileW - 24, 30));
+            tileWheres[i].enableAutoSizing = true; tileWheres[i].fontSizeMin = 13; tileWheres[i].fontSizeMax = 22;
             var lockRoot = Rect("Lock", rt, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            var padlock = Rect("Padlock", lockRoot, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -12), new Vector2(180, 180));
+            var padlock = Rect("Padlock", lockRoot, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 24), new Vector2(124, 124));
             var pl = padlock.gameObject.AddComponent<Image>(); pl.sprite = IconSprite("lock"); pl.color = Paper; pl.preserveAspect = true; pl.raycastTarget = false;
-            var gateStar = Rect("GateStar", padlock, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-24, -30), new Vector2(46, 46));
+            var gateStar = Rect("GateStar", padlock, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-16, -21), new Vector2(32, 32));
             var gs = gateStar.gameObject.AddComponent<Image>(); gs.sprite = IconSprite("star"); gs.color = Accent; gs.preserveAspect = true; gs.raycastTarget = false;
-            tileGates[i] = Label("Gate", padlock, display, "1", 48, Deep, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(24, -28), new Vector2(60, 60));
+            tileGates[i] = Label("Gate", padlock, display, "1", 34, Deep, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(17, -19), new Vector2(44, 44));
             tileLocks[i] = lockRoot.gameObject;
             for (int k = 0; k < 3; k++)   // over the top edge, as Beach Buggy hangs them
             {
@@ -231,7 +238,9 @@ public static partial class MenuSetup
         var bar2 = Rect("SeriesBar", detail, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, 30), new Vector2(0, 116));
         bar2.pivot = new Vector2(0.5f, 0);
         Design.AsRow(bar2, Design.Ink700).raycastTarget = false;
-        var seriesTitle = Label("Series", bar2, display, "ROOKIE RUN", 60, Paper, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(120, 0), new Vector2(1000, 96));
+        // the series' name is the header's now; the bar says what opens next, or why a tapped event is shut
+        var hint = Label("Hint", bar2, strong, "", 38, Muted, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(120, 0), new Vector2(1500, 80));
+        hint.enableAutoSizing = true; hint.fontSizeMin = 22; hint.fontSizeMax = 38;
         var seriesTotal = Label("Stars", bar2, display, "0 / 15", 60, Paper, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-200, 0), new Vector2(400, 96));
         var barStar = Rect("Star", bar2, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-130, 0), new Vector2(84, 84));
         var bsi = barStar.gameObject.AddComponent<Image>(); bsi.sprite = IconSprite("star"); bsi.color = Accent; bsi.preserveAspect = true; bsi.raycastTarget = false;
@@ -239,7 +248,7 @@ public static partial class MenuSetup
         // The event card (Beach Buggy's): the circuit at the left, the mode with its stars, goal and reward in the middle,
         // the best time and the rule at the right, PLAY at the bottom right. A tap on the dim closes it.
         var cardRoot = Rect("EventCard", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-        var cardDim = cardRoot.gameObject.AddComponent<Image>(); cardDim.color = new Color(Deep.r, Deep.g, Deep.b, 0.82f);
+        var cardDim = cardRoot.gameObject.AddComponent<Image>(); cardDim.color = new Color(Deep.r, Deep.g, Deep.b, 0.93f);   // the tiles' stars showed through at 0.82
         var closeCard = cardRoot.gameObject.AddComponent<Button>(); closeCard.transition = Selectable.Transition.None;
         UnityEditor.Events.UnityEventTools.AddPersistentListener(closeCard.onClick, panel.CloseCard);
         var ec = Rect("Card", cardRoot, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 40), new Vector2(1640, 620));
@@ -252,7 +261,7 @@ public static partial class MenuSetup
         var cardArt = Rect("Art", picMask, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(460, 230));
         var cPic = cardArt.gameObject.AddComponent<Image>(); cPic.raycastTarget = false;
         var cTrack = Label("Track", left, display, "", 44, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -276), new Vector2(390, 60));
-        cTrack.enableAutoSizing = true; cTrack.fontSizeMin = 28; cTrack.fontSizeMax = 44;
+        cTrack.enableAutoSizing = true; cTrack.fontSizeMin = 18; cTrack.fontSizeMax = 44;   // "FROST PEAK · REVERSE · MIST" fits
         var cTitle = Label("Title", left, strong, "", 30, Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -346), new Vector2(390, 44));
         cTitle.enableAutoSizing = true; cTitle.fontSizeMin = 20; cTitle.fontSizeMax = 30;
         var modeHead = Rect("Head", mid, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -18), new Vector2(640, 110));
@@ -293,7 +302,10 @@ public static partial class MenuSetup
             Fill(s.FindProperty("tileLocks"), tileLocks.Cast<Object>().ToArray());
             Fill(s.FindProperty("tileGates"), tileGates.Cast<Object>().ToArray());
             Fill(s.FindProperty("tileBoss"), tileBoss.Cast<Object>().ToArray());
-            s.FindProperty("seriesTitle").objectReferenceValue = seriesTitle;
+            s.FindProperty("headerTitle").objectReferenceValue = bar.Find("Title")?.GetComponent<TMP_Text>();
+            s.FindProperty("hint").objectReferenceValue = hint;
+            Fill(s.FindProperty("tileModes"), tileModes.Cast<Object>().ToArray());
+            Fill(s.FindProperty("tileWheres"), tileWheres.Cast<Object>().ToArray());
             s.FindProperty("seriesTotal").objectReferenceValue = seriesTotal;
             s.FindProperty("card").objectReferenceValue = cardRoot.gameObject;
             s.FindProperty("cardPic").objectReferenceValue = cPic;

@@ -133,7 +133,7 @@ public static class CupTest
             Check($"{cup.name}: its special is new to the Tour", specials.Add(Tour.ModeName(ev[2])));
             var runs = ev.Select(e => $"{e.track}|{e.mode}|{e.items}|{e.laps}|{e.reverse}|{e.mist}").ToList();
             Check($"{cup.name}: no circuit run the same way twice", runs.Distinct().Count() == runs.Count);
-            Check($"{cup.name}: the boss opens at half the cup's race stars", Tour.EventGate(4) * 2 == (ev.Length - 1) * Tour.StarsPerEvent);
+            Check($"{cup.name}: the boss opens at three quarters of the cup's race stars", Tour.EventGate(4) * 4 == (ev.Length - 1) * Tour.StarsPerEvent * 3);
         }
         Check("cup 1 runs only the wide circuits (Palm Bay, the Speedway)", Tour.Cups[0].events.All(e => e.track == 0 || e.track == 3));
         Check("Pine Ridge, the narrow one by the lake, waits for cup 3", Tour.Cups.Take(2).SelectMany(c => c.events).All(e => e.track != 2));
@@ -144,7 +144,11 @@ public static class CupTest
         Check("a closed cup names its boss", Tour.Opener(1) == "BEAT MERT");
         Tour.Preview(("c1e1", 3), ("c1e2", 3), ("c1e3", 3), ("c1e4", 3));
         Check("every star in cup 1 does not open cup 2", !Tour.Open(1));
-        Check("the boss opens at 6 of cup 1's 12 race stars", Tour.EventOpen(0, 4));
+        Check("with every race star the boss is open", Tour.EventOpen(0, 4));
+        Tour.Preview(("c1e1", 3), ("c1e2", 3));
+        Check("events open in order: event 4 waits for event 3's podium", Tour.EventOpen(0, 2) && !Tour.EventOpen(0, 3) && Tour.Needs(0, 3) == "FINISH EVENT 3 ON THE PODIUM FIRST");
+        Tour.Preview(("c1e1", 3), ("c1e2", 3), ("c1e3", 1), ("c1e4", 1));
+        Check("two wins and two thirds (8 stars) leave the boss shut", !Tour.EventOpen(0, 4) && Tour.Needs(0, 4) == "1 MORE STAR TO OPEN");
         Tour.Preview(("c1e1", 3), ("c1e2", 3), ("c1b", 3));
         Check("beating Mert opens cup 2", Tour.Open(1) && !Tour.Open(2));
 

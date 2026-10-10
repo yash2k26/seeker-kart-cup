@@ -60,6 +60,9 @@ namespace KartCup
             int first = startPanel;
             if (IsMenu) { if (booted) first = TourPanel.Reopen >= 0 ? TourScreen : 0; else if (ConnectPanel.Due) first = Connect; booted = true; }   // the wallet first, once
             Show(first, silent: true);
+            // The series panel reads it on enable; it is cleared only here, after the screen is up. (Cleared on enable, it
+            // went the moment the menu loaded with that panel active, and CONTINUE landed on the hub, 10 Oct 2026.)
+            if (IsMenu) TourPanel.Reopen = -1;
             // A cup already under way turns the front door into a continue: the character is settled, so re-picking
             // one would just throw the standings away.
             if (playLabel != null) playLabel.text = Resuming ? "CONTINUE CUP" : "PLAY";
@@ -180,6 +183,7 @@ namespace KartCup
             Weekly.Racing = false;
             Tour.Arm(e, c);
             Cup.Begin(CharacterDatabase.SelectedIndex, RosterSize, new[] { e.track });
+            Cup.StartAtBack();
             Load(Cup.SceneName);
         }
 
@@ -192,6 +196,7 @@ namespace KartCup
             var c = Daily.Current;
             Daily.Arm(c);
             Cup.Begin(CharacterDatabase.SelectedIndex, RosterSize, new[] { c.track });
+            Cup.StartAtBack();
             Load(Cup.SceneName);
         }
 

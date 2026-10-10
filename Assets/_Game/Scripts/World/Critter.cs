@@ -110,7 +110,7 @@ namespace KartCup
                 }
             var parent = new GameObject("Critters").transform;
             int crossings = 0;
-            while (crossings < 3 && open.Count > 0)
+            while (crossings < 3 + RaceMode.Hazard / 2 && open.Count > 0)   // a crossing more every second Tour cup
             {
                 int i = open[rnd.Next(open.Count)];
                 open.RemoveAll(j => Mathf.Abs(j - i) < 8);

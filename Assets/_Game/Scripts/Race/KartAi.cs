@@ -24,6 +24,10 @@ namespace KartCup
         // Behind the player it digs in: +0.6% top speed per metre down, up to +16% (6 Oct: the field was too easy to
         // leave behind). Ahead of the player it never eases off: a lead has to be earned.
         public float catchUpPerMetre = 0.006f, maxCatchUp = 0.16f;
+        /// Set by the spawner from the event's pace: how much less this driver lifts in a corner, and whether it ever errs
+        /// (a Tour boss does not). Never on the autopilot, so the playtest's stand-in driver stays the same driver.
+        public float cornerBonus;
+        public bool steady;
 
         [Header("Feel")]
         public float steerAmount = 9f;
@@ -83,7 +87,7 @@ namespace KartCup
                 targetPoint = targetPoint.nextPoint;
                 // the circuit's shortcut: a good field's bolder drivers cut the corner (ShortcutPath)
                 var cut = ShortcutPath.Instance;
-                if (cut != null && reached == cut.from && ShortcutPath.Takes(aggression)) { targetPoint = cut.path[0]; Debug.Log($"[race] {name} takes the shortcut"); }
+                if (cut != null && reached == cut.from && ShortcutPath.Takes(aggression, steady)) { targetPoint = cut.path[0]; Debug.Log($"[race] {name} takes the shortcut"); }
                 if (targetPoint != null) nextPoint = targetPoint.nextPoint;
                 if (targetPoint == null || nextPoint == null) return;
             }
@@ -96,6 +100,17 @@ namespace KartCup
             Vector3 flatIn = new(legIn.x, 0f, legIn.z), flatOut = new(legOut.x, 0f, legOut.z);
             float turn = Vector3.SignedAngle(flatIn, flatOut, Vector3.up);      // + is a right-hander
             float severity = Mathf.InverseLerp(8f, 55f, Mathf.Abs(turn));
+            // Braking reads one bend further at speed: the waypoints are ~28 m apart, and at a boss's pace the lift for the
+            // bend after next has to start before this one. Without it a fast AI arrived too hot, ran wide and lost to a
+            // slower one on Pine Ridge (10 Oct 2026). Only the speed reads it; the line still aims at this bend's apex.
+            float brake = severity;
+            var after = nextPoint.nextPoint;
+            if (after != null)
+            {
+                Vector3 flatNext = after.transform.position - ahead; flatNext.y = 0f;
+                float next = Mathf.InverseLerp(8f, 55f, Vector3.Angle(flatOut, flatNext));
+                brake = Mathf.Max(brake, next * Mathf.InverseLerp(25f, 50f, kart.velMag) * 0.85f);
+            }
 
             // ---- pick a line: personal bias, pulled toward the apex through the corner ----
             float apex = Mathf.Sign(turn) * severity * 0.85f;
@@ -139,7 +154,7 @@ namespace KartCup
 
             // A corner is a speed limit. Aggression buys a later lift, never a free pass. (The floor was 0.52 of top
             // speed in the tightest corner: the field crawled through them; they drift these, so 0.6 holds the road.)
-            float corner = Mathf.Lerp(1f, 0.6f, severity) + aggression * 0.15f;
+            float corner = Mathf.Lerp(1f, 0.6f + cornerBonus, brake) + aggression * 0.15f;
             float wantSpeed = kart.maxSpeed * Mathf.Clamp01(corner);
             float over = kart.velMag - wantSpeed;
             targetAccel = (over > 0f ? Mathf.Clamp01(1f - over / 6f) : 1f) * trafficLift;
@@ -148,7 +163,7 @@ namespace KartCup
             if (forwardDot <= 0f) targetSteer = Mathf.Sign(rightDot);            // pointing away: turn around
 
             // ---- an occasional human error, so the field is beatable ----
-            if (race != null && race.state == RaceManager.State.Racing)
+            if (race != null && race.state == RaceManager.State.Racing && !steady)
             {
                 nextMistake -= dt;
                 if (nextMistake <= 0f)

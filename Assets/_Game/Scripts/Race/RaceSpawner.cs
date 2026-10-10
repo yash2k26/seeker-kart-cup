@@ -33,6 +33,7 @@ namespace KartCup
                 // The scene's own track, so a directly loaded Race3 records its best as forest and RACE AGAIN reloads Race3.
                 int.TryParse(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Replace("Race", ""), out int n);
                 Cup.Begin(CharacterDatabase.SelectedIndex, roster.characters.Length, new[] { Mathf.Clamp(n - 1, 0, Tracks.Count - 1) });
+                if (RaceMode.InEvent) Cup.StartAtBack();   // (the playtest's -event)
             }
             if (Weekly.Racing) RaceMode.Clear();   // the time trial is the ordinary lap, whatever ran before it
             // The event's levers (RaceMode): its laps, the circuit turned round, the mist. Turned before the grid is filled,
@@ -80,7 +81,7 @@ namespace KartCup
             else
             {
                 TurboPad.Spawn(System.Environment.TickCount);
-                OilSlick.Spawn(System.Environment.TickCount + 1, Tracks.At(Cup.TrackIndex).difficulty);   // solo only: rooms never get them
+                OilSlick.Spawn(System.Environment.TickCount + 1, Tracks.At(Cup.TrackIndex).difficulty + RaceMode.Hazard);   // solo only: rooms never get them
                 Ramp.Spawn(System.Environment.TickCount + 3);                                             // Beach Buggy's jumps, on the long straights
                 Critter.Spawn(System.Environment.TickCount + 2, Cup.TrackId);                             // Beach Buggy's critters, crossing the straights
                 if (RaceMode.Alone) gameObject.AddComponent<SmashUp>();                                   // after the critters: they count
@@ -209,7 +210,10 @@ namespace KartCup
                 // Personality is seeded from the character, so the same rival drives the same way every time.
                 var ai = go.AddComponent<KartAi>();
                 ai.Configure(def, first, character);
-                ai.skill = Mathf.Clamp(ai.skill * RaceMode.Difficulty, 0.8f, 1.12f);   // the event's pace (Tour cups, bosses)
+                // the event's pace (Tour cups, bosses), to 1.2 at most: faster than that the AI cannot hold Pine Ridge
+                ai.skill = Mathf.Clamp(ai.skill * RaceMode.Difficulty, 0.8f, 1.2f);
+                ai.cornerBonus = Mathf.Clamp(RaceMode.Difficulty - 1f, 0f, 0.16f) * 0.5f;   // a quicker field is quicker through the corners too
+                if (RaceMode.Current == RaceMode.Kind.Duel) { ai.steady = true; ai.maxCatchUp = 0.24f; }   // a boss makes no unforced mistakes and never lets you go
             }
             // a remote kart gets no hooks and no input: RemoteKart poses the driver and spins the wheels itself
             // each driver's special (solo races; never in a Clean Race). A boss's charges faster: the card says so.

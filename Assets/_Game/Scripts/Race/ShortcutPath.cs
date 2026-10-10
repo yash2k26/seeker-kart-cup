@@ -34,7 +34,8 @@ namespace KartCup
         /// the road (Pine Ridge's, reversed, is a 90 degree flick at 40 m/s, and the field spun off it). A player may still.
         public const float MaxTurnIn = 50f;
 
-        public static bool Takes(float aggression) => Instance != null && RaceMode.Difficulty >= FieldPace && aggression > 0.5f && Instance.TurnIn <= MaxTurnIn;
+        /// A Tour boss (KartAi.steady) always does: it knows its own circuit. Chase skipped Pine Ridge's and lost to the autopilot.
+        public static bool Takes(float aggression, bool boss = false) => Instance != null && RaceMode.Difficulty >= FieldPace && (boss || aggression > 0.5f) && Instance.TurnIn <= MaxTurnIn;
         public bool Holds(BasicWaypoint w) => w != null && System.Array.IndexOf(path, w) >= 0;
 
         /// Turned round with the circuit (TrackDirection): it is entered from the other end.

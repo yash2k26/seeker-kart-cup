@@ -43,6 +43,12 @@ namespace KartCup
         [SerializeField] TMP_Text[] tileNums = System.Array.Empty<TMP_Text>(), tileGates = System.Array.Empty<TMP_Text>();
         [SerializeField] Image[] tileStars = System.Array.Empty<Image>(), tileBoss = System.Array.Empty<Image>();
         [SerializeField] TMP_Text seriesTitle, seriesTotal;
+        // the header's own title (the series' name inside it), each tile's mode and circuit, and the bar's one line on
+        // what to do next (or why a tapped event is shut)
+        [SerializeField] TMP_Text headerTitle, hint;
+        [SerializeField] TMP_Text[] tileModes = System.Array.Empty<TMP_Text>(), tileWheres = System.Array.Empty<TMP_Text>();
+        string told;   // a closed event's reason, shown until the next tap
+        Color hintColour;
         [SerializeField] Image cardPic;
         int pendingRow = -1;
 
@@ -52,7 +58,8 @@ namespace KartCup
         {
             if (cup < 0) cup = Enumerable.Range(0, Tour.Cups.Length).Where(Tour.Open).DefaultIfEmpty(0).Max();   // the furthest open cup
             picking = true;
-            if (Reopen >= 0) { cup = Mathf.Clamp(Reopen, 0, Tour.Cups.Length - 1); picking = false; Reopen = -1; }
+            if (Reopen >= 0) { cup = Mathf.Clamp(Reopen, 0, Tour.Cups.Length - 1); picking = false; }   // ScreenFlow clears it once the screen is up
+            told = null;
             Show();
         }
 
@@ -66,8 +73,9 @@ namespace KartCup
         /// From the events back to the cards; false when the cards are already up (the flow goes home then).
         public bool Back()
         {
+            if (card != null && card.activeSelf) { CloseCard(); return true; }   // the card first, then the events, then the cards
             if (picking) return false;
-            CloseCard(); picking = true; Show();
+            picking = true; told = null; Show();
             return true;
         }
 
@@ -76,7 +84,16 @@ namespace KartCup
         public void Play(int row)
         {
             var c = Tour.Cups[cup];
-            if (row >= c.events.Length || !Tour.EventOpen(cup, row)) { Haptics.Play(Haptics.Kind.Tick); AudioDirector.Instance?.Error(); return; }
+            if (row >= c.events.Length || !Tour.EventOpen(cup, row))
+            {
+                // a shut event says why, in the bar (Beach Buggy's "earn N more stars"), and shakes no
+                told = row < c.events.Length ? $"EVENT {row + 1}  ·  {Tour.Needs(cup, row)}" : null;
+                Haptics.Play(Haptics.Kind.Tick); AudioDirector.Instance?.Error();
+                if (row < tiles.Length && tiles[row] != null) PrimeTween.Tween.ShakeLocalPosition(tiles[row].transform, new Vector3(14f, 0f, 0f), 0.3f, 18f, useUnscaledTime: true);
+                Show();
+                return;
+            }
+            told = null;
             if (card == null) { ScreenFlow.Instance?.StartTourEvent(c.events[row], c); return; }
             pendingRow = row;
             ShowCard(c, row);
@@ -106,7 +123,7 @@ namespace KartCup
             var rival = e.mode == RaceMode.Kind.Duel && roster != null && e.rival >= 0 ? roster.At(e.rival) : null;
             int got = Tour.Stars(e.id);
             var track = Tracks.At(e.track);
-            if (cardMode != null) cardMode.text = boss ? "BOSS DUEL" : Tour.ModeName(e);
+            if (cardMode != null) cardMode.text = boss ? "BOSS DUEL" : e.reverse && e.mode == RaceMode.Kind.Race && e.items == RaceMode.Items.Normal ? "REVERSE RACE" : Tour.ModeName(e);
             if (cardTitle != null) cardTitle.text = e.title.ToUpperInvariant();
             if (cardTrack != null) cardTrack.text = Tour.Where(e);
             if (cardPic != null) { cardPic.sprite = e.track < trackArt.Length ? trackArt[e.track] : null; cardPic.enabled = cardPic.sprite != null; }
@@ -144,7 +161,17 @@ namespace KartCup
                 }
                 if (i < seriesStars.Length && seriesStars[i] != null) seriesStars[i].SetActive(isOpen);
                 if (i < seriesFoots.Length && seriesFoots[i] != null)
-                    seriesFoots[i].text = isOpen ? $"{Tour.CupStars(i)} / {k.events.Length * Tour.StarsPerEvent}" : $"LOCKED  ·  {Tour.Opener(i)}";
+                {
+                    var f = seriesFoots[i];
+                    f.text = isOpen ? $"{Tour.CupStars(i)} / {k.events.Length * Tour.StarsPerEvent}" : $"LOCKED  ·  {Tour.Opener(i)}";
+                    // beside the star while open; the whole foot, centred, while shut (the hidden star's room pushed it into
+                    // the card's edge, 10 Oct 2026)
+                    var rt = f.rectTransform;
+                    rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(isOpen ? 0f : 0.5f, 0.5f);
+                    rt.anchoredPosition = new Vector2(isOpen ? 92f : 0f, 0f);
+                    rt.sizeDelta = new Vector2(isOpen ? 270f : 340f, 60f);
+                    f.alignment = isOpen ? TextAlignmentOptions.Left : TextAlignmentOptions.Center;
+                }
             }
             for (int i = 0; i < tabBacks.Length; i++)
             {
@@ -176,10 +203,18 @@ namespace KartCup
                 }
                 if (i < tileLocks.Length && tileLocks[i] != null) tileLocks[i].SetActive(!evOpen);
                 if (i < tileGates.Length && tileGates[i] != null) tileGates[i].text = Tour.EventGate(i).ToString();
+                if (i < tileModes.Length && tileModes[i] != null) tileModes[i].text = boss ? $"BOSS  ·  {e.title.Replace("BOSS: ", "")}" : Tour.ModeName(e);
+                if (i < tileWheres.Length && tileWheres[i] != null) tileWheres[i].text = Tour.Where(e);
                 for (int k = 0; k < 3; k++)
                     if (i * 3 + k < tileStars.Length && tileStars[i * 3 + k] != null) tileStars[i * 3 + k].color = k < got ? starOn : starOff;
             }
             if (seriesTitle != null) seriesTitle.text = c.name;
+            if (headerTitle != null) headerTitle.text = picking ? "CHOOSE SERIES" : c.name;
+            if (hint != null)
+            {
+                if (hintColour.a == 0f) hintColour = hint.color;   // the builder's muted ink (textOff belonged to the old tabs and is unset)
+                hint.text = told ?? Next(cup); hint.color = told != null ? starOn : hintColour;
+            }
             if (seriesTotal != null) seriesTotal.text = $"{Tour.CupStars(cup)} / {c.events.Length * Tour.StarsPerEvent}";
             if (total != null) total.text = $"{Tour.Total} / {Tour.MaxStars}";
             if (cupName != null) cupName.text = c.name;
@@ -216,6 +251,17 @@ namespace KartCup
             if (prizeSwatch != null && paint != null) prizeSwatch.color = paint.color;
             if (prizeLabel != null && paint != null)
                 prizeLabel.text = Tour.BossBeaten(cup) ? $"{paint.name}  ·  WON" : $"PRIZE  {paint.name}  +  GOLDEN CHEST";
+        }
+
+        /// The bar's line inside a series: what opens next, or that it is won.
+        static string Next(int cup)
+        {
+            var c = Tour.Cups[cup];
+            if (Tour.BossBeaten(cup))
+                return cup + 1 < Tour.Cups.Length ? $"SERIES WON  ·  {Tour.Cups[cup + 1].name} IS OPEN" : "SERIES WON  ·  THE TOUR IS YOURS";
+            for (int i = 0; i < c.events.Length; i++)
+                if (!Tour.EventOpen(cup, i)) return $"EVENT {i + 1}  ·  {Tour.Needs(cup, i)}";
+            return $"{c.events[^1].title.Replace("BOSS: ", "BEAT ")} TO WIN THE SERIES";
         }
 
         /// Editor-side preview.

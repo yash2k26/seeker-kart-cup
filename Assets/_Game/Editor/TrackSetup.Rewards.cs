@@ -11,17 +11,20 @@ public static partial class TrackSetup
 {
     static void ResultsRewards(RectTransform card, TMP_FontAsset display, TMP_FontAsset body)
     {
-        var sticker = Rect("Chest", card, new Vector2(1, 1), new Vector2(1, 1), new Vector2(70, 70), new Vector2(330, 370));
+        // The sticker overhangs the card's top only: its OPEN pill and both lines of words stay inside the card, above the
+        // series card's time box. (Its words ran past the card's edge and OPEN hung off it and over the times, 10 Oct 2026.)
+        var sticker = Rect("Chest", card, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-24, 70), new Vector2(320, 380));
         sticker.pivot = new Vector2(1, 1);
         var content = Rect("Content", sticker, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-        var img = Rect("Picture", content, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, 0), new Vector2(250, 250));
+        var img = Rect("Picture", content, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, 0), new Vector2(200, 200));
         img.pivot = new Vector2(0.5f, 1);
         var chest = img.gameObject.AddComponent<Image>();
         chest.preserveAspect = true; chest.raycastTarget = false;
-        var label = Text("Label", content, display, "", 30, Design.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -246), new Vector2(330, 40));
-        label.enableAutoSizing = true; label.fontSizeMin = 20; label.fontSizeMax = 30;
-        var stars = Text("Stars", content, body, "", 26, Design.Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -284), new Vector2(330, 34));
-        var open = TextButton("Open", content, "OPEN", Design.Ink600, Design.Paper, 34, display, new Vector2(0.5f, 0), new Vector2(0, -50), new Vector2(220, 84));
+        var label = Text("Label", content, display, "", 30, Design.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -204), new Vector2(300, 40));
+        label.enableAutoSizing = true; label.fontSizeMin = 18; label.fontSizeMax = 30;
+        var stars = Text("Stars", content, body, "", 24, Design.Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -246), new Vector2(300, 32));
+        stars.enableAutoSizing = true; stars.fontSizeMin = 15; stars.fontSizeMax = 24;
+        var open = TextButton("Open", content, "OPEN", Design.Ink600, Design.Paper, 32, display, new Vector2(0.5f, 0), new Vector2(0, 6), new Vector2(200, 72));
         var badge = sticker.gameObject.AddComponent<ChestBadge>();
         new SerializedObject(badge).Do(s =>
         {
@@ -42,7 +45,7 @@ public static partial class TrackSetup
         new SerializedObject(result).Do(s => s.FindProperty("line").objectReferenceValue = weekly);
 
         // a Tour event's stars, a cup it opened, a boss's prize; or the Daily Challenge met (or still to meet)
-        var tourLine = Text("Tour", card, body, "", 32, Design.Accent, TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 300), new Vector2(1100, 50));
+        var tourLine = Text("Tour", card, body, "", 32, Design.Accent, TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 258), new Vector2(1100, 50));   // clear of the boxes above it
         tourLine.enableAutoSizing = true; tourLine.fontSizeMin = 22; tourLine.fontSizeMax = 32;
         var tour = card.gameObject.AddComponent<TourResult>();
         new SerializedObject(tour).Do(s => s.FindProperty("line").objectReferenceValue = tourLine);
@@ -79,8 +82,9 @@ public static partial class TrackSetup
         var got = Text("Got", mid, display, "", 58, Design.Paper, TextAlignmentOptions.Center, new Vector2(0.25f, 0), new Vector2(0, 52), new Vector2(220, 70));
         var goal = Text("Goal", mid, display, "", 58, Design.Paper, TextAlignmentOptions.Center, new Vector2(0.75f, 0), new Vector2(0, 52), new Vector2(220, 70));
         goal.enableAutoSizing = true; goal.fontSizeMin = 26; goal.fontSizeMax = 58;
-        var reward = Text("Reward", mid, display, "", 36, Design.Accent, TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 10), new Vector2(430, 44));
-        var right = Box("Times", new Vector2(860, -330), new Vector2(320, 176));
+        var reward = Text("Reward", mid, display, "", 36, Design.Accent, TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 16), new Vector2(430, 44));
+        reward.enableAutoSizing = true; reward.fontSizeMin = 20; reward.fontSizeMax = 36;
+        var right = Box("Times", new Vector2(860, -334), new Vector2(320, 172));   // under the chest sticker
         Text("YourCap", right, body, "YOUR TIME", 24, Design.Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -12), new Vector2(300, 32));
         var yourTime = Text("YourTime", right, display, "", 44, Design.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -42), new Vector2(300, 52));
         Text("BestCap", right, body, "HIGH SCORE", 24, Design.Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -96), new Vector2(300, 32));

@@ -178,6 +178,10 @@ namespace KartCup
         /// Any tap on the screen (skips a shot).
         public static bool Tapped() => UnityEngine.InputSystem.Pointer.current != null && UnityEngine.InputSystem.Pointer.current.press.wasPressedThisFrame;
 
+        /// The results card is up over the podium: the stage, the drivers and the confetti stay, the words go (they sat on
+        /// top of the card, on their own canvas nearer the camera).
+        public void HideWords() { if (overlay != null) overlay.gameObject.SetActive(false); }
+
         /// Back to the race camera and HUD.
         public void End()
         {

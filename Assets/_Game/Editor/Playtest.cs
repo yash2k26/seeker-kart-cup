@@ -276,8 +276,8 @@ public static class Playtest
         if (player == null || spawner == null) return false;
         var touch = player.GetComponent<KartInputMobile>(); if (touch != null) Object.DestroyImmediate(touch);   // one KartInput per kart
         var first = typeof(RaceSpawner).GetField("firstWaypoint", BindingFlags.NonPublic | BindingFlags.Instance)?.GetValue(spawner) as BasicWaypoint;
-        player.gameObject.AddComponent<KartAi>().Configure(null, first, 99);
-        Debug.Log($"[playtest] autopilot drives {player.racerName}");
+        var pilot = player.gameObject.AddComponent<KartAi>(); pilot.Configure(null, first, 99);
+        Debug.Log($"[playtest] autopilot drives {player.racerName} at skill {pilot.skill:0.000}, aggression {pilot.aggression:0.00}");
         return true;
     }
 
@@ -308,7 +308,7 @@ public static class Playtest
         lastAmmo = ammo;
         if (kart != null && kart.spinningOut && !wasSpinning && hits < 3) { hits++; moments.Add((t + 0.35, $"hit{track}-{hits}a")); moments.Add((t + 0.8, $"hit{track}-{hits}b")); }
         wasSpinning = kart != null && kart.spinningOut;
-        if (p.finished && !wasFinished) foreach (var d in new[] { 0.3, 1.0, 1.7, 2.4, 3.2 }) moments.Add((t + d, $"finish{track}-{d:0.0}"));
+        if (p.finished && !wasFinished) foreach (var d in new[] { 0.3, 1.0, 1.7, 2.4, 3.2, 10.0, 14.0 }) moments.Add((t + d, d < 5 ? $"finish{track}-{d:0.0}" : $"card{track}-{d:0}"));   // and the results card after the podium
         wasFinished = p.finished;
         for (int i = moments.Count - 1; i >= 0; i--)
             if (t >= moments[i].at)
@@ -449,14 +449,17 @@ public static class Playtest
 
     static void Capture(string name)
     {
-        var cam = Camera.main;
+        // the podium films on its own camera with the race camera off, and it is not the MainCamera: take whichever is live
+        var cam = Camera.main ?? Object.FindObjectsByType<Camera>(FindObjectsSortMode.None).Where(c => c.isActiveAndEnabled && c.targetTexture == null).OrderByDescending(c => c.depth).FirstOrDefault();
         if (cam == null) return;
         // Screen-space-overlay canvases never land in a RenderTexture: borrow the camera for the shot (or, with
         // -nohud, leave them out for a clean frame of the world).
         foreach (var canvas in Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None))
         {
             if (noHud) break;
-            if (canvas.renderMode != RenderMode.ScreenSpaceOverlay) continue;
+            // (one an earlier shot bound to the race camera, now off for the podium, is bound to this one)
+            bool stale = canvas.renderMode == RenderMode.ScreenSpaceCamera && (canvas.worldCamera == null || !canvas.worldCamera.isActiveAndEnabled);
+            if (canvas.renderMode != RenderMode.ScreenSpaceOverlay && !stale) continue;
             canvas.renderMode = RenderMode.ScreenSpaceCamera;
             canvas.worldCamera = cam;
             canvas.planeDistance = 1f;

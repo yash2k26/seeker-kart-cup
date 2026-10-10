@@ -55,6 +55,7 @@ namespace KartCup
             var order = FinishOrder(race);
             int place = Mathf.Max(1, order.IndexOf(who) + 1);
             if (Weekly.Racing) { TimeTrial(who); return; }
+            Debug.Log($"[race] the player finished {RaceHud.Ordinal(place)} of {order.Count} in {who.finishTime:0.00} s ({RaceMode.EventId}{(RaceMode.Current == RaceMode.Kind.Duel ? ", a duel" : "")})");
             if (RaceMode.Alone) place = SmashUp.Place;   // a Smash-Up places by its stars, so the gems and the chest pay the same
             Cup.Record(order.Select(r => r.characterIndex).ToList());
             bool newBest = !RaceMode.Alone && Tracks.RecordBest(RaceMode.BestKey(Cup.TrackId), who.finishTime);
@@ -137,6 +138,7 @@ namespace KartCup
             // over the podium the dim is lighter, so the confetti and the trophies still show round the card
             var dim = panel.GetComponent<Image>();
             if (dim != null) { var c = dim.color; c.a = podium ? 0.5f : 0.74f; dim.color = c; }
+            if (podium) FindAnyObjectByType<PodiumShow>()?.HideWords();
             UiMotion.Show(panel, panel.transform.childCount > 0 ? panel.transform.GetChild(0) : null);
         }
 
@@ -327,7 +329,11 @@ namespace KartCup
                 return;
             }
             // RACE AGAIN and NEW CUP are the same thing: the track list this cup ran, from the top.
-            if (Cup.IsFinalRace) Cup.Begin(Cup.PlayerCharacter, roster != null ? roster.characters.Length : 8, Cup.TrackList);
+            if (Cup.IsFinalRace)
+            {
+                Cup.Begin(Cup.PlayerCharacter, roster != null ? roster.characters.Length : 8, Cup.TrackList);
+                if (RaceMode.InEvent) Cup.StartAtBack();   // a series event again starts from the back again
+            }
             else Cup.Advance();
             ScreenFlow.Instance?.LoadCupRace();
         }

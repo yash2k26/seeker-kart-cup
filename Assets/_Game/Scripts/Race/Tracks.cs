@@ -24,6 +24,9 @@ namespace KartCup
         };
 
         public static int Count => All.Length;
+        /// Laps a race runs (RaceManager.totalLaps, TrackSetup, worker/src/tracks.json): one since 10 Oct 2026, the user.
+        /// A Tour event may ask for more (RaceMode.Laps).
+        public const int Laps = 1;
         public static Def At(int i) => All[Mathf.Clamp(i, 0, All.Length - 1)];
         public static string SceneOf(int i) => "Race" + (Mathf.Clamp(i, 0, All.Length - 1) + 1);
         public static int IndexOf(string id) { for (int i = 0; i < All.Length; i++) if (All[i].id == id) return i; return 0; }

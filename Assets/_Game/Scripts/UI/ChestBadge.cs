@@ -27,7 +27,7 @@ namespace KartCup
             if (content != null) content.SetActive(show);
             if (!show) return;
             if (stars != null) stars.text = (tier == null ? $"STARS  {Chests.Stars}/{Chests.StarGoal}" : $"+{gained} STARS  ·  {Chests.Stars}/{Chests.StarGoal}")
-                                            + (Gems.LastPodium > 0 ? $"  ·  +{Gems.LastPodium} GEMS" : "");
+                                            + (Gems.LastPodium > 0 && !TourCard ? $"  ·  +{Gems.LastPodium} GEMS" : "");
             if (openButton != null) openButton.SetActive(tier != null && Chests.Pending > 0 && ChestReveal.Instance != null && !ChestReveal.Instance.Showing);
             if (chest != null) chest.enabled = tier != null;
             if (label != null) label.text = tier == null ? "Podium finishes earn chests" : filled ? "+ GOLDEN TREASURE CHEST!" : Chests.Names[(int)tier.Value];
@@ -39,6 +39,9 @@ namespace KartCup
             t.localScale = Vector3.zero;
             Tween.Scale(t, Vector3.one, 0.45f, Ease.OutBack, startDelay: 0.35f, useUnscaledTime: true);
         }
+
+        /// A series race's card shows its gems in its own reward line (EventResult): not twice.
+        static bool TourCard => RaceMode.InEvent && RaceMode.EventId != "daily" && !Weekly.Racing;
 
         public void Open() { ChestReveal.Instance?.OpenNext(); if (openButton != null) openButton.SetActive(false); }
     }

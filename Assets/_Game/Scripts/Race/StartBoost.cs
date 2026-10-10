@@ -11,6 +11,8 @@ namespace KartCup
     {
         const float Window = 0.4f;                              // seconds before GO a press counts
         [SerializeField] TMP_Text hint;
+        [SerializeField] GameObject plate;                       // the hint's backing, shown and hidden with it
+        GameObject Shown => plate != null ? plate : hint != null ? hint.gameObject : null;
         RaceManager race;
         float pressedAt = -1f;                                   // seconds left on the countdown when DRIFT went down
         bool wasDown, fired;
@@ -19,13 +21,14 @@ namespace KartCup
         {
             race = RaceManager.Instance;
             if (race != null) race.onGo.AddListener(Go);
-            if (hint != null) hint.gameObject.SetActive(false);
+            Shown?.SetActive(false);
         }
 
         void Update()
         {
             bool counting = race != null && race.state == RaceManager.State.Countdown && race.countdown > 0f;
-            if (hint != null && hint.gameObject.activeSelf != counting) hint.gameObject.SetActive(counting);
+            var shown = Shown;
+            if (shown != null && shown.activeSelf != counting) shown.SetActive(counting);
             if (!counting) { wasDown = false; return; }
             bool down = InputManager.MobileInput.driftButton;
             if (down && !wasDown) pressedAt = race.countdown;     // the last press is the one that counts

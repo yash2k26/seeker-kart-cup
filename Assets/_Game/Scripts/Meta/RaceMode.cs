@@ -25,6 +25,8 @@ namespace KartCup
         /// A boss's special charges this many times as fast as yours (said on the event card, so it is a rule, not a cheat).
         public static float BossCharge = 1f;
         public static Items Rule = Items.Normal;
+        /// More of the circuit's hazards (oil, animal crossings): 0 in a free race and the Tour's first cup, up to 4.
+        public static int Hazard;
         public static int Laps = 1;
         /// The circuit driven the other way round (TrackDirection), and in thick mist.
         public static bool Reverse, Mist;
@@ -43,7 +45,7 @@ namespace KartCup
         public static void Clear()
         {
             Current = Kind.Race; Rival = -1; Difficulty = 1f; Fire = 1f; BossCharge = 1f;
-            Rule = Items.Normal; Laps = 1; Reverse = Mist = false; EventId = "";
+            Rule = Items.Normal; Laps = 1; Reverse = Mist = false; EventId = ""; Hazard = 0;
         }
 
         /// The personal best this race is kept under: the circuit's own for an ordinary race, its own row otherwise.
