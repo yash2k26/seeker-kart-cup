@@ -982,15 +982,16 @@ public static partial class MenuSetup
         var dim = Rect("Dim", screen.transform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(600, 600));
         dim.gameObject.AddComponent<Image>().color = new Color(Deep.r, Deep.g, Deep.b, 0.68f);
         Header(screen.transform, "SETTINGS", nameof(ScreenFlow.ShowTitle));
-        var card = Rect("Card", screen.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -70), new Vector2(1240, 780));
+        var card = Rect("Card", screen.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -70), new Vector2(1240, 836));
         Design.AsCard(card, Panel);
 
-        SettingRow(card, SettingToggle.Which.AutoGas, "AUTO GAS", "The kart drives itself; brake to slow down", -40);
-        SettingRow(card, SettingToggle.Which.Sound, "SOUND", "Everything you hear", -160);
-        SettingRow(card, SettingToggle.Which.Music, "MUSIC", "The soundtrack only", -280);
-        SettingRow(card, SettingToggle.Which.Haptics, "VIBRATION", "Taps, hits and boosts", -400);
-        SettingRow(card, SettingToggle.Which.Shake, "SCREEN SHAKE", "Turn off if it makes you queasy", -520);
-        SettingRow(card, SettingToggle.Which.Fps, "FRAME COUNTER", "For testing", -640);
+        SettingRow(card, SettingToggle.Which.Steering, "STEERING", "", -32);
+        SettingRow(card, SettingToggle.Which.AutoGas, "AUTO GAS", "The kart drives itself; brake to slow down", -144);
+        SettingRow(card, SettingToggle.Which.Sound, "SOUND", "Everything you hear", -256);
+        SettingRow(card, SettingToggle.Which.Music, "MUSIC", "The soundtrack only", -368);
+        SettingRow(card, SettingToggle.Which.Haptics, "VIBRATION", "Taps, hits and boosts", -480);
+        SettingRow(card, SettingToggle.Which.Shake, "SCREEN SHAKE", "Turn off if it makes you queasy", -592);
+        SettingRow(card, SettingToggle.Which.Fps, "FRAME COUNTER", "For testing", -704);
         return screen;
     }
 
@@ -1010,15 +1011,22 @@ public static partial class MenuSetup
                         new Vector2(0, 0.5f), new Vector2(40, -26), new Vector2(700, 36));
         sub.rectTransform.pivot = new Vector2(0, 0.5f);
 
-        // the switch: a trough with a knob that slides to ON
-        var track = Rect("Switch", rt, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-40, 0), new Vector2(140, 72));
+        // the switch: a trough with a knob that slides to ON. STEERING cycles three ways instead: a wider lit pill
+        // with the chosen way written in it, and the hint line says how that way works
+        bool cycle = which == SettingToggle.Which.Steering;
+        var track = Rect("Switch", rt, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-40, 0), new Vector2(cycle ? 220 : 140, 72));
         track.pivot = new Vector2(1, 0.5f);
-        var trackImg = Design.AsPill(track, Deep);
+        var trackImg = Design.AsPill(track, cycle ? Design.Lit : Deep);
         trackImg.raycastTarget = false;
-        var knob = Rect("Knob", track, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(56, 56));
-        Design.AsPill(knob, Paper).raycastTarget = false;
-        var state = Label(caption + "State", rt, strong, "", 26, Muted, TextAlignmentOptions.Right,
-                          new Vector2(1, 0.5f), new Vector2(-200, 0), new Vector2(100, 40));
+        RectTransform knob = null;
+        if (!cycle)
+        {
+            knob = Rect("Knob", track, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(56, 56));
+            Design.AsPill(knob, Paper).raycastTarget = false;
+        }
+        var state = cycle
+            ? Label(caption + "State", track, strong, "", 30, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(200, 44))
+            : Label(caption + "State", rt, strong, "", 26, Muted, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-200, 0), new Vector2(100, 40));
 
         var toggle = rt.gameObject.AddComponent<SettingToggle>();
         var so = new SerializedObject(toggle);
@@ -1028,6 +1036,7 @@ public static partial class MenuSetup
         so.FindProperty("track").objectReferenceValue = trackImg;
         so.FindProperty("knob").objectReferenceValue = knob;
         so.FindProperty("state").objectReferenceValue = state;
+        if (cycle) so.FindProperty("hint").objectReferenceValue = sub;
         so.FindProperty("onColour").colorValue = Design.Lit;
         so.FindProperty("offColour").colorValue = Deep;
         so.FindProperty("travel").floatValue = 34f;

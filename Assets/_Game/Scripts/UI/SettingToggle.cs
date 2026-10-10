@@ -9,7 +9,7 @@ namespace KartCup
     /// hit area. The knob slides and the track lights (the shell's lit violet, not the action gold) when it is on.
     public sealed class SettingToggle : MonoBehaviour
     {
-        public enum Which { Shake, Haptics, Fps, Sound, Music, AutoGas }
+        public enum Which { Shake, Haptics, Fps, Sound, Music, AutoGas, Steering }
 
         [SerializeField] Which setting;
         [SerializeField] TMP_Text label;
@@ -17,6 +17,7 @@ namespace KartCup
         [SerializeField] Image track;
         [SerializeField] RectTransform knob;
         [SerializeField] TMP_Text state;
+        [SerializeField] TMP_Text hint;              // STEERING only: the row cycles three ways, and says how the chosen one works
         [SerializeField] Color onColour = new(0.455f, 0.275f, 1f), offColour = new(0.05f, 0.012f, 0.15f);
         [SerializeField] float travel = 34f;
 
@@ -32,6 +33,7 @@ namespace KartCup
                 case Which.Sound: Settings.Sound = !Settings.Sound; break;
                 case Which.Music: Settings.Music = !Settings.Music; break;
                 case Which.AutoGas: Settings.AutoGas = !Settings.AutoGas; break;
+                case Which.Steering: Settings.Steering = (Settings.Steer)(((int)Settings.Steering + 1) % 3); break;
             }
             Refresh(true);
             if (setting == Which.Haptics) Haptics.Play(Haptics.Kind.Tick);   // felt only when it was just turned on, which is the point
@@ -50,6 +52,18 @@ namespace KartCup
         {
             bool on = Value;
             if (label != null) label.text = caption;
+            if (setting == Which.Steering)
+            {
+                var mode = Settings.Steering;
+                if (state != null) state.text = mode.ToString().ToUpperInvariant();
+                if (hint != null) hint.text = mode switch
+                {
+                    Settings.Steer.Slide => "Slide your left thumb sideways, anywhere",
+                    Settings.Steer.Tilt => "Tilt the phone like a wheel",
+                    _ => "Two arrows under your left thumb",
+                };
+                return;
+            }
             if (state != null) state.text = on ? "ON" : "OFF";
             if (track != null) track.color = on ? onColour : offColour;
             if (knob == null) return;

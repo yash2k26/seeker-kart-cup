@@ -852,8 +852,14 @@ public static partial class TrackSetup
         // One accent: GAS is the action a thumb holds for the whole race, so it carries the accent and nothing else does.
         // The item button lights up only while an item is actually armed (RaceHud tints it), which is a state, not chrome.
         var ink = Design.Ink700;
-        Button("SteerLeft", safe.transform, input, HoldButton.Control.SteerLeft, ink, new Vector2(0, 0), new Vector2(64, 64), new Vector2(240, 184), "", display, steering, "arrow_basic_w");
-        Button("SteerRight", safe.transform, input, HoldButton.Control.SteerRight, ink, new Vector2(0, 0), new Vector2(328, 64), new Vector2(240, 184), "", display, steering, "arrow_basic_e");
+        var steerL = Button("SteerLeft", safe.transform, input, HoldButton.Control.SteerLeft, ink, new Vector2(0, 0), new Vector2(64, 64), new Vector2(240, 184), "", display, steering, "arrow_basic_w").GetComponent<CanvasGroup>();
+        var steerR = Button("SteerRight", safe.transform, input, HoldButton.Control.SteerRight, ink, new Vector2(0, 0), new Vector2(328, 64), new Vector2(240, 184), "", display, steering, "arrow_basic_e").GetComponent<CanvasGroup>();
+        new SerializedObject(steering).Do(s => { s.FindProperty("leftArrow").objectReferenceValue = steerL; s.FindProperty("rightArrow").objectReferenceValue = steerR; });
+        // STEERING = SLIDE: the whole left half is the wheel (under every button, so ability and pause still win)
+        var slide = Rect("SlideArea", safe.transform, Vector2.zero, new Vector2(0.5f, 1f), Vector2.zero, Vector2.zero);
+        slide.SetAsFirstSibling();
+        slide.gameObject.AddComponent<Image>().color = Color.clear;
+        new SerializedObject(slide.gameObject.AddComponent<TouchSteerArea>()).Do(s => s.FindProperty("input").objectReferenceValue = input);
         var gasBtn = Button("Gas", safe.transform, input, HoldButton.Control.Accelerate, Design.Accent, new Vector2(1, 0), new Vector2(-64, 64), new Vector2(288, 184), "GAS", display, steering);
         var driftBtn = Button("Drift", safe.transform, input, HoldButton.Control.Drift, ink, new Vector2(1, 0), new Vector2(-376, 64), new Vector2(224, 184), "DRIFT", display, steering);
         var brakeBtn = Button("Brake", safe.transform, input, HoldButton.Control.Brake, ink, new Vector2(1, 0), new Vector2(-624, 64), new Vector2(184, 150), "BRAKE", display, steering);
@@ -910,6 +916,9 @@ public static partial class TrackSetup
             l.FindProperty("item").objectReferenceValue = itemBtn.rectTransform;
             l.FindProperty("meter").objectReferenceValue = meterBack;
             l.FindProperty("itemLabel").objectReferenceValue = item.rectTransform;
+            l.FindProperty("steerLeft").objectReferenceValue = steerL;
+            l.FindProperty("steerRight").objectReferenceValue = steerR;
+            l.FindProperty("slideArea").objectReferenceValue = slide.gameObject;
         });
 
         var fpsCounter = canvasGo.AddComponent<FpsCounter>();
@@ -1025,19 +1034,20 @@ public static partial class TrackSetup
         dim.gameObject.AddComponent<Image>().color = new Color(Design.Ink900.r, Design.Ink900.g, Design.Ink900.b, 0.74f);
         var card = Rect("Card", dim, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(920, 900));
         Design.AsCard(card, Design.Ink800);
-        Text("Headline", card, display, "PAUSED", 82, Design.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -40), new Vector2(800, 100));
+        Text("Headline", card, display, "PAUSED", 82, Design.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -28), new Vector2(800, 100));
         // Beach Buggy's pause has Audio and Controls: the switches a player reaches for mid-race, the settings screen's own rows
-        foreach (var (which, caption, hint, y) in new[] { (SettingToggle.Which.AutoGas, "AUTO GAS", "The kart drives itself", -150f),
-                                                          (SettingToggle.Which.Sound, "SOUND", "Everything you hear", -262f),
-                                                          (SettingToggle.Which.Music, "MUSIC", "The soundtrack only", -374f) })
+        foreach (var (which, caption, hint, y) in new[] { (SettingToggle.Which.Steering, "STEERING", "", -134f),
+                                                          (SettingToggle.Which.AutoGas, "AUTO GAS", "The kart drives itself", -232f),
+                                                          (SettingToggle.Which.Sound, "SOUND", "Everything you hear", -330f),
+                                                          (SettingToggle.Which.Music, "MUSIC", "The soundtrack only", -428f) })
         {
             MenuSetup.SettingRow(card, which, caption, hint, y);
             var row = (RectTransform)card.Find(caption);
-            row.sizeDelta = new Vector2(820, 100);
+            row.sizeDelta = new Vector2(820, 92);
         }
 
         var menu = new GameObject("PauseMenu").AddComponent<PauseMenu>();
-        var resume = TextButton("Resume", card, "RESUME", Design.Accent, paper, 48, display, new Vector2(0.5f, 0), new Vector2(0, 244), new Vector2(580, 124));
+        var resume = TextButton("Resume", card, "RESUME", Design.Accent, paper, 48, display, new Vector2(0.5f, 0), new Vector2(0, 224), new Vector2(580, 124));
         var restart = TextButton("Restart", card, "RESTART", slate, paper, 38, display, new Vector2(0.5f, 0), new Vector2(-152, 80), new Vector2(276, 112));
         var quit = TextButton("Quit", card, "QUIT", slate, paper, 38, display, new Vector2(0.5f, 0), new Vector2(152, 80), new Vector2(276, 112));
         UnityEditor.Events.UnityEventTools.AddPersistentListener(resume.onClick, menu.Resume);

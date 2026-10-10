@@ -31,6 +31,11 @@ public static class Playtest
     // -gatewalk: the player keeps the phone's touch input and is carried through every gate in turn, so the line is
     // crossed inside a real trigger callback, as on a phone (the autopilot's AI input hid the finish bug of 10 Oct 2026).
     static bool gatewalk; static int walkGate; static double nextWalk;
+    // -steer arrows|slide|tilt: the STEERING setting for this run, put back on exit. Under slide, 4 s after GO a thumb
+    // lands on the left arrow's spot and slides right: the raycast must reach the slide area under the dimmed arrows,
+    // and the kart must turn right.
+    static string steer; static KartCup.Settings.Steer prevSteer; static int thumbStep;
+    static UnityEngine.EventSystems.PointerEventData thumb; static GameObject thumbOn; static Vector2 thumbFrom; static Vector3 thumbHeading; static float thumbMax; static bool thumbShot;
     static float[][] sweep;   // -camsweep "dist,height,look,fov;...": each auto frame with the next camera
     // with -autopilot, frames on the moments that matter: a pickup (the roulette), a hit (the throw), the finish
     static readonly System.Collections.Generic.List<(double at, string name)> moments = new();
@@ -77,6 +82,9 @@ public static class Playtest
         Ability.Used -= OnAbility; Ability.Used += OnAbility; abilities = 0;
         for (int i = 0; i < args.Length - 1; i++) { if (args[i] == "-every") double.TryParse(args[i + 1], out every); if (args[i] == "-seconds") double.TryParse(args[i + 1], out until); }
         sweep = null;
+        steer = null; thumbStep = 0; thumbMax = 0f;
+        for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-steer") steer = args[i + 1];
+        if (steer != null) { prevSteer = KartCup.Settings.Steering; KartCup.Settings.Steering = steer == "slide" ? KartCup.Settings.Steer.Slide : steer == "tilt" ? KartCup.Settings.Steer.Tilt : KartCup.Settings.Steer.Arrows; }
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-camsweep")
             sweep = args[i + 1].Split(';').Select(v => v.Split(',').Select(x => float.Parse(x, System.Globalization.CultureInfo.InvariantCulture)).ToArray()).ToArray();
         prevQuality = QualitySettings.GetQualityLevel();
@@ -176,6 +184,7 @@ public static class Playtest
         // (timed from the green light: the drone's lap before it is as long as the circuit)
         var raceNow = Object.FindFirstObjectByType<RaceManager>();
         if (goAt < 0 && raceNow != null && raceNow.state == RaceManager.State.Racing) goAt = t;
+        if (steer == "slide" && goAt >= 0 && raceNow.Player != null) SlideThumb(t - goAt - 4, raceNow.Player);
         if (item != null && !armed && goAt >= 0 && t >= goAt + 2.0)
         {
             armed = true;
@@ -220,6 +229,7 @@ public static class Playtest
         Report(t);
         Debug.Log("[playtest] done");
         if (mobile) QualitySettings.SetQualityLevel(prevQuality, true);
+        if (steer != null) KartCup.Settings.Steering = prevSteer;
         EditorApplication.Exit(0);
     }
 
@@ -272,6 +282,38 @@ public static class Playtest
                 if (name.StartsWith("side:")) SideShot(name.Substring(5)); else Capture(name);
                 Debug.Log($"[playtest] moment {name}"); moments.RemoveAt(i);
             }
+    }
+
+    /// A thumb through the real event system: down on the left arrow's spot, 300 px right over half a second, held,
+    /// lifted at 2 s. Logs what the touch hit, the steer it made and how far the kart turned.
+    static void SlideThumb(double s, KartProgress p)
+    {
+        if (s < 0 || thumbStep > 1) return;
+        var kart = p.GetComponent<Kart>(); var heading = kart.rotator != null ? kart.rotator : p.transform;
+        if (thumbStep == 0)
+        {
+            var es = UnityEngine.EventSystems.EventSystem.current;
+            var arrow = GameObject.Find("SteerLeft");
+            if (es == null || arrow == null) { Debug.Log("[playtest] slide: no event system or no arrows"); thumbStep = 2; return; }
+            thumbFrom = RectTransformUtility.WorldToScreenPoint(null, arrow.transform.position);
+            thumb = new UnityEngine.EventSystems.PointerEventData(es) { position = thumbFrom, pressPosition = thumbFrom };
+            var hits = new System.Collections.Generic.List<UnityEngine.EventSystems.RaycastResult>(); es.RaycastAll(thumb, hits);
+            thumbOn = hits.Count > 0 ? hits[0].gameObject : null;
+            Debug.Log($"[playtest] slide: a thumb on the left arrow ({thumbFrom}) lands on {(thumbOn != null ? thumbOn.name : "nothing")} (want SlideArea); arrows block touches: {arrow.GetComponent<CanvasGroup>().blocksRaycasts}");
+            thumbOn = UnityEngine.EventSystems.ExecuteEvents.GetEventHandler<UnityEngine.EventSystems.IPointerDownHandler>(thumbOn);
+            UnityEngine.EventSystems.ExecuteEvents.Execute(thumbOn, thumb, UnityEngine.EventSystems.ExecuteEvents.pointerDownHandler);
+            thumbHeading = Vector3.ProjectOnPlane(heading.forward, Vector3.up); thumbStep = 1; thumbShot = false;
+            return;
+        }
+        if (!thumbShot && s >= 1.2) { thumbShot = true; Capture($"steer{track}-slide"); }
+        thumb.position = thumbFrom + Vector2.right * 300f * Mathf.Clamp01((float)s / 0.5f);
+        UnityEngine.EventSystems.ExecuteEvents.Execute(thumbOn, thumb, UnityEngine.EventSystems.ExecuteEvents.dragHandler);
+        thumbMax = Mathf.Max(thumbMax, InputManager.MobileInput.steerInput);
+        if (s < 2) return;
+        UnityEngine.EventSystems.ExecuteEvents.Execute(thumbOn, thumb, UnityEngine.EventSystems.ExecuteEvents.pointerUpHandler);
+        float turned = Vector3.SignedAngle(thumbHeading, Vector3.ProjectOnPlane(heading.forward, Vector3.up), Vector3.up);
+        Debug.Log($"[playtest] slide: handler {(thumbOn != null ? thumbOn.name : "none")}, steer peaked at {thumbMax:F2}, the kart turned {turned:F0} deg (right is +)");
+        thumbStep = 2;
     }
 
     /// What the feel layer is doing right now: the bubbles drawn, the speed lines' state, the player's boost.

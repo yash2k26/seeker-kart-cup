@@ -14,6 +14,14 @@ namespace KartCup
         public static bool Music { get => Get("kc.music"); set { Set("kc.music", value); AudioDirector.Instance?.ApplyVolume(); } }
         /// The kart accelerates by itself (Beach Buggy's way); off, GAS must be held. ControlLayout moves the buttons to match.
         public static bool AutoGas { get => Get("kc.autogas"); set { Set("kc.autogas", value); ControlLayout.ApplyAll(); } }
+        /// How the kart is steered: the two arrows, a drag anywhere on the left half (wherever the thumb lands is
+        /// centre), or tilting the phone. Not Beach Buggy's hold-a-screen-half: our DRIFT sits on the right half.
+        public enum Steer { Arrows, Slide, Tilt }
+        public static Steer Steering
+        {
+            get => (Steer)Mathf.Clamp(PlayerPrefs.GetInt("kc.steer", 0), 0, 2);
+            set { PlayerPrefs.SetInt("kc.steer", (int)value); PlayerPrefs.Save(); ControlLayout.ApplyAll(); }
+        }
 
         /// Called once at boot so a setting stored last session is live before anything reads it.
         public static void Apply()
