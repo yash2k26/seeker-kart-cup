@@ -81,7 +81,13 @@ namespace KartCup
             var race = RaceManager.Instance;
 
             // ---- advance along the chain ----
-            if ((targetPoint.transform.position - tr.position).sqrMagnitude <= targetPoint.radius * targetPoint.radius)
+            // Reached when within its radius, or once past it: across the line through it square to the road, close by. On
+            // the radius alone a kart knocked off its line could never get onto a missed point again and circled it (the
+            // reversed Speedway's hairpin, 17 s, 11 Oct 2026).
+            Vector3 toTarget = targetPoint.transform.position - tr.position;
+            Vector3 roadHere = nextPoint.transform.position - targetPoint.transform.position;
+            bool passed = toTarget.sqrMagnitude < 40f * 40f && Vector3.Dot(-toTarget, roadHere) > 0f;
+            if (toTarget.sqrMagnitude <= targetPoint.radius * targetPoint.radius || passed)
             {
                 var reached = targetPoint;
                 targetPoint = targetPoint.nextPoint;

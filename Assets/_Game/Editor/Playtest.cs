@@ -285,10 +285,18 @@ public static class Playtest
         return true;
     }
 
+    static double nextTrace;
     static void Moments(double t)
     {
         var race = Object.FindFirstObjectByType<RaceManager>(); var p = race != null ? race.Player : null;
         if (p == null) return;
+        // -trace: the player's kart once a second (where, how fast, on the ground, spinning, what it aims at)
+        if (System.Environment.GetCommandLineArgs().Contains("-trace") && race.state == RaceManager.State.Racing && t >= nextTrace)
+        {
+            nextTrace = t + 1.0;
+            var k = p.GetComponent<Kart>(); var ai = p.GetComponent<KartAi>();
+            Debug.Log($"[trace] {race.raceTime:0.0}s at {p.transform.position:F0} v={k.velMag:0} ground={k.grounded} spin={k.spinningOut} gate={p.checkpointIndex} aim={(ai != null && ai.targetPoint != null ? ai.targetPoint.name : "-")}");
+        }
         if (!countShot && race.state == RaceManager.State.Countdown && race.countdown < 1.6f) { countShot = true; Capture($"countdown{track}"); }
         if (oobTest && !oobDone && goAt >= 0 && t > goAt + 8)
         {
