@@ -79,9 +79,9 @@ public static partial class TrackSetup
         }
         Text("GotCap", mid, body, "YOU GOT", 26, Design.Muted, TextAlignmentOptions.Center, new Vector2(0.25f, 0), new Vector2(0, 116), new Vector2(220, 36));
         Text("GoalCap", mid, body, "GOAL", 26, Design.Muted, TextAlignmentOptions.Center, new Vector2(0.75f, 0), new Vector2(0, 116), new Vector2(220, 36));
-        var got = Text("Got", mid, display, "", 58, Design.Paper, TextAlignmentOptions.Center, new Vector2(0.25f, 0), new Vector2(0, 52), new Vector2(220, 70));
-        var goal = Text("Goal", mid, display, "", 58, Design.Paper, TextAlignmentOptions.Center, new Vector2(0.75f, 0), new Vector2(0, 52), new Vector2(220, 70));
-        goal.enableAutoSizing = true; goal.fontSizeMin = 26; goal.fontSizeMax = 58;
+        var got = Text("Got", mid, display, "", 58, Design.Paper, TextAlignmentOptions.Center, new Vector2(0.25f, 0), new Vector2(0, 52), new Vector2(200, 70));
+        var goal = Text("Goal", mid, display, "", 58, Design.Paper, TextAlignmentOptions.Center, new Vector2(0.75f, 0), new Vector2(0, 52), new Vector2(200, 70));
+        foreach (var t in new[] { got, goal }) { t.enableAutoSizing = true; t.fontSizeMin = 18; t.fontSizeMax = 58; }   // each to its own half: "12 SMASHED" fits
         var reward = Text("Reward", mid, display, "", 36, Design.Accent, TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 16), new Vector2(430, 44));
         reward.enableAutoSizing = true; reward.fontSizeMin = 20; reward.fontSizeMax = 36;
         var right = Box("Times", new Vector2(860, -334), new Vector2(320, 172));   // under the chest sticker

@@ -8,11 +8,20 @@ namespace KartCup
     public sealed class PerfLog : MonoBehaviour
     {
         float acc, worst; int frames, hitches; bool told;
+        float countAcc; int countFrames; bool reported;
 
         void Update()
         {
             var race = RaceManager.Instance;
             if (race == null) return;
+            // The 3-2-1 is the render budget's second chance: its first is the drone's lap, and a tap skips that before it
+            // proves anything (on the phone with the intro skipped, Palm Bay ran 42 fps at the full 4x MSAA all session).
+            if (race.state == RaceManager.State.Countdown) { countAcc += Time.unscaledDeltaTime; countFrames++; return; }
+            if (!reported && race.state == RaceManager.State.Racing)
+            {
+                reported = true;
+                if (!RenderBudget.MeasuredThisRace && countAcc > 1.5f) RenderBudget.Report(countFrames / countAcc);
+            }
             if (race.state == RaceManager.State.Finished) { if (!told && frames > 0) Flush(race); told = true; return; }
             if (race.state != RaceManager.State.Racing) return;
             float dt = Time.unscaledDeltaTime;

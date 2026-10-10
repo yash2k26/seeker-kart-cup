@@ -137,14 +137,14 @@ namespace KartCup
         public static string Variant(Event e) => string.Join("  ·  ", new[] { e.reverse ? "REVERSE" : null, e.mist ? "MIST" : null, e.laps > 1 ? $"{e.laps} LAPS" : null }.Where(x => x != null));
         public static string Goal(Event e) => e.mode switch
         {
-            RaceMode.Kind.Duel => "WIN", RaceMode.Kind.Elimination => "LAST ONE IN", RaceMode.Kind.Smash => "2 IN 5", _ => "1ST",
+            RaceMode.Kind.Duel => "WIN", RaceMode.Kind.Smash => "2 IN 5", _ => "1ST",   // (Elimination's "LAST ONE IN" ran into "3RD" on the results card)
         };
         public static string Rule(Event e, string rival)
         {
             string rule = e.mode switch
             {
                 RaceMode.Kind.Duel => (rival != null ? $"One on one against {rival}." : "One on one.") + " Their special charges faster than yours. First over the line wins.",
-                RaceMode.Kind.Elimination => "The last kart is knocked out every 15 seconds. Be the last one left.",
+                RaceMode.Kind.Elimination => $"The last kart is knocked out at {Elimination.First:0} seconds, then every {Elimination.Every:0}. Be the last one left.",
                 RaceMode.Kind.Smash => "Alone for a lap. Smash the crates and critters by the road: two in every five for three stars.",
                 _ => e.items switch
                 {

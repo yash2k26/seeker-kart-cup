@@ -58,10 +58,12 @@ namespace KartCup
             Debug.Log($"[race] the player finished {RaceHud.Ordinal(place)} of {order.Count} in {who.finishTime:0.00} s ({RaceMode.EventId}{(RaceMode.Current == RaceMode.Kind.Duel ? ", a duel" : "")})");
             if (RaceMode.Alone) place = SmashUp.Place;   // a Smash-Up places by its stars, so the gems and the chest pay the same
             Cup.Record(order.Select(r => r.characterIndex).ToList());
-            bool newBest = !RaceMode.Alone && Tracks.RecordBest(RaceMode.BestKey(Cup.TrackId), who.finishTime);
+            // knocked out of an Elimination is not a lap: its "time" is a ranking placeholder (Elimination.Knock), never a best
+            bool lapped = who.finishTime < 1e5f;
+            bool newBest = !RaceMode.Alone && lapped && Tracks.RecordBest(RaceMode.BestKey(Cup.TrackId), who.finishTime);
             Gems.Podium(place);   // and gems (ChestBadge shows both on the card)
             Chests.Earn(place);   // a podium earns a chest (ChestBadge shows it on the card)
-            if (RaceMode.EventId == "daily") Daily.Record(place); else if (RaceMode.InEvent) Tour.Record(RaceMode.EventId, place, who.finishTime);   // TourResult shows it
+            if (RaceMode.EventId == "daily") Daily.Record(place); else if (RaceMode.InEvent) Tour.Record(RaceMode.EventId, place, lapped ? who.finishTime : 0f);   // TourResult shows it
 
             bool single = Cup.IsSingleRace, final = Cup.IsFinalRace;
             int cupPlace = Cup.PlayerPlace;

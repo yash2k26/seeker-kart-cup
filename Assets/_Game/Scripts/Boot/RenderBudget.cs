@@ -16,9 +16,14 @@ namespace KartCup
         static float shipped = -1f; static int shippedMsaa = -1;
         static int step = -1;                                          // -1: the shipped scale
 
-        /// The drone lap's frame rate (capped at the game's 60).
+        /// Whether this race's drone lap has been measured (PerfLog falls back to the countdown when it has not).
+        public static bool MeasuredThisRace => measuredScene == UnityEngine.SceneManagement.SceneManager.GetActiveScene().handle;
+        static int measuredScene = -1;
+
+        /// The drone lap's frame rate (capped at the game's 60), or the countdown's.
         public static void Report(float fps)
         {
+            measuredScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().handle;
             var urp = UniversalRenderPipeline.asset;
             if (urp == null) return;
             if (shipped < 0f) { shipped = urp.renderScale; shippedMsaa = urp.msaaSampleCount; }

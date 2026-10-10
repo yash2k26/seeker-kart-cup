@@ -5,13 +5,14 @@ using UnityEngine;
 
 namespace KartCup
 {
-    /// Elimination (Beach Buggy's): twenty seconds after GO, and every fifteen after that, whoever is last is knocked
-    /// out of the race. Out early, you place behind everyone still driving; the last kart running wins. Finishing the
-    /// laps first ends it the ordinary way.
+    /// Elimination (Beach Buggy's): ten seconds after GO, and every five after that, whoever is last is knocked out of
+    /// the race. Out early, you place behind everyone still driving; the last kart running wins. Finishing the laps first
+    /// ends it the ordinary way. (At 20 s and every 15, a one-lap race of ~33 s lost one kart before the line and played
+    /// as an ordinary race, 11 Oct 2026; now the fifth knockout falls at 30 s.)
     public sealed class Elimination : MonoBehaviour
     {
         public static Elimination Instance { get; private set; }
-        public const float First = 20f, Every = 15f;
+        public const float First = 10f, Every = 5f;
 
         RaceManager race;
         float next = First;
