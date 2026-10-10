@@ -25,6 +25,7 @@ namespace KartCup
         {
             if (roster == null || roster.characters.Length == 0) { Debug.LogError("[race] no roster"); return; }
             Chests.ClearLast(); Tour.ClearLast(); Daily.LastPaid = false;
+            gameObject.AddComponent<PerfLog>();   // frame times to the log, every race
             if (RoomClient.InRaceRoom) { RaceMode.Clear(); SpawnOnline(); return; }   // a room is always the ordinary race
 
             // A race entered outside a cup (editor playtest, a direct scene load) still needs a grid.
@@ -117,8 +118,22 @@ namespace KartCup
 
         public static CharacterDatabase Roster => FindAnyObjectByType<RaceSpawner>()?.roster;
 
-        static bool DeviceAutopilot => !Application.isEditor && !RoomClient.InRaceRoom
-            && System.IO.File.Exists(System.IO.Path.Combine(Application.persistentDataPath, "autopilot"));
+        static string AutopilotFile => System.IO.Path.Combine(Application.persistentDataPath, "autopilot");
+        static bool DeviceAutopilot => !Application.isEditor && !RoomClient.InRaceRoom && System.IO.File.Exists(AutopilotFile);
+
+        /// The autopilot's driver, from the file adb puts there: empty for the character's own AI; "skill=1.1" and
+        /// "steady" (no unforced mistakes, takes the shortcuts) stand in for a stronger player, to play the Tour through.
+        static void Tune(KartAi ai)
+        {
+            string cfg = "";
+            try { cfg = System.IO.File.ReadAllText(AutopilotFile); } catch { }
+            foreach (var word in cfg.Split(new[] { ' ', '\n', '\r', ',' }, System.StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (word.StartsWith("skill=") && float.TryParse(word.Substring(6), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float s)) ai.skill = s;
+                if (word == "steady") ai.steady = true;
+            }
+            Debug.Log($"[race] autopilot drives the player at skill {ai.skill:0.000}{(ai.steady ? ", steady" : "")}");
+        }
 
         /// The room's roster in join order. Our own kart is the real thing; everyone else is a RemoteKart proxy.
         void SpawnOnline()
@@ -201,7 +216,7 @@ namespace KartCup
                 go.AddComponent<KartHooks>().Bind(kart, pose, true);
                 // A test hook for the phone: with a file named "autopilot" in the app's own files folder (only adb puts
                 // one there), the field's AI drives the player's kart, so a whole race can be watched on the device.
-                if (DeviceAutopilot) { var ai = go.AddComponent<KartAi>(); ai.Configure(def, first, character); Debug.Log("[race] autopilot drives the player"); }
+                if (DeviceAutopilot) { var ai = go.AddComponent<KartAi>(); ai.Configure(def, first, character); Tune(ai); }
                 else go.AddComponent<KartInputMobile>();
             }
             else if (!online)
