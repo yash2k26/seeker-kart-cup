@@ -48,6 +48,9 @@ const CLOCK_BEHIND_S = 10;             // ...and this far behind (a queued frame
 // stall at the line delays every state in it, honestly), and not later (an on-time state after the line would hide it).
 const CLOCK_LAG_SLACK_S = 1.0, RTT_CAP_MS = 2000;
 const LAG_BUCKET_MS = 5_000, LAG_SPAN_MS = 20_000;
+// ...and the drift: over at least DRIFT_MIN_MS of states, the lag's floor may rise by DRIFT_SLACK_S plus DRIFT_RATE of
+// the time (3%: a clock 15% slow is caught on any lap; an honest one, set once at the countdown, drifts by nothing).
+const DRIFT_MIN_MS = 8_000, DRIFT_SLACK_S = 0.5, DRIFT_RATE = 0.03;
 const SP_EVERY_MS = 2000;
 const MIN_SAMPLE_S = 0.02;             // the referee skips a state less than this after the last (phones send 15 Hz)
 // A seat is held (no drop, no kick) while its phone is in the wallet app staking: this many times per wallet per round.
@@ -610,7 +613,22 @@ export class RoomDO extends DurableObject<Env> {
     const t = nowMs(), seen = (p.lags ?? []).filter(b => b[0] >= t - LAG_SPAN_MS - LAG_BUCKET_MS).map(b => b[1]);
     if (!seen.length) return 'no race clock seen after GO';
     const lag = Math.min(...seen), bound = Math.min(p.rttMin ?? 0, RTT_CAP_MS) / 2000 + CLOCK_LAG_SLACK_S;
-    return lag > bound ? `race clock ${lag.toFixed(2)} s behind the room (round trip ${p.rttMin ?? '?'} ms)` : null;
+    if (lag > bound) return `race clock ${lag.toFixed(2)} s behind the room (round trip ${p.rttMin ?? '?'} ms)`;
+    // A clock that runs slow falls further behind as the race goes on. On a short race (one lap since 10 Oct 2026) it
+    // never gets as far behind as the allowance above, so the drift itself is judged: the least lag in the last third
+    // of what was seen against the least in the first third. An honest phone sets its race clock once at the countdown
+    // and never moves it (NetRace/RaceManager goAt), so its floor stays flat; network delay only ever adds lag.
+    const all = p.lags ?? [];
+    if (all.length >= 3) {
+      const t0 = all[0][0], t1 = all[all.length - 1][0], span = t1 - t0;
+      if (span >= DRIFT_MIN_MS) {
+        const early = Math.min(...all.filter(b => b[0] <= t0 + span / 3).map(b => b[1]));
+        const late = Math.min(...all.filter(b => b[0] >= t1 - span / 3).map(b => b[1]));
+        const drift = late - early, allowed = DRIFT_SLACK_S + DRIFT_RATE * span / 1000;
+        if (drift > allowed) return `race clock drifting ${drift.toFixed(2)} s behind the room over ${(span / 1000).toFixed(0)} s`;
+      }
+    }
+    return null;
   }
 
   flag(p: Player, why: string) {

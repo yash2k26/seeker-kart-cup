@@ -20,7 +20,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   check('catalog is priced in SOL and quoted in both currencies', cfg.catalog.length >= 14 && cfg.catalog.every(i => typeof i.sol === 'number' && !('usd' in i) && /^\d+$/.test(i.price.SKR)));
   const rally = cfg.catalog.find(i => i.sku === 'paint.rally'), hero = cfg.catalog.find(i => i.sku === 'kart.firetruck');
   check('the SKR-only paint has no SOL price', rally && rally.price.SOL === '' && rally.skrOnly === true);
-  check('a hero kart is 0.15 SOL and a clean SKR amount (multiple of 5 SKR)', hero?.price?.SOL === '150000000' && BigInt(hero.price.SKR) % 5000000n === 0n && BigInt(hero.price.SKR) > 0n, hero?.price?.SKR);
+  check('a hero kart is quoted at its catalog SOL price and a clean SKR amount (multiple of 5 SKR)', hero?.price?.SOL === String(Math.round(hero.sol * 1e9)) && BigInt(hero.price.SKR) % 5000000n === 0n && BigInt(hero.price.SKR) > 0n, hero?.price?.SKR);
   check('SOL is quoted at a 20% premium over SKR', hero && Math.abs(Number(hero.price.SOL) / 1e9 * cfg.rates.SOL / (Number(hero.price.SKR) / 1e6 * cfg.rates.SKR) - 1.2) < 0.08, `${hero?.price?.SOL} lamports @ $${cfg.rates.SOL}`);
   check('bundles list what they grant', cfg.catalog.find(i => i.sku === 'bundle.garage')?.grants?.length > 10);
   console.log(`   (SKR $${cfg.rates.SKR} · SOL $${cfg.rates.SOL} · ${cfg.rates.source})`);
@@ -262,7 +262,8 @@ async function race(clients, speeds, opts = []) {
   await Promise.all(drives);
   const [res] = await Promise.all([slow, griefer, fast].map(x => x.wait(m => m.t === 'results', 20000, 'results')));
   const bySlow = res.results.order.find(o => o.id === slow.id);
-  check('a bogus finish does not cut the race short for an honest slow racer', bySlow && !bySlow.dnf && bySlow.ms > 60000, JSON.stringify(res.results.order));
+  // its whole drive (one lap since 10 Oct 2026: about 33 s on forest at 32 m/s), not cut short at the bogus finish
+  check('a bogus finish does not cut the race short for an honest slow racer', bySlow && !bySlow.dnf && bySlow.ms > drive(track, 32).finishT * 1000 * 0.9, JSON.stringify(res.results.order));
   check('a DNF racer\'s states are not relayed', fromDnf === 0, `${fromDnf} relayed`);
   check('a padded state is never relayed', biggest < 8000, `${biggest} bytes`);
   slow.close(); griefer.close(); fast.close();
