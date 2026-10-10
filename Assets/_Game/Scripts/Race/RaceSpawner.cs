@@ -69,6 +69,7 @@ namespace KartCup
             {
                 TurboPad.Spawn(System.Environment.TickCount);
                 OilSlick.Spawn(System.Environment.TickCount + 1, Tracks.At(Cup.TrackIndex).difficulty);   // solo only: rooms never get them
+                Ramp.Spawn(System.Environment.TickCount + 3);                                             // Beach Buggy's jumps, on the long straights
                 Chicken.Spawn(System.Environment.TickCount + 2);                                          // Beach Buggy's chickens, crossing the straights
                 show.Prizes(Tracks.At(Cup.TrackIndex).kicker, Tracks.At(Cup.TrackIndex).name.ToUpperInvariant(), new[] { "1ST", "2ND", "3RD" });
             }

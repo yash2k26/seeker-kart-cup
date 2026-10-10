@@ -87,7 +87,7 @@ namespace KartCup
             var wp = root.transform; int n = wp.childCount;
             var rnd = new System.Random(seed);
             var avoid = new List<Vector3>();
-            foreach (var name in new[] { "TurboPads", "OilSlicks" })
+            foreach (var name in new[] { "TurboPads", "OilSlicks", "Ramps" })
                 if (GameObject.Find(name) is { } g) foreach (Transform t in g.transform) avoid.Add(t.position);
             var open = new List<int>();
             for (int i = 10; i < n - 4; i++)

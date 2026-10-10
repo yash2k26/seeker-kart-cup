@@ -36,6 +36,8 @@ public static class Playtest
     // and the kart must turn right.
     static string steer; static KartCup.Settings.Steer prevSteer; static int thumbStep;
     static UnityEngine.EventSystems.PointerEventData thumb; static GameObject thumbOn; static Vector2 thumbFrom; static Vector3 thumbHeading; static float thumbMax; static bool thumbShot;
+    // -ramp: a ramp is put 30 m ahead on the player's line 6 s after GO; airtime, height and the landing are logged
+    static bool rampTest, rampDone; static double rampAt, airFrom; static float rampY, rampTop, worstUp, rampNear; static int rampFrames; static Vector3 rampPos;
     static float[][] sweep;   // -camsweep "dist,height,look,fov;...": each auto frame with the next camera
     // with -autopilot, frames on the moments that matter: a pickup (the roulette), a hit (the throw), the finish
     static readonly System.Collections.Generic.List<(double at, string name)> moments = new();
@@ -83,6 +85,7 @@ public static class Playtest
         for (int i = 0; i < args.Length - 1; i++) { if (args[i] == "-every") double.TryParse(args[i + 1], out every); if (args[i] == "-seconds") double.TryParse(args[i + 1], out until); }
         sweep = null;
         steer = null; thumbStep = 0; thumbMax = 0f;
+        rampTest = args.Contains("-ramp"); rampDone = false; rampAt = airFrom = -1; worstUp = 1f; rampFrames = 0;
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-steer") steer = args[i + 1];
         if (steer != null) { prevSteer = KartCup.Settings.Steering; KartCup.Settings.Steering = steer == "slide" ? KartCup.Settings.Steer.Slide : steer == "tilt" ? KartCup.Settings.Steer.Tilt : KartCup.Settings.Steer.Arrows; }
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-camsweep")
@@ -132,6 +135,13 @@ public static class Playtest
                 itemFrom = pad.position - pad.forward * 16f + Vector3.up * 7f + pad.right * 5f; itemAt = pad.position;
                 SideShot($"pad{track}");
                 Debug.Log($"[playtest] {pads.transform.childCount} turbo pad(s), first at {pad.position}");
+            }
+            var ramps = GameObject.Find("Ramps");
+            if (introShot == 0 && ramps != null && ramps.transform.childCount > 0)
+            {
+                var rp = ramps.transform.GetChild(0);
+                itemFrom = rp.position - rp.forward * 13f + rp.right * 7f + Vector3.up * 3.2f; itemAt = rp.position + rp.forward * 2f + Vector3.up * 0.6f;
+                SideShot($"ramp{track}-look");
             }
             var slicks = GameObject.Find("OilSlicks");
             if (introShot == 0 && slicks != null && slicks.transform.childCount > 0)
@@ -267,6 +277,7 @@ public static class Playtest
             foreach (var s in Object.FindObjectsByType<Smashable>(FindObjectsSortMode.None)) { if (s.name.Contains("cone")) continue; float d = (s.transform.position - p.transform.position).sqrMagnitude; if (d < bestD) { bestD = d; best = s; } }
             if (best != null) { var k = p.GetComponent<Kart>(); var v = k.rb.linearVelocity; var ahead = p.transform.position + (v.sqrMagnitude > 1f ? v.normalized : p.transform.forward) * 14f; best.transform.position = ahead + Vector3.up * 0.2f; Debug.Log($"[playtest] smashable {best.name} put on the line"); }
         }
+        if (rampTest) RampTest(t, p);
         var caster = p.GetComponent<ItemCaster>(); var kart = p.GetComponent<Kart>();
         int ammo = caster != null && caster.item != null ? caster.ammo : 0;
         if (ammo > lastAmmo && pickups < 3) { pickups++; moments.Add((t + 0.2, $"pickup{track}-{pickups}a")); moments.Add((t + 1.0, $"pickup{track}-{pickups}b")); }
@@ -282,6 +293,38 @@ public static class Playtest
                 if (name.StartsWith("side:")) SideShot(name.Substring(5)); else Capture(name);
                 Debug.Log($"[playtest] moment {name}"); moments.RemoveAt(i);
             }
+    }
+
+    static void RampTest(double t, KartProgress p)
+    {
+        var k = p.GetComponent<Kart>();
+        if (!rampDone && goAt >= 0 && t > goAt + 6)
+        {
+            rampDone = true;
+            var v = k.rb.linearVelocity; var dir = v.sqrMagnitude > 4f ? Vector3.ProjectOnPlane(v, Vector3.up).normalized : p.transform.forward;
+            var go = Ramp.Place(Resources.Load<GameObject>("Ramp"), p.transform.position + dir * 30f, dir, null);
+            if (go == null) { Debug.Log("[playtest] ramp: no ground ahead"); return; }
+            rampAt = t; rampY = go.transform.position.y; rampTop = rampY; rampPos = go.transform.position; rampNear = 1e9f;
+            Debug.Log($"[playtest] ramp put at {go.transform.position}, the player at {k.velMag:F1} m/s");
+            return;
+        }
+        if (rampAt < 0) return;
+        if (t > rampAt + 5) { if (rampFrames == 0) { rampFrames = 1; Debug.Log($"[playtest] ramp: never left the ground; passed {rampNear:F1} m from it"); } return; }
+        rampNear = Mathf.Min(rampNear, Vector3.Distance(p.transform.position, rampPos));
+        rampTop = Mathf.Max(rampTop, p.transform.position.y);
+        if (airFrom < 0 && !k.grounded && t > rampAt + 0.3)
+        {
+            airFrom = t; moments.Add((t + 0.25, $"ramp{track}-air")); moments.Add((t + 0.6, $"ramp{track}-air2"));
+            var f = Vector3.ProjectOnPlane(k.rb.linearVelocity, Vector3.up).normalized; var r = Vector3.Cross(Vector3.up, f);
+            itemFrom = rampPos + f * 12f + r * 16f + Vector3.up * 2.5f; itemAt = rampPos + f * 12f + Vector3.up * 2f;   // beside the arc
+            moments.Add((t + 0.3, $"side:ramp{track}-side"));
+        }
+        if (airFrom > 0) worstUp = Mathf.Min(worstUp, Vector3.Dot((k.rotator != null ? k.rotator : p.transform).up, Vector3.up));
+        if (airFrom > 0 && k.grounded && rampFrames == 0)
+        {
+            rampFrames = 1; moments.Add((t + 0.05, $"ramp{track}-land"));
+            Debug.Log($"[playtest] ramp: {t - airFrom:F2} s in the air, {rampTop - rampY:F1} m over the ramp's foot, worst tilt up·Y={worstUp:F2}, landed at {k.velMag:F1} m/s");
+        }
     }
 
     /// A thumb through the real event system: down on the left arrow's spot, 300 px right over half a second, held,
