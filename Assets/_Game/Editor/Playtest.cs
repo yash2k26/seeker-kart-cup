@@ -152,6 +152,14 @@ public static class Playtest
                 itemFrom = rp.position - rp.forward * 13f + rp.right * 7f + Vector3.up * 3.2f; itemAt = rp.position + rp.forward * 2f + Vector3.up * 0.6f;
                 SideShot($"ramp{track}-look");
             }
+            var cutPath = Object.FindFirstObjectByType<ShortcutPath>();
+            if (introShot == 0 && cutPath != null)
+            {
+                var mouth = cutPath.path[0].transform; var mid = cutPath.path[cutPath.path.Length / 2].transform;   // over its mouth, looking down it
+                itemFrom = mouth.position - mouth.forward * 22f + Vector3.up * 16f; itemAt = mid.position;
+                SideShot($"cut{track}");
+                Debug.Log($"[playtest] shortcut from {cutPath.from.name} to {cutPath.to.name}, {cutPath.path.Length} waypoints, mouth at {mouth.position}, turn-in {cutPath.TurnIn:0} deg");
+            }
             var critters = GameObject.Find("Critters");
             if (introShot == 0 && critters != null && critters.transform.childCount > 0)
             {

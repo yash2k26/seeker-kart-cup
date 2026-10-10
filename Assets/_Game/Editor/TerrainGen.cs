@@ -72,7 +72,8 @@ public static class TerrainGen
     /// Builds the heightfield as 4x4 chunk meshes with colliders. `roadHalf` is the half width that must be level
     /// with the road (road + kerb + run-off); beyond it the terrain blends back to the theme's shape.
     public static Transform Build(Vector3[] centre, System.Func<float, float, float> shape, float roadHalf,
-                                  Palette palette, Material mat, GroundSurfacePreset surface, string dir, out int tris)
+                                  Palette palette, Material mat, GroundSurfacePreset surface, string dir, out int tris,
+                                  Vector3[] path = null, float pathHalf = 0f)
     {
         int n = centre.Length;
         for (int ix = 0; ix <= Cells; ix++)
@@ -108,6 +109,23 @@ public static class TerrainGen
                 float band = 16f + Mathf.Clamp(drop * 0.8f, 0f, 30f);
                 float t2 = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((d - roadHalf) / band));
                 h[ix, iz] = Mathf.Lerp(roadY - 0.05f, terrain, t2);
+
+                // A shortcut (TrackShortcut.cs) is levelled the same way, where it is nearer than the road's own level.
+                if (path != null)
+                {
+                    float pd = float.MaxValue, pathY = 0f;
+                    for (int s = 0; s < path.Length - 1; s++)
+                    {
+                        Vector3 a = path[s], b = path[s + 1];
+                        float abx = b.x - a.x, abz = b.z - a.z, len = abx * abx + abz * abz;
+                        float t = len > 0.001f ? Mathf.Clamp01(((x - a.x) * abx + (z - a.z) * abz) / len) : 0f;
+                        float qx = a.x + abx * t, qz = a.z + abz * t, dist = Mathf.Sqrt((x - qx) * (x - qx) + (z - qz) * (z - qz));
+                        if (dist < pd) { pd = dist; pathY = Mathf.Lerp(a.y, b.y, t); }
+                    }
+                    float pBand = 10f + Mathf.Clamp(Mathf.Abs(terrain - pathY) * 0.8f, 0f, 24f);
+                    float t3 = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((pd - pathHalf) / pBand));
+                    if (t3 < t2) h[ix, iz] = Mathf.Lerp(pathY - 0.05f, h[ix, iz], t3);
+                }
             }
 
         Directory.CreateDirectory(dir);

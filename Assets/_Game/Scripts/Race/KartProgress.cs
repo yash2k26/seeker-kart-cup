@@ -98,7 +98,9 @@ namespace KartCup
             if (!lost && kart.velMag < 1.5f && !kart.grounded) { if (offTrackSince < 0) offTrackSince = Time.time; }
             else offTrackSince = -1f;
 
-            if (racing && kart.velMag < 2f) { if (crawlingSince < 0) crawlingSince = Time.time; }
+            // An AI wedged between a trunk and a rock rocks back and forth at 2-5 m/s on its own reverse (KartAi), so it
+            // never read as crawling at 2 and sat there all race (Pine Ridge, 10 Oct): for the AI, crawling is under 5.
+            if (racing && kart.velMag < (isPlayer ? 2f : 5f)) { if (crawlingSince < 0) crawlingSince = Time.time; }
             else crawlingSince = -1f;
 
             // An AI that is not moving is stuck, so free it quickly. A PLAYER may simply have stopped — parking to

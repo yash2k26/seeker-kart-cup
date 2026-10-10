@@ -48,6 +48,7 @@ namespace KartCup
             for (int k = 0; k < n; k++) { order[k].SetSiblingIndex(k); Turn(order[k]); }
             for (int k = 0; k < n; k++) order[k].GetComponent<BasicWaypoint>().nextPoint = order[(k + 1) % n].GetComponent<BasicWaypoint>();
 
+            ShortcutPath.Instance?.Reverse();                 // entered from its other end
             if (race != null)
             {
                 int count = race.checkpoints.Length;

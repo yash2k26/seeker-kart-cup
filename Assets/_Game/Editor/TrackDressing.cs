@@ -68,6 +68,7 @@ public static partial class TrackSetup
             _ => ("Pirate", new[] { "crate", "barrel", "crate-bottles", "crate" }),
         };
         int n = centre.Length, made = 0;
+        keepOnCut = true;                                // a crate on the shortcut is there to be hit
         void Drop(int i, float side, float dist, float h)
         {
             if (made >= 26) return;
@@ -91,6 +92,7 @@ public static partial class TrackSetup
             Drop(Wrap(i + 1, n), side2, HalfWidth + 1.6f, 0.9f);
             side2 = -side2;
         }
+        keepOnCut = false;
         Debug.Log($"[track] {made} smashables");
     }
 
@@ -136,6 +138,7 @@ public static partial class TrackSetup
             b = Bounds(go);
         }
         go.transform.position += new Vector3(pos.x - b.center.x, 0, pos.z - b.center.z);
+        if (Clears(go)) { Object.DestroyImmediate(go); return new GameObject("cleared") { transform = { parent = parent } }; }   // nothing on the shortcut
         if (solid != Solid.None) Collide(go, solid);
         return go;
     }

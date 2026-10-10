@@ -238,10 +238,20 @@ namespace KartCup
         {
             var root = GameObject.Find("Waypoints");
             if (root == null || root.transform.childCount < 8 || Camera.main == null || Camera.main == cam) return false;
-            int n = root.transform.childCount;
-            path = new Vector3[n];
+            // Beach Buggy hints at its shortcuts in the intro: the drone takes the circuit's (ShortcutPath) instead of the corner
+            var cut = ShortcutPath.Instance;
+            var points = new System.Collections.Generic.List<Vector3>();
+            for (int i = 0; i < root.transform.childCount; i++)
+            {
+                var w = root.transform.GetChild(i);
+                points.Add(w.position);
+                if (cut == null || cut.from == null || w != cut.from.transform) continue;
+                foreach (var p in cut.path) points.Add(p.transform.position + Vector3.up * 1.5f);
+                while (i + 1 < root.transform.childCount && root.transform.GetChild(i + 1) != cut.to.transform) i++;
+            }
+            path = points.ToArray();
+            int n = path.Length;
             float lap = 0f;
-            for (int i = 0; i < n; i++) path[i] = root.transform.GetChild(i).position;
             for (int i = 0; i < n; i++) lap += Vector3.Distance(path[i], path[(i + 1) % n]);
             flySeconds = Mathf.Clamp(lap / 190f, 5f, 7.5f);        // quick: about 190 m/s on average
             return true;

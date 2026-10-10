@@ -79,12 +79,14 @@ public static partial class TrackSetup
         // checkpoints, grid and props all inherit it.
         TerrainGen.Profile(centre, V.shape, Length());
         Analyse();
+        PlanShortcut();                                   // before the terrain: it is levelled along the cut too
 
         Environment();
         RenderMap();
         var road = Road();
         var waypoints = Waypoints();
         var checkpoints = Checkpoints();
+        BuildShortcut();                                  // after the circuit's waypoints (it joins them), before the dressing (which keeps off it)
         Geometry[V.id] = GeometryJson(checkpoints);
         var grid = StartGrid();
         Barriers();
@@ -593,7 +595,8 @@ public static partial class TrackSetup
             mat.shader = lit; mat.SetColor("_BaseColor", V.ground);
         }
         EditorUtility.SetDirty(mat);
-        TerrainGen.Build(centre, V.shape, HalfWidth + Kerb + 1.5f, V.palette, mat, Offroad(), MeshDir, out terrainTris);
+        terrainMat = mat;
+        TerrainGen.Build(centre, V.shape, HalfWidth + Kerb + 1.5f, V.palette, mat, Offroad(), MeshDir, out terrainTris, shortcut?.path, CutHalf + 6f);
 
         // Water: the sea round the island, or a lake in a basin. One shared material; its surf ring is radial from
         // the origin at the island's shoreline, so the lake (well inside it) gets the caustics without the surf.
@@ -635,7 +638,18 @@ public static partial class TrackSetup
         foreach (var c in corners)
         {
             int from = Wrap(c.start - 3, n), len = Mathf.Min(c.count + 6, n - 1);
-            Wall(root, $"Barrier{from}", white, red, (HalfWidth + Kerb + 0.7f) * c.outside, 1.15f, from, len);
+            float lateral = (HalfWidth + Kerb + 0.7f) * c.outside;
+            // a gap where a shortcut leaves or joins the road through this wall (Pine Ridge's crosses an S-bend's)
+            int run = -1;
+            for (int k = 0; k <= len + 1; k++)
+            {
+                int i = Wrap(from + k, n);
+                bool open = k <= len && !OnCut(centre[i] + right[i] * lateral, 9f);   // wide: a kart turning in runs wide of the cut's middle
+                if (open && run < 0) run = k;
+                if (open || run < 0) continue;
+                if (k - 1 - run >= 2) Wall(root, $"Barrier{Wrap(from + run, n)}", white, red, lateral, 1.15f, Wrap(from + run, n), k - 1 - run);
+                run = -1;
+            }
         }
     }
 

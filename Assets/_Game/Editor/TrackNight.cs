@@ -72,6 +72,7 @@ public static partial class TrackSetup
 
     static void Lamp(Transform root, int i, float side, Material pole, Material glow, ref int count)
     {
+        if (OnCut(Beside(i, side, HalfWidth + Kerb + 2.4f), 1.5f)) return;   // not in the mouth of the shortcut
         lampHeads.Add(LampPost(root, $"Lamp{count++:00}", Beside(i, side, HalfWidth + Kerb + 2.4f), Quaternion.LookRotation(-right[i] * side, Vector3.up), pole, glow, V.lampColor));   // +Z toward the road
         props++;
     }

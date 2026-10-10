@@ -79,7 +79,11 @@ namespace KartCup
             // ---- advance along the chain ----
             if ((targetPoint.transform.position - tr.position).sqrMagnitude <= targetPoint.radius * targetPoint.radius)
             {
+                var reached = targetPoint;
                 targetPoint = targetPoint.nextPoint;
+                // the circuit's shortcut: a good field's bolder drivers cut the corner (ShortcutPath)
+                var cut = ShortcutPath.Instance;
+                if (cut != null && reached == cut.from && ShortcutPath.Takes(aggression)) { targetPoint = cut.path[0]; Debug.Log($"[race] {name} takes the shortcut"); }
                 if (targetPoint != null) nextPoint = targetPoint.nextPoint;
                 if (targetPoint == null || nextPoint == null) return;
             }
@@ -100,8 +104,10 @@ namespace KartCup
             smoothedLateral = Mathf.Lerp(smoothedLateral, Mathf.Clamp(wantLateral, -1f, 1f), 1f - Mathf.Exp(-3f * dt));
 
             Vector3 roadRight = Vector3.Cross(Vector3.up, legOut).normalized;
+            // on the shortcut's dirt (9 m wide) the line stays near its middle
+            float lateral = ShortcutPath.Instance != null && ShortcutPath.Instance.Holds(targetPoint) ? lateralRange * 0.45f : lateralRange;
             Vector3 aim = Vector3.Lerp(here, ahead, 1f - Mathf.Clamp01(Vector3.Distance(tr.position, here) * lookAhead))
-                          + roadRight * (smoothedLateral * lateralRange);
+                          + roadRight * (smoothedLateral * lateral);
 
             aim = Detour(aim);                                                   // oil in the path: aim beside it until past
             Vector3 toAim = aim - tr.position;
