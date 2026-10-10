@@ -19,12 +19,13 @@ namespace KartCup
         [SerializeField] BasicWaypoint firstWaypoint;
         [SerializeField] KartCamera raceCamera;
         [SerializeField] int racers = 6;
+        BasicWaypoint first;                             // where the AI sets off: the start line, whichever way round
 
         void Start()
         {
             if (roster == null || roster.characters.Length == 0) { Debug.LogError("[race] no roster"); return; }
             Chests.ClearLast(); Tour.ClearLast(); Daily.LastPaid = false;
-            if (RoomClient.InRaceRoom) { SpawnOnline(); return; }
+            if (RoomClient.InRaceRoom) { RaceMode.Clear(); SpawnOnline(); return; }   // a room is always the ordinary race
 
             // A race entered outside a cup (editor playtest, a direct scene load) still needs a grid.
             if (!Cup.Active)
@@ -33,15 +34,24 @@ namespace KartCup
                 int.TryParse(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Replace("Race", ""), out int n);
                 Cup.Begin(CharacterDatabase.SelectedIndex, roster.characters.Length, new[] { Mathf.Clamp(n - 1, 0, Tracks.Count - 1) });
             }
-            // Kartel Weekly's time trial: the player alone on the grid (Weekly.Racing); a duel: the rival on pole, you beside
+            if (Weekly.Racing) RaceMode.Clear();   // the time trial is the ordinary lap, whatever ran before it
+            // The event's levers (RaceMode): its laps, the circuit turned round, the mist. Turned before the grid is filled,
+            // so the karts take their places on the reversed grid.
+            var first = firstWaypoint;
+            var race = RaceManager.Instance;
+            if (race != null) race.totalLaps = Mathf.Max(1, RaceMode.Laps);
+            if (RaceMode.Reverse) first = TrackDirection.Reverse(gridSlots, race) ?? first;
+            if (RaceMode.Mist) TrackDirection.Mist();
+            this.first = first;
+            // Kartel Weekly's time trial and a Smash-Up: the player alone on the grid; a duel: the rival on pole, you beside
             bool duel = RaceMode.Current == RaceMode.Kind.Duel && RaceMode.Rival >= 0;
-            int count = Weekly.Racing ? 1 : duel ? 2 : Mathf.Min(racers, gridSlots.Length);
+            int count = Weekly.Racing || RaceMode.Alone ? 1 : duel ? 2 : Mathf.Min(racers, gridSlots.Length);
 
             for (int slot = 0; slot < count && slot < Cup.Grid.Count; slot++)
             {
                 // The grid comes from the cup: pole on race one, then the standings reversed, so leading costs you
                 // track position next time out.
-                int character = Weekly.Racing ? Cup.PlayerCharacter : duel ? (slot == 0 ? RaceMode.Rival : Cup.PlayerCharacter) : Cup.Grid[slot];
+                int character = Weekly.Racing || RaceMode.Alone ? Cup.PlayerCharacter : duel ? (slot == 0 ? RaceMode.Rival : Cup.PlayerCharacter) : Cup.Grid[slot];
                 var def = roster.At(character);
                 bool isPlayer = duel ? slot == 1 : character == Cup.PlayerCharacter;   // (a mirror duel has the same driver twice)
                 var kartId = isPlayer && !Weekly.Racing ? PlayerKart(def, allowTrial: true) : def.kartId;
@@ -60,7 +70,9 @@ namespace KartCup
             if (race == null) yield break;
             var show = PodiumShow.Ensure();
             if (RaceMode.Current == RaceMode.Kind.Elimination && !Weekly.Racing) gameObject.AddComponent<Elimination>();
-            if (Weekly.Racing) { var boxes = FindAnyObjectByType<ItemBag>(); if (boxes != null) boxes.gameObject.SetActive(false); }   // the time trial: no items
+            // the time trial, a Smash-Up and a Clean Race: no items
+            bool noItems = Weekly.Racing || RaceMode.Alone || RaceMode.Rule == RaceMode.Items.Clean;
+            if (noItems) { var boxes = FindAnyObjectByType<ItemBag>(); if (boxes != null) boxes.gameObject.SetActive(false); }
             else Loadout(race);
             if (show == null) { race.BeginCountdown(); yield break; }
             race.Hold();
@@ -70,7 +82,8 @@ namespace KartCup
                 TurboPad.Spawn(System.Environment.TickCount);
                 OilSlick.Spawn(System.Environment.TickCount + 1, Tracks.At(Cup.TrackIndex).difficulty);   // solo only: rooms never get them
                 Ramp.Spawn(System.Environment.TickCount + 3);                                             // Beach Buggy's jumps, on the long straights
-                Chicken.Spawn(System.Environment.TickCount + 2);                                          // Beach Buggy's chickens, crossing the straights
+                Critter.Spawn(System.Environment.TickCount + 2, Cup.TrackId);                             // Beach Buggy's critters, crossing the straights
+                if (RaceMode.Alone) gameObject.AddComponent<SmashUp>();                                   // after the critters: they count
                 show.Prizes(Tracks.At(Cup.TrackIndex).kicker, Tracks.At(Cup.TrackIndex).name.ToUpperInvariant(), new[] { "1ST", "2ND", "3RD" });
             }
             float until = Time.time + show.IntroSeconds, skippable = Time.time + 0.6f;
@@ -187,7 +200,7 @@ namespace KartCup
                 go.AddComponent<KartHooks>().Bind(kart, pose, true);
                 // A test hook for the phone: with a file named "autopilot" in the app's own files folder (only adb puts
                 // one there), the field's AI drives the player's kart, so a whole race can be watched on the device.
-                if (DeviceAutopilot) { var ai = go.AddComponent<KartAi>(); ai.Configure(def, firstWaypoint, character); Debug.Log("[race] autopilot drives the player"); }
+                if (DeviceAutopilot) { var ai = go.AddComponent<KartAi>(); ai.Configure(def, first, character); Debug.Log("[race] autopilot drives the player"); }
                 else go.AddComponent<KartInputMobile>();
             }
             else if (!online)
@@ -195,11 +208,13 @@ namespace KartCup
                 go.AddComponent<KartHooks>().Bind(kart, pose, false);
                 // Personality is seeded from the character, so the same rival drives the same way every time.
                 var ai = go.AddComponent<KartAi>();
-                ai.Configure(def, firstWaypoint, character);
+                ai.Configure(def, first, character);
                 ai.skill = Mathf.Clamp(ai.skill * RaceMode.Difficulty, 0.8f, 1.12f);   // the event's pace (Tour cups, bosses)
             }
             // a remote kart gets no hooks and no input: RemoteKart poses the driver and spins the wheels itself
-            if (!online && !Weekly.Racing) Ability.On(kart, def.displayName, isPlayer);   // each driver's special (solo races)
+            // each driver's special (solo races; never in a Clean Race). A boss's charges faster: the card says so.
+            if (!online && !Weekly.Racing && RaceMode.Rule != RaceMode.Items.Clean)
+                Ability.On(kart, def.displayName, isPlayer).rate = !isPlayer && RaceMode.Current == RaceMode.Kind.Duel ? RaceMode.BossCharge : 1f;
             return kart;
         }
     }

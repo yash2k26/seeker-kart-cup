@@ -18,6 +18,7 @@ public static class CupTest
         FinalRaceEndsTheCup();
         SingleRace();
         SurvivesARestart();
+        TourShape();
         Debug.Log(failures == 0 ? "[cuptest] PASS — all checks" : $"[cuptest] {failures} FAILURE(S)");
         if (Application.isBatchMode) EditorApplication.Exit(failures == 0 ? 0 : 1);
     }
@@ -115,6 +116,52 @@ public static class CupTest
         Cup.Restore();
         Check("a save from before track lists is not resurrected", !Cup.Active);
         PlayerPrefs.DeleteKey("kc.cup");
+    }
+
+    /// The Tour's rows keep Beach Buggy's rules (research/reports "Beach Buggy career and track design"): two races, a
+    /// special, a race, the boss; a different special in every cup; no circuit run the same way twice in a cup; the wide
+    /// circuits first; and the boss, not a star count, opens the next cup.
+    static void TourShape()
+    {
+        var specials = new System.Collections.Generic.HashSet<string>();
+        for (int c = 0; c < Tour.Cups.Length; c++)
+        {
+            var cup = Tour.Cups[c]; var ev = cup.events;
+            bool Plain(Tour.Event e) => e.mode == RaceMode.Kind.Race && e.items == RaceMode.Items.Normal;
+            Check($"{cup.name}: five events, the boss last", ev.Length == 5 && ev[4].mode == RaceMode.Kind.Duel && ev.Take(4).All(e => e.mode != RaceMode.Kind.Duel));
+            Check($"{cup.name}: the special is event 3, the rest are races", !Plain(ev[2]) && new[] { 0, 1, 3 }.All(i => Plain(ev[i])));
+            Check($"{cup.name}: its special is new to the Tour", specials.Add(Tour.ModeName(ev[2])));
+            var runs = ev.Select(e => $"{e.track}|{e.mode}|{e.items}|{e.laps}|{e.reverse}|{e.mist}").ToList();
+            Check($"{cup.name}: no circuit run the same way twice", runs.Distinct().Count() == runs.Count);
+            Check($"{cup.name}: the boss opens at half the cup's race stars", Tour.EventGate(4) * 2 == (ev.Length - 1) * Tour.StarsPerEvent);
+        }
+        Check("cup 1 runs only the wide circuits (Palm Bay, the Speedway)", Tour.Cups[0].events.All(e => e.track == 0 || e.track == 3));
+        Check("Pine Ridge, the narrow one by the lake, waits for cup 3", Tour.Cups.Take(2).SelectMany(c => c.events).All(e => e.track != 2));
+        Check("ids are unique", Tour.Cups.SelectMany(c => c.events).Select(e => e.id).Distinct().Count() == Tour.Cups.Sum(c => c.events.Length));
+
+        Tour.Preview();
+        Check("cup 1 is open from the start, cup 2 is not", Tour.Open(0) && !Tour.Open(1));
+        Check("a closed cup names its boss", Tour.Opener(1) == "BEAT MERT");
+        Tour.Preview(("c1e1", 3), ("c1e2", 3), ("c1e3", 3), ("c1e4", 3));
+        Check("every star in cup 1 does not open cup 2", !Tour.Open(1));
+        Check("the boss opens at 6 of cup 1's 12 race stars", Tour.EventOpen(0, 4));
+        Tour.Preview(("c1e1", 3), ("c1e2", 3), ("c1b", 3));
+        Check("beating Mert opens cup 2", Tour.Open(1) && !Tour.Open(2));
+
+        // what each event arms, and what is kept off the board
+        var (c3, smash) = Tour.Find("c3e3");
+        Tour.Arm(smash, c3);
+        Check("a Smash-Up is alone and unranked", RaceMode.Alone && !RaceMode.Ranked);
+        var (c5, boss) = Tour.Find("c5b");
+        Tour.Arm(boss, c5);
+        Check("Beeman's duel: reversed, two laps, a faster charge", RaceMode.Reverse && RaceMode.Laps == 2 && RaceMode.BossCharge > 1f && !RaceMode.Ranked);
+        Check("a reversed best is kept apart from the circuit's", RaceMode.BestKey("forest") == "forest.rev.l2");
+        var (c1, plain) = Tour.Find("c1e1");
+        Tour.Arm(plain, c1);
+        Check("an ordinary race is ranked and clears the last event's levers", RaceMode.Ranked && !RaceMode.Reverse && RaceMode.Laps == 1 && RaceMode.BestKey("beach") == "beach");
+        Check("the rookie field fires less than the Grand Tour's", Tour.Cups[0].fire < 1f && Tour.Cups[^1].fire > 1f);
+        RaceMode.Clear();
+        Tour.Preview();
     }
 
     static void Check(string what, bool ok)

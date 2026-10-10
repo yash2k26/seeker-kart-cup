@@ -73,6 +73,15 @@ public static class Playtest
             KartCup.RaceMode.Current = args[i + 1] == "duel" ? KartCup.RaceMode.Kind.Duel : KartCup.RaceMode.Kind.Elimination;
             if (KartCup.RaceMode.Current == KartCup.RaceMode.Kind.Duel) KartCup.RaceMode.Rival = 1;
         }
+        // -event c3e3: a Tour event as the Tour arms it (its circuit, mode, bubbles, laps, direction, mist); -reverse and
+        // -mist turn those on for any race
+        for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-event")
+        {
+            var (c, e) = KartCup.Tour.Find(args[i + 1]);
+            if (e != null) { KartCup.Tour.Arm(e, c); track = e.track + 1; } else Debug.LogError("[playtest] no event " + args[i + 1]);
+        }
+        if (args.Contains("-reverse")) KartCup.RaceMode.Reverse = true;
+        if (args.Contains("-mist")) KartCup.RaceMode.Mist = true;
         look = "Lighthouse";
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-look") look = args[i + 1];   // what the vista frames look at
         item = null; itemShot = 0; thrownAt = -1; goAt = -1; armed = false; heldShot = false;

@@ -240,6 +240,9 @@ namespace KartCup
                 if (dist < 25f && dot < -0.5f) behind = true;
             }
             heldFor += 1f;                                                       // seconds held, near enough (checked about once a second)
+            // RaceMode.Fire, the event's own dial apart from its pace: a keen field takes every chance and lets go sooner;
+            // a rookie one lets chances pass and sits on what it holds.
+            float fire = Mathf.Max(0.2f, RaceMode.Fire);
             bool use = held switch
             {
                 "Nitro" => Mathf.Abs(Vector3.SignedAngle(Vector3.ProjectOnPlane(fwd, Vector3.up), Vector3.ProjectOnPlane(nextPoint.transform.position - tr.position, Vector3.up), Vector3.up)) < 12f
@@ -247,9 +250,10 @@ namespace KartCup
                 "Bomb" or "Trap" => behind,
                 _ => ahead,
             };
-            if (!use && heldFor < 12f) { nextItem = 1f; return; }
+            if (use && fire < 1f && Random.value > fire) use = false;
+            if (!use && heldFor < 12f / fire) { nextItem = 1f; return; }
             heldFor = 0f;
-            nextItem = Random.Range(2.5f, 5f);
+            nextItem = Random.Range(2.5f, 5f) / fire;
             PressItem();
         }
 

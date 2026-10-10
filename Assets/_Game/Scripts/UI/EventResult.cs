@@ -26,17 +26,16 @@ namespace KartCup
             if (table != null) table.gameObject.SetActive(!tour);
             if (status != null) status.gameObject.SetActive(!tour);
             if (!tour) return;
-            var track = Tracks.At(e.track);
             bool duel = e.mode == RaceMode.Kind.Duel;
             if (headline != null) headline.text = r.stars > 0 ? "GREAT JOB!" : "TRY AGAIN";
             if (picture != null) { picture.sprite = e.track < trackArt.Length ? trackArt[e.track] : null; picture.enabled = picture.sprite != null; }
-            if (trackName != null) trackName.text = track.name.ToUpperInvariant();
+            if (trackName != null) trackName.text = Tour.Where(e);
             if (eventTitle != null) eventTitle.text = e.title.ToUpperInvariant();
-            if (gotValue != null) gotValue.text = duel ? (r.place == 1 ? "WON" : "LOST") : RaceHud.Ordinal(r.place).ToUpperInvariant();
+            if (gotValue != null) gotValue.text = duel ? (r.place == 1 ? "WON" : "LOST") : e.mode == RaceMode.Kind.Smash ? $"{SmashUp.Score} SMASHED" : RaceHud.Ordinal(r.place).ToUpperInvariant();
             if (goalValue != null) goalValue.text = Tour.Goal(e);
             if (reward != null) reward.text = Gems.LastPodium > 0 ? $"+{Gems.LastPodium} GEMS" : r.stars > 0 ? $"+{r.stars} STARS" : "NO REWARD";
             if (yourTime != null) yourTime.text = r.time > 0f ? RaceHud.Clock(r.time) : "--:--";
-            float b = Tracks.Best(track.id);
+            float b = Tracks.Best(Tour.BestKey(e));
             if (best != null) best.text = b > 0f ? RaceHud.Clock(b) : "--:--";
             if (rule != null) rule.text = Tour.Rule(e, null);
             for (int k = 0; k < stars.Length; k++) if (stars[k] != null) stars[k].color = k < r.stars ? starOn : starOff;

@@ -24,7 +24,7 @@ namespace KartCup
         void Show()
         {
             var c = Daily.Current;
-            if (title != null) title.text = $"DAILY  ·  {Tracks.At(c.track).name.ToUpperInvariant()}";
+            if (title != null) title.text = $"DAILY  ·  {Tracks.At(c.track).name.ToUpperInvariant()}{(c.reverse ? "  ·  REVERSE" : "")}{(c.mist ? "  ·  MIST" : "")}";
             if (line != null)
                 line.text = Daily.Done ? $"Done today  ·  next in {Daily.NextIn()}"
                     : $"{RaceMode.Name(c.mode).ToLowerInvariant().FirstUpper()}{(c.mode == RaceMode.Kind.Duel && RaceSpawner.Roster != null ? " vs " + RaceSpawner.Roster.At(c.rival).displayName : "")}  ·  {c.goal.ToLowerInvariant()}";

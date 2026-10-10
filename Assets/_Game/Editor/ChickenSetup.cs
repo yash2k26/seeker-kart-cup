@@ -34,7 +34,7 @@ public static class ChickenSetup
         Box(model, "Foot R", orange, new Vector3(0.13f, 0.02f, 0.06f), new Vector3(0.14f, 0.04f, 0.18f));
         root.transform.localScale = Vector3.one * 1.8f;   // a hen the size of a driver's head: big enough to aim at, or round
         var col = root.AddComponent<SphereCollider>(); col.isTrigger = true; col.radius = 0.55f; col.center = new Vector3(0, 0.55f, 0.05f);
-        var c = root.AddComponent<Chicken>();
+        var c = root.AddComponent<Critter>();
         var clip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Game/Audio/SFX/chicken_squawk.wav");
         new SerializedObject(c).Do(s => s.FindProperty("squawk").objectReferenceValue = clip);
         foreach (var r in root.GetComponentsInChildren<MeshRenderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;

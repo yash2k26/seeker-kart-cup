@@ -35,6 +35,8 @@ namespace KartCup
         public float charge01;
         public bool Ready => charge01 >= 1f;
         public bool isPlayer;
+        /// How fast it charges against the usual: a Tour boss's 1.5 (RaceMode.BossCharge). A faster charge, never a free one.
+        public float rate = 1f;
         public static event System.Action<Ability> Used;    // the HUD's callout, the playtest's frames
 
         Kart kart;
@@ -52,7 +54,7 @@ namespace KartCup
         {
             var race = RaceManager.Instance;
             if (race == null || kart == null) return;
-            if (race.state == RaceManager.State.Racing && !Ready) charge01 = Mathf.Min(1f, charge01 + Time.deltaTime / Charge);
+            if (race.state == RaceManager.State.Racing && !Ready) charge01 = Mathf.Min(1f, charge01 + Time.deltaTime * rate / Charge);
             if (shield != null && Time.time > Mathf.Max(shieldUntil, ramUntil)) { Destroy(shield); shield = null; }
         }
 

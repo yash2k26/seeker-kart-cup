@@ -24,6 +24,13 @@ namespace KartCup
             var manager = FindAnyObjectByType<ItemManager>();
             names = manager != null ? manager.GetComponentsInChildren<Item>().Select(i => i.itemName).Distinct().ToArray() : new string[0];
             rows = transform.Cast<Transform>().Select(r => r.GetComponentsInChildren<ItemGiver>()).Where(r => r.Length > 0).ToArray();
+            // Nitro Rush and Rocket Rumble (RaceMode.Only): every bubble holds the one item, for everyone, all race
+            if (RaceMode.Only is { } only && names.Contains(only))
+            {
+                foreach (var row in rows) foreach (var box in row) box.itemName = only;
+                enabled = false;
+                return;
+            }
             if (names.Length < 2 || rows.Length == 0) { enabled = false; return; }
             shown = rows.Select(r => r.Select(b => b.GetComponent<Renderer>()).ToArray()).ToArray();
             wasShown = rows.Select(r => r.Select(_ => true).ToArray()).ToArray();

@@ -303,6 +303,8 @@ public static class MenuPreview
             {
                 foreach (var tour in Object.FindObjectsByType<TourPanel>(FindObjectsSortMode.None)) tour.CardInEditor(0, 4);
                 Canvas.ForceUpdateCanvases(); Shot(cam, "menu10-card");
+                foreach (var tour in Object.FindObjectsByType<TourPanel>(FindObjectsSortMode.None)) tour.CardInEditor(1, 1);   // a race run the other way round
+                Canvas.ForceUpdateCanvases(); Shot(cam, "menu10-card-reverse");
                 foreach (var tour in Object.FindObjectsByType<TourPanel>(FindObjectsSortMode.None)) tour.ShowInEditor(1);
             }
         }

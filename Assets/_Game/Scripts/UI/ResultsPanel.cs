@@ -55,8 +55,9 @@ namespace KartCup
             var order = FinishOrder(race);
             int place = Mathf.Max(1, order.IndexOf(who) + 1);
             if (Weekly.Racing) { TimeTrial(who); return; }
+            if (RaceMode.Alone) place = SmashUp.Place;   // a Smash-Up places by its stars, so the gems and the chest pay the same
             Cup.Record(order.Select(r => r.characterIndex).ToList());
-            bool newBest = Tracks.RecordBest(Cup.TrackId, who.finishTime);
+            bool newBest = !RaceMode.Alone && Tracks.RecordBest(RaceMode.BestKey(Cup.TrackId), who.finishTime);
             Gems.Podium(place);   // and gems (ChestBadge shows both on the card)
             Chests.Earn(place);   // a podium earns a chest (ChestBadge shows it on the card)
             if (RaceMode.EventId == "daily") Daily.Record(place); else if (RaceMode.InEvent) Tour.Record(RaceMode.EventId, place, who.finishTime);   // TourResult shows it

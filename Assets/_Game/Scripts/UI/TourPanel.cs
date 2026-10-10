@@ -106,15 +106,15 @@ namespace KartCup
             var rival = e.mode == RaceMode.Kind.Duel && roster != null && e.rival >= 0 ? roster.At(e.rival) : null;
             int got = Tour.Stars(e.id);
             var track = Tracks.At(e.track);
-            if (cardMode != null) cardMode.text = boss ? "BOSS DUEL" : RaceMode.Name(e.mode);
+            if (cardMode != null) cardMode.text = boss ? "BOSS DUEL" : Tour.ModeName(e);
             if (cardTitle != null) cardTitle.text = e.title.ToUpperInvariant();
-            if (cardTrack != null) cardTrack.text = track.name.ToUpperInvariant();
+            if (cardTrack != null) cardTrack.text = Tour.Where(e);
             if (cardPic != null) { cardPic.sprite = e.track < trackArt.Length ? trackArt[e.track] : null; cardPic.enabled = cardPic.sprite != null; }
             if (cardRule != null) cardRule.text = Tour.Rule(e, rival?.displayName);
             if (cardGoal != null) cardGoal.text = Tour.Goal(e);
             var paint = boss ? Paints.All.FirstOrDefault(p => p.sku == c.bossPaint) : null;
             if (cardPrize != null) cardPrize.text = boss ? (Tour.BossBeaten(cup) ? "WON" : $"{paint?.name ?? "PAINT"}") : got >= Tour.StarsPerEvent ? "ALL STARS" : "5 GEMS";
-            float best = Tracks.Best(track.id);
+            float best = Tracks.Best(Tour.BestKey(e));
             if (cardBest != null) cardBest.text = best > 0f ? RaceHud.Clock(best) : "--:--";
             for (int k = 0; k < cardStars.Length; k++)
                 if (cardStars[k] != null) { cardStars[k].color = k < got ? starOn : starOff; cardStars[k].gameObject.SetActive(true); }
@@ -144,7 +144,7 @@ namespace KartCup
                 }
                 if (i < seriesStars.Length && seriesStars[i] != null) seriesStars[i].SetActive(isOpen);
                 if (i < seriesFoots.Length && seriesFoots[i] != null)
-                    seriesFoots[i].text = isOpen ? $"{Tour.CupStars(i)} / {k.events.Length * Tour.StarsPerEvent}" : $"LOCKED  ·  {k.gate} STARS";
+                    seriesFoots[i].text = isOpen ? $"{Tour.CupStars(i)} / {k.events.Length * Tour.StarsPerEvent}" : $"LOCKED  ·  {Tour.Opener(i)}";
             }
             for (int i = 0; i < tabBacks.Length; i++)
             {
@@ -155,7 +155,7 @@ namespace KartCup
                     var k = Tour.Cups[i];
                     tabLabels[i].text = Tour.Open(i)
                         ? $"{k.name}\n<size=62%><color=#FFB126>{Tour.CupStars(i)} / {k.events.Length * Tour.StarsPerEvent} STARS</color></size>"
-                        : $"{k.name}\n<size=62%>LOCKED  ·  {k.gate} STARS TO OPEN</size>";
+                        : $"{k.name}\n<size=62%>LOCKED  ·  {Tour.Opener(i)} TO OPEN</size>";
                 }
             }
             // inside the series: the tiles and the bar
@@ -185,7 +185,7 @@ namespace KartCup
             if (cupName != null) cupName.text = c.name;
             if (cupState != null)
                 cupState.text = open ? $"{Tour.CupStars(cup)} / {c.events.Length * Tour.StarsPerEvent} stars  ·  1st 3  ·  2nd 2  ·  3rd 1"
-                                     : $"Collect {c.gate - Tour.Total} more stars to open {c.name}";
+                                     : $"{Tour.Opener(cup)} TO OPEN {c.name}";
             var who = roster != null ? roster.Selected : null;
             if (driver != null) driver.text = $"DRIVING AS  {(who != null ? who.displayName.ToUpperInvariant() : "—")}";
 
@@ -198,8 +198,8 @@ namespace KartCup
                 var e = c.events[i];
                 int got = Tour.Stars(e.id);
                 if (i < titles.Length) titles[i].text = e.title.ToUpperInvariant();
-                if (i < modes.Length) modes[i].text = RaceMode.Name(e.mode);
-                if (i < tracks.Length) tracks[i].text = Tracks.At(e.track).name.ToUpperInvariant();
+                if (i < modes.Length) modes[i].text = Tour.ModeName(e);
+                if (i < tracks.Length) tracks[i].text = Tour.Where(e);
                 for (int k = 0; k < 3; k++)
                     if (i * 3 + k < stars.Length && stars[i * 3 + k] != null)
                     {

@@ -8,14 +8,15 @@ namespace KartCup
     /// stars. Nothing carries over and nothing is lost by missing a day: no streak.
     public static class Daily
     {
-        public sealed class Challenge { public int day, track, rival; public RaceMode.Kind mode; public string title, goal; }
+        public sealed class Challenge { public int day, track, rival; public RaceMode.Kind mode; public string title, goal; public bool reverse, mist; }
 
         static readonly string[] Titles = { "Night Shift", "Cold Open", "Pine Dash", "Speed Trap", "Coast Run", "Summit Scrap", "Forest Duel" };
 
         public static int Today => (int)(DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 86400);
 
         /// The challenge for a day: every circuit in turn, the modes in a cycle of their own (so they meet differently),
-        /// a rival from the roster for duels.
+        /// a rival from the roster for duels, and the circuit run the other way round or in mist on a cycle of their own
+        /// again, so the same circuit and mode come back differently (Beach Buggy's variety from levers, not track).
         public static Challenge For(int day, int rosterSize = 10)
         {
             var mode = (day % 3) switch { 0 => RaceMode.Kind.Race, 1 => RaceMode.Kind.Elimination, _ => RaceMode.Kind.Duel };
@@ -25,6 +26,7 @@ namespace KartCup
             {
                 day = day, track = track, rival = rival, mode = mode, title = Titles[day % Titles.Length],
                 goal = mode == RaceMode.Kind.Duel ? "Win the duel" : mode == RaceMode.Kind.Elimination ? "Survive to the top 3" : "Finish on the podium",
+                reverse = day % 5 is 1 or 3, mist = day % 7 is 2 or 5,
             };
         }
 
@@ -37,7 +39,9 @@ namespace KartCup
 
         public static void Arm(Challenge c)
         {
+            RaceMode.Clear();   // nothing of the last event carries over
             RaceMode.Current = c.mode; RaceMode.Rival = c.mode == RaceMode.Kind.Duel ? c.rival : -1;
+            RaceMode.Reverse = c.reverse; RaceMode.Mist = c.mist;
             RaceMode.Difficulty = c.mode == RaceMode.Kind.Duel ? 1.02f : 1.0f; RaceMode.EventId = "daily";
         }
 

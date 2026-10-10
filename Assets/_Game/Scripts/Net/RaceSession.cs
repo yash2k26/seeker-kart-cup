@@ -51,6 +51,9 @@ namespace KartCup
             raceStart = lapStart = Time.time;
             nextSample = 0f; recording = true; player = null;
             KartApi.Event("race_start", new { trackId });
+            // A reversed lap, a second lap, a bubble full of nitro or a Smash-Up is not the circuit's lap: it races off the
+            // board (the referee would refuse it anyway) and keeps its own personal best (RaceMode.BestKey).
+            if (!RoomClient.InRaceRoom && !Weekly.Racing && !RaceMode.Ranked) { RaceToken = null; return; }
             try
             {
                 var s = await KartApi.StartRace(trackId, Weekly.Racing ? "weekly" : null);

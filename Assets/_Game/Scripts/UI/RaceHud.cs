@@ -145,7 +145,8 @@ namespace KartCup
 
             int lap = Mathf.Clamp(p.lap, 1, race.totalLaps);
             if (lapLabel != null) lapLabel.text = Elimination.Instance != null && race.state == RaceManager.State.Racing
-                ? $"OUT IN {Mathf.CeilToInt(Elimination.Instance.SecondsToNext)}" : $"LAP {lap}/{race.totalLaps}";
+                ? $"OUT IN {Mathf.CeilToInt(Elimination.Instance.SecondsToNext)}"
+                : SmashUp.Instance != null ? $"SMASHED {SmashUp.Score}/{SmashUp.Need(3)}" : $"LAP {lap}/{race.totalLaps}";
             if (lap != lastLap)
             {
                 if (lastLap > 0 && lap == race.totalLaps && race.totalLaps > 1) Big("FINAL LAP", 1.4f);

@@ -4,15 +4,22 @@ using UnityEngine;
 
 namespace KartCup
 {
-    /// Beach Buggy's chickens: a few wander across the road at a crossing, back and forth, bobbing, pausing at each kerb.
+    /// Beach Buggy's critters: a few wander across the road at a crossing, back and forth, bobbing, pausing at each kerb.
     /// A kart that hits one sends it flying in a burst of feathers with a squawk, and loses a little speed; it is back at
     /// its crossing a few seconds later for the next lap. A trigger, not a body (Smashable has the reason). Solo races
     /// only, like the oil (RaceSpawner): rooms never get them.
-    public sealed class Chicken : MonoBehaviour
+    ///
+    /// One animal per circuit, Beach Buggy's way of making a map read at a glance (crabs on the beach, penguins on the
+    /// ice): Resources/Critter_<track id> (CritterSetup), the chicken where a circuit has none of its own.
+    public sealed class Critter : MonoBehaviour
     {
-        public static readonly List<Chicken> All = new();
+        public static readonly List<Critter> All = new();
+        public static event System.Action<Critter, Kart> Hit;   // Smash-Up counts them
         const float Flight = 1.2f, Back = 7f, Pause = 1.1f;
         [SerializeField] AudioClip squawk;
+        [SerializeField] float pitch = 1f;      // the same squawk, pitched for the animal
+        [SerializeField] bool sideways;         // a crab crosses the road side-on
+        [SerializeField] Color puffColor = new(1f, 0.98f, 0.94f);   // feathers, or sand
         Vector3 a, b, vel, spin, homeScale;
         float offset, speed = 1.4f, hitAt = -1f, downUntil = -1f;
         Renderer[] shown;
@@ -46,6 +53,7 @@ namespace KartCup
             dir.y = 0f;
             float bob = walking ? Mathf.Abs(Mathf.Sin((Time.time + offset) * 13f)) * 0.14f : 0f;
             transform.position = pos + Vector3.up * bob;
+            if (sideways) dir = Vector3.Cross(Vector3.up, dir);
             if (dir.sqrMagnitude > 0.001f) transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir.normalized), 1f - Mathf.Exp(-10f * Time.deltaTime));
             if (!walking) transform.localRotation *= Quaternion.Euler(Mathf.Max(0f, Mathf.Sin((Time.time + offset) * 9f)) * 30f, 0f, 0f);   // pecking at the kerb
         }
@@ -60,30 +68,31 @@ namespace KartCup
             vel = v * 0.7f + away.normalized * 4f + Vector3.up * (7f + v.magnitude * 0.15f);
             spin = Random.onUnitSphere * Random.Range(540f, 900f);
             hitAt = Time.time;
-            Debug.Log($"[race] {kart.name} hit a chicken");
+            Debug.Log($"[race] {kart.name} hit a {name.Replace("(Clone)", "").ToLowerInvariant()}");
+            Hit?.Invoke(this, kart);
             if (!kart.rb.isKinematic) kart.rb.linearVelocity = v * 0.88f;          // feathers in the grille: a little speed gone
             var puff = Resources.Load<GameObject>("FX/SmashPuff");
             if (puff != null)
             {
                 var p = Instantiate(puff, transform.position + Vector3.up * 0.6f, Quaternion.identity);
-                foreach (var ps in p.GetComponentsInChildren<ParticleSystem>()) { var m = ps.main; m.startColor = new Color(1f, 0.98f, 0.94f); m.startSizeMultiplier *= 1.4f; }
+                foreach (var ps in p.GetComponentsInChildren<ParticleSystem>()) { var m = ps.main; m.startColor = puffColor; m.startSizeMultiplier *= 1.4f; }
             }
             var prog = kart.GetComponent<KartProgress>();
             bool player = prog != null && prog.isPlayer;
             if (squawk != null && AudioDirector.Instance != null && (player || Camera.main == null || (Camera.main.transform.position - transform.position).sqrMagnitude < 30f * 30f))
-                AudioDirector.Instance.Play(squawk, player ? 0.9f : 0.5f, Random.Range(0.92f, 1.12f));
+                AudioDirector.Instance.Play(squawk, player ? 0.9f : 0.5f, pitch * Random.Range(0.92f, 1.12f));
             if (player) { Haptics.Play(Haptics.Kind.Hit); CameraFeel.Instance?.Kick(-kart.transform.forward, 0.35f); }
         }
 
         void Show(bool on) { foreach (var r in shown) if (r != null) r.enabled = on; }
 
         /// This race's crossings: three on straights along the waypoints, away from the grid, the turbo pads and the oil,
-        /// two chickens each, at different paces so they never walk in step.
-        public static void Spawn(int seed)
+        /// two animals each, at different paces so they never walk in step.
+        public static void Spawn(int seed, string trackId)
         {
-            var prefab = Resources.Load<GameObject>("Chicken");
+            var prefab = Resources.Load<GameObject>("Critter_" + trackId) ?? Resources.Load<GameObject>("Chicken");
             var root = GameObject.Find("Waypoints");
-            if (prefab == null || root == null || root.transform.childCount < 20 || GameObject.Find("Chickens") != null) return;
+            if (prefab == null || root == null || root.transform.childCount < 20 || GameObject.Find("Critters") != null) return;
             var wp = root.transform; int n = wp.childCount;
             var rnd = new System.Random(seed);
             var avoid = new List<Vector3>();
@@ -96,7 +105,7 @@ namespace KartCup
                 bool near = false; foreach (var p in avoid) if (Vector3.Distance(p, wp.GetChild(i).position) < 25f) near = true;
                 if (!near) open.Add(i);
             }
-            var parent = new GameObject("Chickens").transform;
+            var parent = new GameObject("Critters").transform;
             int crossings = 0;
             while (crossings < 3 && open.Count > 0)
             {
@@ -107,12 +116,12 @@ namespace KartCup
                 var from = Ground(at.position - at.right * 6f); var to = Ground(at.position + at.right * 6f);
                 for (int k = 0; k < 2; k++)
                 {
-                    var c = Instantiate(prefab, parent).GetComponent<Chicken>();
+                    var c = Instantiate(prefab, parent).GetComponent<Critter>();
                     c.Walk(k == 0 ? from : to, k == 0 ? to : from, (float)rnd.NextDouble() * 6f, 1.1f + (float)rnd.NextDouble() * 0.8f);
                 }
                 crossings++;
             }
-            Debug.Log($"[race] {parent.childCount} chicken(s) at {crossings} crossing(s)");
+            Debug.Log($"[race] {parent.childCount} {prefab.name.ToLowerInvariant()}(s) at {crossings} crossing(s)");
         }
     }
 }
