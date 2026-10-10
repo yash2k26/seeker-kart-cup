@@ -152,6 +152,13 @@ public static class Playtest
                 itemFrom = rp.position - rp.forward * 13f + rp.right * 7f + Vector3.up * 3.2f; itemAt = rp.position + rp.forward * 2f + Vector3.up * 0.6f;
                 SideShot($"ramp{track}-look");
             }
+            var critters = GameObject.Find("Critters");
+            if (introShot == 0 && critters != null && critters.transform.childCount > 0)
+            {
+                var c = critters.transform.GetChild(0);   // the circuit's animal, close, three-quarter on
+                itemFrom = c.position + c.forward * 5f + c.right * 2.5f + Vector3.up * 2.2f; itemAt = c.position + Vector3.up * 0.9f;
+                SideShot($"critter{track}");
+            }
             var slicks = GameObject.Find("OilSlicks");
             if (introShot == 0 && slicks != null && slicks.transform.childCount > 0)
             {

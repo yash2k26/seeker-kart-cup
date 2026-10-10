@@ -98,13 +98,16 @@ namespace KartCup
             var avoid = new List<Vector3>();
             foreach (var name in new[] { "TurboPads", "OilSlicks", "Ramps" })
                 if (GameObject.Find(name) is { } g) foreach (Transform t in g.transform) avoid.Add(t.position);
+            // straights only: a critter in a hairpin is a wall. Pine Ridge has no true straight, so there the gentlest
+            // bends will do (up to 35 degrees across two waypoints, about 50 m).
             var open = new List<int>();
-            for (int i = 10; i < n - 4; i++)
-            {
-                if (Vector3.Angle(wp.GetChild(i - 1).forward, wp.GetChild(i + 1).forward) > 20f) continue;   // straights only: a chicken in a hairpin is a wall
-                bool near = false; foreach (var p in avoid) if (Vector3.Distance(p, wp.GetChild(i).position) < 25f) near = true;
-                if (!near) open.Add(i);
-            }
+            for (int limit = 20; limit <= 35 && open.Count < 3; limit += 15)
+                for (int i = 10; i < n - 4; i++)
+                {
+                    if (open.Contains(i) || Vector3.Angle(wp.GetChild(i - 1).forward, wp.GetChild(i + 1).forward) > limit) continue;
+                    bool near = false; foreach (var p in avoid) if (Vector3.Distance(p, wp.GetChild(i).position) < 25f) near = true;
+                    if (!near) open.Add(i);
+                }
             var parent = new GameObject("Critters").transform;
             int crossings = 0;
             while (crossings < 3 && open.Count > 0)

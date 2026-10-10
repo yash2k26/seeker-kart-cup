@@ -921,8 +921,11 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d7c39bdca3617412cb479deaf393517e, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::KartCup.Chicken
+  m_EditorClassIdentifier: Assembly-CSharp::KartCup.Critter
   squawk: {fileID: 8300000, guid: b5410d3f600a3409da1b426225ee48f1, type: 3}
+  pitch: 1
+  sideways: 0
+  puffColor: {r: 1, g: 0.98, b: 0.94, a: 1}
 --- !u!1 &7409229013546097003
 GameObject:
   m_ObjectHideFlags: 0
