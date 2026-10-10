@@ -277,6 +277,10 @@ public static class Playtest
         var touch = player.GetComponent<KartInputMobile>(); if (touch != null) Object.DestroyImmediate(touch);   // one KartInput per kart
         var first = typeof(RaceSpawner).GetField("firstWaypoint", BindingFlags.NonPublic | BindingFlags.Instance)?.GetValue(spawner) as BasicWaypoint;
         var pilot = player.gameObject.AddComponent<KartAi>(); pilot.Configure(null, first, 99);
+        // -skill 1.08 -steady: a stronger driver than the 0.953 default, the way the device autopilot file sets one
+        var a = System.Environment.GetCommandLineArgs();
+        for (int i = 0; i < a.Length - 1; i++) if (a[i] == "-skill" && float.TryParse(a[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float s)) pilot.skill = s;
+        if (a.Contains("-steady")) pilot.steady = true;
         Debug.Log($"[playtest] autopilot drives {player.racerName} at skill {pilot.skill:0.000}, aggression {pilot.aggression:0.00}");
         return true;
     }

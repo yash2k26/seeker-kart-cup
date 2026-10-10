@@ -91,6 +91,7 @@ public static partial class TrackSetup
         var grid = StartGrid();
         Barriers();
         Dressing();
+        FarLayer(GameObject.Find("Dressing").transform);
         ItemBoxes();
 
         // ---- systems ----

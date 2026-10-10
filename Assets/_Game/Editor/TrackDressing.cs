@@ -96,6 +96,28 @@ public static partial class TrackSetup
         Debug.Log($"[track] {made} smashables");
     }
 
+    /// Trackside clutter on its own layer (RaceCamera.FarLayer), which the race camera stops drawing past
+    /// RaceCamera.FarCull metres: the palms, rocks, crates, bushes and the beach town's houses within 80 m of the road.
+    /// Not the lamps, the glows, the landmarks or the horizon ring. FpsCounter's sweep on the Nothing Phone, Palm Bay:
+    /// culling them at 150 m took 49 fps to 57 (10 Oct 2026); far off they are fog anyway.
+    static void FarLayer(Transform root)
+    {
+        int n = 0;
+        foreach (var r in root.GetComponentsInChildren<Renderer>(true))
+        {
+            string name = r.name;
+            if (name.Contains("Glow") || name.Contains("Halo") || name.Contains("Flame") || name.Contains("Lantern") || name.Contains("Firefl")
+                || name.StartsWith("Lamp") || r.GetComponentInParent<KartCup.Smashable>() != null) continue;
+            var b = r.bounds;
+            if (Mathf.Max(b.size.x, b.size.z) > 25f || b.size.y > 20f) continue;                       // a landmark: always drawn
+            float near = float.MaxValue;
+            for (int i = 0; i < centre.Length; i += 2) near = Mathf.Min(near, (new Vector2(centre[i].x, centre[i].z) - new Vector2(b.center.x, b.center.z)).sqrMagnitude);
+            if (near > 80f * 80f) continue;                                                            // the horizon ring stays
+            r.gameObject.layer = KartCup.RaceCamera.FarLayer; n++;
+        }
+        Debug.Log($"[track] {n} renderers culled past {KartCup.RaceCamera.FarCull} m");
+    }
+
     /// A trigger round the prop and Smashable on it; never static-batched, because it has to fly.
     static void MakeSmashable(GameObject go)
     {

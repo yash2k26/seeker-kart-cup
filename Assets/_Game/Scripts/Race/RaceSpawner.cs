@@ -26,6 +26,7 @@ namespace KartCup
             if (roster == null || roster.characters.Length == 0) { Debug.LogError("[race] no roster"); return; }
             Chests.ClearLast(); Tour.ClearLast(); Daily.LastPaid = false;
             gameObject.AddComponent<PerfLog>();   // frame times to the log, every race
+            RaceCamera.Apply(raceCamera != null ? raceCamera.GetComponent<Camera>() : Camera.main);   // trackside clutter not drawn far off
             if (RoomClient.InRaceRoom) { RaceMode.Clear(); SpawnOnline(); return; }   // a room is always the ordinary race
 
             // A race entered outside a cup (editor playtest, a direct scene load) still needs a grid.
