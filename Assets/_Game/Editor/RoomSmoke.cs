@@ -183,8 +183,10 @@ public static class RoomSmoke
         {
             podiumAt = t;
             podiumRacers = Object.FindObjectsByType<PodiumPose>(FindObjectsSortMode.None).Length;
-            podiumTitle = Texts().FirstOrDefault(x => x.EndsWith("!"));
         }
+        // the winner is called on the drum roll's last stroke: until then the line reads AND THE WINNER IS...
+        if (podiumAt > 0 && podiumTitle == null && t - podiumAt > PodiumShow.WinAt + 0.3)
+            podiumTitle = Texts().FirstOrDefault(x => x.EndsWith("!"));
         var dim = Object.FindFirstObjectByType<ResultsPanel>()?.transform.Find("Dim");
         bool card = dim != null && dim.gameObject.activeInHierarchy;
         if (podiumAt > 0 && card && t - podiumAt > 3) { Verify(client); return; }

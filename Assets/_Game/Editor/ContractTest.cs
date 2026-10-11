@@ -70,7 +70,9 @@ public static class ContractTest
             var ai = go.AddComponent<KartAi>();
             // WP00 sits just past the grid. "First found" was whichever waypoint Unity listed first: on Pine Ridge
             // that was behind the line, the kart drove the wrong way off the road and never saw a checkpoint.
-            ai.SetTarget(Object.FindObjectsByType<BasicWaypoint>(FindObjectsSortMode.None).OrderBy(w => w.name).First());
+            // (and the circuit's own WP00: a shortcut's waypoints sort before it by name, and on Mount Ember the kart set off
+            // for the cut, the wrong way, into the lava)
+            ai.SetTarget(GameObject.Find("Waypoints").transform.GetChild(0).GetComponent<BasicWaypoint>());
             ai.skill = 1.0f;
             // RaceSession.OnFinish derives totalMs from Time.time in the finish frame and keeps no copy of it, so
             // stamp the same expression here. This listener is added after ResultsPanel's, so it runs in that frame.

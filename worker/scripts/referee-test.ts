@@ -187,13 +187,28 @@ for (const [id, g] of Object.entries(TRACK_GEO)) {
     const long = referee(g, drive(g, 45, 15).filter(p => p.t < gapAt || p.t > gapAt + 14));
     check(long.bad === null && finishT(long, g) !== null, `${id} a 14 s gap mid-race still finishes (${long.bad}, ${long.n} crossings)`);
     // lost out there: 25 s of circles 8 m past the corridor, then back to the road
-    const out = g.halfWidth + g.kerb + 25 + 8, { at } = path(g), s0 = gateArc(3) + 20, pts: Sample[] = [];
+    // staged on the straightest stretch past a gate: 40 m off the inside of a 16 m bend (Pine Ridge's esses since 11 Oct)
+    // is past the bend's own centre, where an offset point swings round and leaps between samples
+    const out = g.halfWidth + g.kerb + 25 + 8, { at } = path(g), pts: Sample[] = [];
+    let s0 = gateArc(3) + 20, flattest = Infinity;
+    for (let k = 2; k < g.gates.length - 2; k++)
+    {
+      const s = gateArc(k) + 20; let turn = 0;
+      for (let u = s - 5; u < s + 40; u += 5)
+      {
+        const a = at(u), b = at(u + 5), c = at(u + 10);
+        turn += Math.abs(Math.atan2(c.z - b.z, c.x - b.x) - Math.atan2(b.z - a.z, b.x - a.x));
+      }
+      if (turn < flattest) { flattest = turn; s0 = s; }
+    }
     let t = 0;
     for (let sArc = -15; sArc < s0; sArc += 3) { t += 3 / 45; const q = at(sArc); pts.push({ t: +t.toFixed(3), x: q.x, y: 0, z: q.z }); }
-    for (let j = 1; j <= 15; j++) { t += 1 / 15; const q = at(s0 + j, out * j / 15); pts.push({ t: +t.toFixed(3), x: q.x, y: 0, z: q.z }); }
+    // out and back over 3 s each, and six whole circles: on a bend (the 11 Oct layouts are full of them) a point 40 m off
+    // the line moves several times faster than the line, and a 1 s ramp jumped 8 m between samples, a teleport
+    for (let j = 1; j <= 45; j++) { t += 1 / 15; const q = at(s0 + j / 3, out * j / 45); pts.push({ t: +t.toFixed(3), x: q.x, y: 0, z: q.z }); }
     const c0 = at(s0 + 15, out);
-    for (let j = 0; j < 25 * 15; j++) { t += 1 / 15; const ang = j / 15 * 12 / 8; pts.push({ t: +t.toFixed(3), x: c0.x + 8 * Math.cos(ang) - 8, y: 0, z: c0.z + 8 * Math.sin(ang) }); }
-    for (let j = 1; j <= 15; j++) { t += 1 / 15; const q = at(s0 + 15 + j, out * (1 - j / 15)); pts.push({ t: +t.toFixed(3), x: q.x, y: 0, z: q.z }); }
+    for (let j = 0; j < 25 * 15; j++) { t += 1 / 15; const ang = j / (25 * 15) * 6 * 2 * Math.PI; pts.push({ t: +t.toFixed(3), x: c0.x + 8 * Math.cos(ang) - 8, y: 0, z: c0.z + 8 * Math.sin(ang) }); }
+    for (let j = 1; j <= 45; j++) { t += 1 / 15; const q = at(s0 + 15 + j / 3, out * (1 - j / 45)); pts.push({ t: +t.toFixed(3), x: q.x, y: 0, z: q.z }); }
     for (let sArc = s0 + 30; sArc < L * g.laps + 20; sArc += 3) { t += 3 / 45; const q = at(sArc); pts.push({ t: +t.toFixed(3), x: q.x, y: 0, z: q.z }); }
     const circ = referee(g, pts);
     check(circ.bad === null && finishT(circ, g) !== null, `${id} 25 s of circling past the corridor is not leaving the circuit (${circ.bad}, ${circ.offM.toFixed(0)} m)`);
