@@ -81,7 +81,7 @@ namespace KartCup
         /// A boss's special charges this much faster than the player's (the card says so). 11 Oct 2026, the user: "every
         /// boss is really strong, really have good powers, good racing skills and everything": twice as fast (was 1.5).
         public const float BossCharge = 2f;
-        /// ...and a boss drives a maxed kart: every power at five pips but SPEED, which their pace (BossEdge) already sets,
+        /// ...and a boss drives a maxed kart: every power at five pips but SPEED, which their pace (BossPace) already sets,
         /// so a clean, quick driver can still beat them. Boosts hit harder and last longer, it corners with more bite, a hit
         /// barely slows it and it shoves back, and its items fly faster with a shot more to every pickup (KartDef.ApplyTo).
         static KartDef bossKart;
@@ -95,13 +95,12 @@ namespace KartCup
                 return bossKart;
             }
         }
-        /// How far above their cup's field a boss drives, and how keen they are to fire: the boss is the wall (10 Oct 2026,
-        /// the user: "it's easy to beat the boss and the next level is easy to reach"). The autopilot, a fair stand-in for a
-        /// tidy driver, beat Chase in a duel at the old +0.03. The edge grows a cup at a time: Mert is the first wall, Beeman
-        /// the last. Capped at BossTop: past about 1.18 a boss is too fast to stay on Pine Ridge's road and loses on its own
-        /// (Beeman at 1.25 lost a reversed two-lap duel to the autopilot); keener items and no mistakes carry it beyond.
-        public static float BossEdge(int cup) => 0.07f + 0.02f * cup;
-        public const float BossTop = 1.15f;
+        /// How fast each cup's boss drives, and how keen they are to fire: the boss is the wall (10 Oct 2026, the user: "it's
+        /// easy to beat the boss and the next level is easy to reach"; 11 Oct: "every boss is really strong"). A boss's pace is
+        /// their own, not their cup's field plus an edge: at 0.90 + 0.07 the average driver beat Mert. Faster than every field,
+        /// rising a cup at a time to 1.15: past about 1.18 a boss is too fast to stay on the road and loses on its own (Beeman
+        /// at 1.25 lost a duel to the autopilot); the maxed kart, keener items and no mistakes carry it beyond.
+        public static readonly float[] BossPace = { 1.04f, 1.07f, 1.10f, 1.13f, 1.15f };
         public static float BossFire(int cup) => 1.2f + 0.06f * cup;
         public const int StarsPerEvent = 3;
         public static int MaxStars => Cups.Sum(c => c.events.Length) * StarsPerEvent;
@@ -193,7 +192,7 @@ namespace KartCup
             RaceMode.Current = e.mode; RaceMode.Rival = e.rival; RaceMode.EventId = e.id;
             bool boss = e.mode == RaceMode.Kind.Duel;
             int index = System.Array.IndexOf(Cups, c);
-            RaceMode.Difficulty = boss ? Mathf.Min(c.pace + BossEdge(index), BossTop) : c.pace;
+            RaceMode.Difficulty = boss ? BossPace[Mathf.Clamp(index, 0, BossPace.Length - 1)] : c.pace;
             RaceMode.Fire = boss ? Mathf.Max(BossFire(index), c.fire + 0.3f) : c.fire;
             RaceMode.Hazard = index;                                                          // the later cups lay more oil and more crossings
             RaceMode.BossCharge = e.mode == RaceMode.Kind.Duel ? BossCharge : 1f;          // ...and charges faster: a stated rule, never unlimited
