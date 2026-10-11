@@ -17,16 +17,16 @@ namespace KartCup
         /// By driver (CharacterDef.displayName).
         public static Def For(string driver) => driver switch
         {
-            "Toly" => new() { kind = Kind.Burst, name = "SHIP IT", line = "A huge burst of speed" },
-            "Mert" => new() { kind = Kind.Missiles, name = "INDEXED", line = "Three homing missiles" },
+            "Toly" => new() { kind = Kind.Burst, name = "AFTERBURNER", line = "A huge burst of speed" },
+            "Mert" => new() { kind = Kind.Missiles, name = "HEAT SEEKERS", line = "Three homing missiles" },
             "Akshay" => new() { kind = Kind.LongBoost, name = "TOP SPEED", line = "A long, steady boost" },
             "Emmett" => new() { kind = Kind.Rockets, name = "BLINDSIDE", line = "Two rockets dead ahead" },
             "Bitsy" => new() { kind = Kind.ChainBoost, name = "ALL GAS", line = "Three boosts in a row" },
             "Pip" => new() { kind = Kind.Bulldozer, name = "BULLDOZER", line = "Unstoppable: whoever she touches spins" },
-            "Chase" => new() { kind = Kind.SunBomb, name = "NETWORK EFFECT", line = "A sun bomb thrown ahead" },
-            "Beeman" => new() { kind = Kind.Shield, name = "HOTFIX", line = "A shield nothing gets through" },
+            "Chase" => new() { kind = Kind.SunBomb, name = "SUNBURST", line = "A sun bomb thrown ahead" },
+            "Beeman" => new() { kind = Kind.Shield, name = "FORCE FIELD", line = "A shield nothing gets through" },
             "Maroo" => new() { kind = Kind.Oil, name = "BIG CURLS", line = "Three oil slicks behind" },
-            "Andrew" => new() { kind = Kind.Review, name = "CODE REVIEW", line = "Everyone close ahead spins out" },
+            "Andrew" => new() { kind = Kind.Review, name = "SHOCKWAVE", line = "Everyone close ahead spins out" },
             _ => new() { kind = Kind.Burst, name = "BURST", line = "A burst of speed" },
         };
 

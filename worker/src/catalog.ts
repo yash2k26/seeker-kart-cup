@@ -42,19 +42,19 @@ export const CATALOG: Sku[] = [
   { sku: 'paint.white',    kind: 'paint', name: 'White',    blurb: 'Clean white. Shows every scratch.',       sol: 0.03 },
 
   // SPEED, TURBO, GRIP, ARMOR, ATTACK — Street karts total 14, Hero karts 18 (the free five total 10)
-  kart('taxi',             'Mempool',       'Takes everyone for a ride.',            3, 3, 2, 3, 3),
-  kart('van',              'Airdrop',       'Delivers. Eventually.',                 2, 3, 2, 4, 3),
+  kart('taxi',             'Night Cab',       'Takes everyone for a ride.',            3, 3, 2, 3, 3),
+  kart('van',              'Courier',       'Delivers. Eventually.',                 2, 3, 2, 4, 3),
   kart('hatchback-sports', 'Hot Hatch',     'Point it and it goes.',                 4, 3, 3, 2, 2),
   kart('police',           'Slasher',       'Enforces the racing line.',             3, 3, 3, 2, 3),
-  kart('firetruck',        'Hotfix',        'A fire truck. In a kart race. Yes.',    3, 4, 3, 5, 3),
-  kart('garbage-truck',    'Garbage Chain', 'Hauls the whole mempool.',              2, 3, 3, 5, 5),
-  kart('tractor',          'Yield Farmer',  'Slow off the line, unstoppable after.', 2, 5, 3, 5, 3),
+  kart('firetruck',        'Fire Chief',        'A fire truck. In a kart race. Yes.',    3, 4, 3, 5, 3),
+  kart('garbage-truck',    'Big Haul', 'Hauls the whole field.',              2, 3, 3, 5, 5),
+  kart('tractor',          'Harvester',  'Slow off the line, unstoppable after.', 2, 5, 3, 5, 3),
   kart('race-future',      'Photon',        'Low, wide, glued to the road.',         5, 4, 5, 2, 2),
 
-  driver('mert',   'Mert',   'Indexes every corner before he takes it. Or beat him in Cup 1.',             0.08),
+  driver('mert',   'Mert',   'Knows every corner before he takes it. Or beat him in Cup 1.',             0.08),
   driver('akshay', 'Akshay', 'Top speed, turns like a ferry. Or beat him in Cup 2.',                       0.08),
-  driver('chase',  'Chase',  'Knows every dev on the grid. Waves at all of them. Or beat him in Cup 3.',   0.08),
-  driver('toly',   'Toly',   'Ships blocks faster than you can read them. Or beat him in Cup 4.',          0.12),
+  driver('chase',  'Chase',  'Knows everyone on the grid. Waves at all of them. Or beat him in Cup 3.',   0.08),
+  driver('toly',   'Toly',   'Gone before you've read his number. Or beat him in Cup 4.',          0.12),
   gems(100, 0.012), gems(550, 0.05), gems(1200, 0.09),
 
   // packs: the item name is the ItemManager's, the count is credited to the phone's inventory when the purchase verifies
@@ -65,7 +65,7 @@ export const CATALOG: Sku[] = [
   pack('bouncer', 'Bouncer',     'Bouncers x3', 'Off the walls until it finds someone.',      3, 0.01),
   pack('sunbomb', 'Sun Bomb',    'Sun Bombs x3', 'Lob it, count to two, stand well back.',    3, 0.015),
 
-  { sku: 'bundle.founder', kind: 'bundle', name: "Founder's Pack", blurb: 'Photon, Hotfix, Mempool, Slasher, two paints and the Founder badge. Sold once, never again.',
+  { sku: 'bundle.founder', kind: 'bundle', name: "Founder's Pack", blurb: 'Photon, Fire Chief, Night Cab, Slasher, two paints and the Founder badge. Sold once, never again.',
     sol: 0.18, until: '2027-01-10T00:00:00Z', grants: ['kart.race-future', 'kart.firetruck', 'kart.taxi', 'kart.police', 'paint.sunset', 'paint.midnight', 'badge.founder'] },
   { sku: 'bundle.garage',  kind: 'bundle', name: 'Full Garage', blurb: 'Every kart and paint, including the ones we add this season, plus the Founder badge.',
     sol: 0.35, grants: ['kart.taxi', 'kart.van', 'kart.hatchback-sports', 'kart.police', 'kart.firetruck', 'kart.garbage-truck', 'kart.tractor', 'kart.race-future',

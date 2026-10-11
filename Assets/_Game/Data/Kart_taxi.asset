@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Kart_taxi
   m_EditorClassIdentifier: Assembly-CSharp::KartCup.KartDef
   id: taxi
-  displayName: Mempool
+  displayName: Night Cab
   blurb: Takes everyone for a ride.
   sku: kart.taxi
   speed: 3

@@ -25,13 +25,13 @@ public static class KartSetup
         ("ooli", "Ooli", "Sits flat through the sweepers.", "",                           3, 2, 2, 2, 1),
         ("oopi", "Oopi", "Big tyres, big attitude.", "",                                  2, 2, 2, 3, 1),
         ("oozi", "Oozi", "All gas, some brakes.", "",                                     2, 3, 1, 2, 2),
-        ("taxi", "Mempool", "Takes everyone for a ride.", "kart.taxi",                    3, 3, 2, 3, 3),
-        ("van", "Airdrop", "Delivers. Eventually.", "kart.van",                           2, 3, 2, 4, 3),
+        ("taxi", "Night Cab", "Takes everyone for a ride.", "kart.taxi",                    3, 3, 2, 3, 3),
+        ("van", "Courier", "Delivers. Eventually.", "kart.van",                           2, 3, 2, 4, 3),
         ("hatchback-sports", "Hot Hatch", "Point it and it goes.", "kart.hatchback-sports", 4, 3, 3, 2, 2),
         ("police", "Slasher", "Enforces the racing line.", "kart.police",                 3, 3, 3, 2, 3),
-        ("firetruck", "Hotfix", "A fire truck. In a kart race. Yes.", "kart.firetruck",   3, 4, 3, 5, 3),
-        ("garbage-truck", "Garbage Chain", "Hauls the whole mempool.", "kart.garbage-truck", 2, 3, 3, 5, 5),
-        ("tractor", "Yield Farmer", "Slow off the line, unstoppable after.", "kart.tractor", 2, 5, 3, 5, 3),
+        ("firetruck", "Fire Chief", "A fire truck. In a kart race. Yes.", "kart.firetruck",   3, 4, 3, 5, 3),
+        ("garbage-truck", "Big Haul", "Hauls the whole field.", "kart.garbage-truck", 2, 3, 3, 5, 5),
+        ("tractor", "Harvester", "Slow off the line, unstoppable after.", "kart.tractor", 2, 5, 3, 5, 3),
         ("race-future", "Photon", "Low, wide, glued to the road.", "kart.race-future",    5, 4, 5, 2, 2),
     };
 

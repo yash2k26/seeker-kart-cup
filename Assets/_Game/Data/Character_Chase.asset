@@ -22,5 +22,5 @@ MonoBehaviour:
   weight: -2
   turbo: -1
   attack: 1
-  blurb: Knows every dev on the grid. Waves at all of them.
+  blurb: Knows everyone on the grid. Waves at all of them.
   sku: driver.chase

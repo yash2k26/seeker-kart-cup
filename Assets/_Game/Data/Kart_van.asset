@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Kart_van
   m_EditorClassIdentifier: Assembly-CSharp::KartCup.KartDef
   id: van
-  displayName: Airdrop
+  displayName: Courier
   blurb: Delivers. Eventually.
   sku: kart.van
   speed: 2

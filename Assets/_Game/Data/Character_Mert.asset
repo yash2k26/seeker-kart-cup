@@ -22,5 +22,5 @@ MonoBehaviour:
   weight: -2
   turbo: -1
   attack: 1
-  blurb: Indexes every corner before he takes it.
+  blurb: Knows every corner before he takes it.
   sku: driver.mert

@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Kart_tractor
   m_EditorClassIdentifier: Assembly-CSharp::KartCup.KartDef
   id: tractor
-  displayName: Yield Farmer
+  displayName: Harvester
   blurb: Slow off the line, unstoppable after.
   sku: kart.tractor
   speed: 2

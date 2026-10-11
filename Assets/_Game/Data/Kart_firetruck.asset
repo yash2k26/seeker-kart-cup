@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Kart_firetruck
   m_EditorClassIdentifier: Assembly-CSharp::KartCup.KartDef
   id: firetruck
-  displayName: Hotfix
+  displayName: Fire Chief
   blurb: A fire truck. In a kart race. Yes.
   sku: kart.firetruck
   speed: 3

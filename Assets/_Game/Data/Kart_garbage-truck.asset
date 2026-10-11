@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: Kart_garbage-truck
   m_EditorClassIdentifier: Assembly-CSharp::KartCup.KartDef
   id: garbage-truck
-  displayName: Garbage Chain
-  blurb: Hauls the whole mempool.
+  displayName: Big Haul
+  blurb: Hauls the whole field.
   sku: kart.garbage-truck
   speed: 2
   turbo: 3

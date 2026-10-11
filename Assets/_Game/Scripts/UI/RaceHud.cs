@@ -55,14 +55,22 @@ namespace KartCup
             if (!playerAbility.Fire()) Haptics.Play(Haptics.Kind.Tick);   // not charged yet (OnAbility says the rest)
         }
 
-        /// Anyone's special: yours in big gold letters; a rival's near you as a line, so a spin has a name on it.
+        /// Anyone's special: yours in big gold letters; a rival's near you as a line. Both say what it DOES (the def's
+        /// line), so a player who has never read the driver screen still knows why they just spun.
         void OnAbility(Ability a)
         {
-            if (a.isPlayer) { Big($"<color=#FFB126>{a.def.name}!</color>", 1.1f); AudioDirector.Instance?.Confirm(); return; }
+            if (a.isPlayer)
+            {
+                Big($"<color=#FFB126>{a.def.name}!</color>", 1.1f);
+                Banner(a.def.line, 1.6f);
+                AudioDirector.Instance?.Confirm();
+                return;
+            }
             var p = race != null ? race.Player : null;
             if (p == null || (a.transform.position - p.transform.position).sqrMagnitude > 70f * 70f) return;
             var who = a.GetComponent<KartProgress>();
-            Banner($"{(who != null ? who.racerName.ToUpperInvariant() : "RIVAL")}   ·   <color=#FFB126>{a.def.name}</color>", 1.6f);
+            Banner($"{(who != null ? who.racerName.ToUpperInvariant() : "RIVAL")}  ·  <color=#FFB126>{a.def.name}</color>:  " +
+                   a.def.line.ToLowerInvariant(), 2f);
         }
 
         void AbilityButton()
