@@ -4,7 +4,7 @@ using UnityEngine;
 namespace KartCup
 {
     /// Gems, the premium currency (9 Oct 2026; Beach Buggy's): earned from chests, podiums, the daily and a first boss
-    /// win, bought in packs (catalog.ts gems.*), spent to recruit the four judges. Kept on the phone like chests and
+    /// win, bought in packs (catalog.ts gems.*), spent to recruit the five judges. Kept on the phone like chests and
     /// items. ponytail: a PlayerPrefs balance; a Worker-side ledger when gems can be traded or when cheating costs us.
     public static class Gems
     {
@@ -38,7 +38,7 @@ namespace KartCup
         public static void ClearLast() => LastPodium = 0;
 
         /// What a locked driver costs: the two Tour openers 100, Chase 200, Toly 300. "" (free) is 0.
-        public static int PriceOf(CharacterDef d) => d == null || d.IsFree ? 0 : d.displayName switch { "Toly" => 300, "Chase" => 200, _ => 100 };
+        public static int PriceOf(CharacterDef d) => d == null || d.IsFree ? 0 : d.displayName switch { "Beeman" => 400, "Toly" => 300, "Chase" => 200, _ => 100 };
 
         static void Set(int v) { cache = v; PlayerPrefs.SetInt(Key, v); PlayerPrefs.Save(); Changed?.Invoke(); }
     }

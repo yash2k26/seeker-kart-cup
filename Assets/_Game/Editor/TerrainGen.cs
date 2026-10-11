@@ -34,7 +34,7 @@ public static class TerrainGen
 
     /// Road profile: the terrain sampled under the centreline, then smoothed until a kart can take every crest
     /// flat out. Writes centre[i].y, so everything derived from the centreline inherits the elevation.
-    public static void Profile(Vector3[] centre, System.Func<float, float, float> shape, float lapLength)
+    public static void Profile(Vector3[] centre, System.Func<float, float, float> shape, float lapLength, float floor = 0.5f)
     {
         int n = centre.Length;
         float ds = lapLength / n;
@@ -63,17 +63,22 @@ public static class TerrainGen
             }
             if (MaxGrade <= 0.09f && MaxKink <= 0.012f) break;
         }
-        // KartProgress calls y < -8 "lost": keep the road comfortably above the sea and any basin.
+        // KartProgress calls y < -8 "lost": keep the road comfortably above it, and above the hazard (`floor`).
         float min = Mathf.Min(y);
-        float lift = Mathf.Max(0f, 0.5f - min);
+        float lift = Mathf.Max(0f, floor - min);
         for (int i = 0; i < n; i++) centre[i].y = y[i] + lift;
     }
+
+    /// What is off the road on a map with a hazard (TrackThemes: Theme.hazardY): its surface, the bank down into it,
+    /// how far past the shoulder land may rise again, and where the land comes to the kerb instead (`pad`: the nearest
+    /// centreline sample and the point; behind a corner's barrier, round the start).
+    public sealed class Hazard { public float y, bank, moat, padWidth = 46f; public System.Func<int, Vector2, bool> pad; }
 
     /// Builds the heightfield as 4x4 chunk meshes with colliders. `roadHalf` is the half width that must be level
     /// with the road (road + kerb + run-off); beyond it the terrain blends back to the theme's shape.
     public static Transform Build(Vector3[] centre, System.Func<float, float, float> shape, float roadHalf,
                                   Palette palette, Material mat, GroundSurfacePreset surface, string dir, out int tris,
-                                  Vector3[] path = null, float pathHalf = 0f)
+                                  Vector3[] path = null, float pathHalf = 0f, Hazard hazard = null)
     {
         int n = centre.Length;
         for (int ix = 0; ix <= Cells; ix++)
@@ -105,8 +110,18 @@ public static class TerrainGen
                 // Level with the road (5 cm under it, so the flat strips never z-fight the terrain's coarser
                 // linearisation on a crest), then a bank out to free terrain. The bank widens with the height it has
                 // to cover so a cutting through a hill is a slope, not a wall.
-                float drop = Mathf.Abs(terrain - roadY);
-                float band = 16f + Mathf.Clamp(drop * 0.8f, 0f, 30f);
+                float band;
+                if (hazard != null)
+                {
+                    // Off the road is the hazard: a short bank down to its floor, and no land within `moat` of the
+                    // shoulder to cut across. Behind a barrier, or round the start, dry land up to the kerb instead.
+                    if (hazard.pad != null && hazard.pad(best, new Vector2(x, z)))
+                        terrain = Mathf.Lerp(Mathf.Max(terrain, roadY - 0.3f), terrain, Step(roadHalf + hazard.padWidth, roadHalf + hazard.padWidth + 14f, d));
+                    else
+                        terrain = Mathf.Lerp(Mathf.Min(terrain, hazard.y - 3f), terrain, Step(roadHalf + hazard.moat, roadHalf + hazard.moat + 10f, d));
+                    band = hazard.bank;
+                }
+                else band = 16f + Mathf.Clamp(Mathf.Abs(terrain - roadY) * 0.8f, 0f, 30f);
                 float t2 = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((d - roadHalf) / band));
                 h[ix, iz] = Mathf.Lerp(roadY - 0.05f, terrain, t2);
 

@@ -782,9 +782,10 @@ public static partial class MenuSetup
         // the Grand Prix shows its running order where a single track shows its map
         var order = Rect("Order", card, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-44, -300), new Vector2(196, 196));
         order.pivot = new Vector2(1, 1);
-        for (int i = 0; i < Tracks.Count && i < 4; i++)
+        int cols = Tracks.Count > 4 ? 3 : 2; float cell0 = 196f / cols;       // two by two for four tracks, three across for five or six
+        for (int i = 0; i < Tracks.Count && i < cols * cols; i++)
         {
-            var cell = Rect("Map" + i, order, new Vector2(0, 1), new Vector2(0, 1), new Vector2(i % 2 * 100 + 48, -(i / 2) * 100 - 48), new Vector2(92, 92));
+            var cell = Rect("Map" + i, order, new Vector2(0, 1), new Vector2(0, 1), new Vector2(i % cols * cell0 + cell0 / 2f, -(i / cols) * cell0 - cell0 / 2f), new Vector2(cell0 - 8f, cell0 - 8f));
             var img = cell.gameObject.AddComponent<Image>();
             img.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(Art + $"Textures/UI/Tracks/{Tracks.At(i).id}_map.png");
             img.preserveAspect = true; img.raycastTarget = false; img.color = new Color(1, 1, 1, 0.9f);
@@ -804,7 +805,7 @@ public static partial class MenuSetup
         // it alone; in a Grand Prix they are all lit and numbered in running order.
         var row = Rect("Tracks", screen.transform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-64, 48), Vector2.zero);
         int nTracks = Tracks.Count;
-        const float cw = 326f, ch = 232f, gap = 18f;
+        float cw = nTracks > 4 ? 290f : 326f; const float ch = 232f, gap = 18f;      // five fit between the card and the edge at 290
         var cards = new RectTransform[nTracks]; var cardArt = new Image[nTracks]; var cardRings = new Image[nTracks]; var badges = new GameObject[nTracks];
         for (int i = 0; i < nTracks; i++)
         {
@@ -828,7 +829,7 @@ public static partial class MenuSetup
             shadeImg.sprite = FadeSprite(vertical: true); shadeImg.color = Deep; shadeImg.raycastTarget = false;
             var nm = Label("Name", rt, display, def.name.ToUpperInvariant(), 40, Paper, TextAlignmentOptions.BottomLeft,
                            new Vector2(0, 0), new Vector2(20, 14), new Vector2(cw - 110, 48));
-            nm.enableAutoSizing = true; nm.fontSizeMin = 26; nm.fontSizeMax = 40;
+            nm.enableAutoSizing = true; nm.fontSizeMin = 22; nm.fontSizeMax = 40;
             var map = Rect("Map", rt, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-12, 10), new Vector2(76, 76));
             map.pivot = new Vector2(1, 0);
             var mapImg = map.gameObject.AddComponent<Image>();

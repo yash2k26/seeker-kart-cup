@@ -10,7 +10,7 @@ import { json, now } from './index';
 
 const WEEK = 7 * 86400;
 const MONDAY0 = Date.UTC(1970, 0, 5) / 1000;                       // a Monday, 00:00 UTC
-const ORDER = ['beach', 'alpine', 'forest', 'speedway'];             // Tracks.cs order: Palm Bay, Frost Peak, Pine Ridge, Sunset Speedway
+const ORDER = ['beach', 'alpine', 'forest', 'speedway', 'volcano']; // Tracks.cs order: Palm Bay, Frost Peak, Pine Ridge, Sunset Speedway, Mount Ember
 const FIRST = Math.floor((Date.UTC(2026, 9, 5) / 1000 - MONDAY0) / WEEK);   // the week of 5 Oct 2026 opens on Palm Bay
 export const SPLIT = [50, 30, 20];                                   // % of the pot for places 1-3
 export const MIN_SEEKERS = 3;

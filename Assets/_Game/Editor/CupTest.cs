@@ -159,8 +159,8 @@ public static class CupTest
         Check("a Smash-Up is alone and unranked", RaceMode.Alone && !RaceMode.Ranked);
         var (c5, boss) = Tour.Find("c5b");
         Tour.Arm(boss, c5);
-        Check("Beeman's duel: reversed, two laps, a faster charge", RaceMode.Reverse && RaceMode.Laps == 2 && RaceMode.BossCharge > 1f && !RaceMode.Ranked);
-        Check("a reversed best is kept apart from the circuit's", RaceMode.BestKey("forest") == "forest.rev.l2");
+        Check("Beeman's duel: Mount Ember, two laps, a faster charge, and he joins you after", boss.track == Tracks.IndexOf("volcano") && RaceMode.Laps == 2 && RaceMode.BossCharge > 1f && !RaceMode.Ranked && c5.bossSku == "driver.beeman");
+        Check("a two-lap best is kept apart from the circuit's", RaceMode.BestKey("volcano") == "volcano.l2");
         var (c1, plain) = Tour.Find("c1e1");
         Tour.Arm(plain, c1);
         Check("an ordinary race is ranked and clears the last event's levers", RaceMode.Ranked && !RaceMode.Reverse && RaceMode.Laps == 1 && RaceMode.BestKey("beach") == "beach");

@@ -11,7 +11,7 @@ public static class AudioSetup
     const string Music = "Assets/_Game/Audio/Music/";
 
     // Original loops (tools/audio/game_music.py). Each circuit has its own; a race may also draw any of the others.
-    static readonly (string map, string track)[] Own = { ("beach", "coast_run"), ("alpine", "blue_hour"), ("forest", "golden_mist"), ("speedway", "floodlights") };
+    static readonly (string map, string track)[] Own = { ("beach", "coast_run"), ("alpine", "blue_hour"), ("forest", "golden_mist"), ("speedway", "floodlights"), ("volcano", "afterburn") };
     static readonly string[] Pool = { "coast_run", "blue_hour", "golden_mist", "floodlights", "afterburn" };
 
     public static AudioDirector Build(bool menu, string map = null)

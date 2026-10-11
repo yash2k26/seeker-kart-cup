@@ -7,7 +7,7 @@ namespace KartCup
 {
     /// Kartel Tour, the career (Beach Buggy's series): five cups of five events, each event worth up to three stars
     /// (1st 3, 2nd 2, 3rd 1; a duel's win 3; a Smash-Up by what it smashed), kept at their best. Each cup ends in a boss
-    /// duel against one of the grid's own: beat them and they join your roster (the four judges are otherwise bought)
+    /// duel against one of the grid's own: beat them and they join your roster (the five judges are otherwise bought)
     /// with their paint (never sold) and a golden chest, and the next cup opens. A cup's field is quicker than the
     /// last (RaceMode.Difficulty) and fires more (RaceMode.Fire), so the stars mean something.
     ///
@@ -31,7 +31,7 @@ namespace KartCup
 
         const RaceMode.Kind Race = RaceMode.Kind.Race, Elim = RaceMode.Kind.Elimination, Duel = RaceMode.Kind.Duel, Smash = RaceMode.Kind.Smash;
         const RaceMode.Items Nitro = RaceMode.Items.Nitro, Rockets = RaceMode.Items.Rockets, Clean = RaceMode.Items.Clean;
-        // track indices (Tracks.All): 0 Palm Bay 1 Frost Peak 2 Pine Ridge 3 Sunset Speedway
+        // track indices (Tracks.All): 0 Palm Bay 1 Frost Peak 2 Pine Ridge 3 Sunset Speedway 4 Mount Ember
         // roster indices (TrackSetup.Roster): 0 Toly 1 Mert 2 Akshay 3 Emmett 4 Bitsy 5 Pip 6 Chase 7 Beeman 8 Maroo 9 Andrew
         public static readonly CupDef[] Cups =
         {
@@ -63,23 +63,38 @@ namespace KartCup
             {
                 new Event { id = "c4e1", title = "Midnight Grand", track = 0, mode = Race, laps = 2 },
                 new Event { id = "c4e2", title = "Back Through the Pines", track = 2, mode = Race, reverse = true },
-                new Event { id = "c4e3", title = "Rocket Rumble", track = 1, mode = Race, items = Rockets },
+                new Event { id = "c4e3", title = "Rocket Rumble", track = 4, mode = Race, items = Rockets },     // Mount Ember's first
                 new Event { id = "c4e4", title = "Fog Bank", track = 3, mode = Race, mist = true, laps = 2 },
                 new Event { id = "c4b", title = "BOSS: TOLY", track = 3, mode = Duel, rival = 0, laps = 2 },
             } },
             // 10 Oct 2026 (the user: "multiple series, tasks and races to clear each"): a fifth, the hardest field, Beeman
-            // its boss. He is free already, so the prize is his paint and the chest.
-            new() { name = "GRAND TOUR", kicker = "CUP 5", pace = 1.12f, fire = 1.35f, boss = 7, bossPaint = "boss.beeman", bossSku = "", events = new[]
+            // its boss. A judge too (11 Oct, the user: "beeman is also a judge"): beat him and he joins your roster.
+            new() { name = "GRAND TOUR", kicker = "CUP 5", pace = 1.12f, fire = 1.35f, boss = 7, bossPaint = "boss.beeman", bossSku = "driver.beeman", events = new[]
             {
                 new Event { id = "c5e1", title = "Coast to Coast", track = 0, mode = Race, reverse = true, laps = 2 },
                 new Event { id = "c5e2", title = "Whiteout", track = 1, mode = Race, mist = true, reverse = true },
-                new Event { id = "c5e3", title = "Clean Sweep", track = 2, mode = Race, items = Clean },
+                new Event { id = "c5e3", title = "Clean Sweep", track = 4, mode = Race, items = Clean },
                 new Event { id = "c5e4", title = "Twilight Double", track = 3, mode = Race, laps = 2 },
-                new Event { id = "c5b", title = "BOSS: BEEMAN", track = 2, mode = Duel, rival = 7, reverse = true, laps = 2 },
+                new Event { id = "c5b", title = "BOSS: BEEMAN", track = 4, mode = Duel, rival = 7, laps = 2 },   // the last wall, on the lava
             } },
         };
-        /// A boss's special charges this much faster than the player's (the card says so).
-        public const float BossCharge = 1.5f;
+        /// A boss's special charges this much faster than the player's (the card says so). 11 Oct 2026, the user: "every
+        /// boss is really strong, really have good powers, good racing skills and everything": twice as fast (was 1.5).
+        public const float BossCharge = 2f;
+        /// ...and a boss drives a maxed kart: every power at five pips but SPEED, which their pace (BossEdge) already sets,
+        /// so a clean, quick driver can still beat them. Boosts hit harder and last longer, it corners with more bite, a hit
+        /// barely slows it and it shoves back, and its items fly faster with a shot more to every pickup (KartDef.ApplyTo).
+        static KartDef bossKart;
+        public static KartDef BossKart
+        {
+            get
+            {
+                if (bossKart != null) return bossKart;
+                bossKart = ScriptableObject.CreateInstance<KartDef>();
+                bossKart.speed = 2; bossKart.turbo = 5; bossKart.grip = 5; bossKart.armor = 5; bossKart.attack = 5;
+                return bossKart;
+            }
+        }
         /// How far above their cup's field a boss drives, and how keen they are to fire: the boss is the wall (10 Oct 2026,
         /// the user: "it's easy to beat the boss and the next level is easy to reach"). The autopilot, a fair stand-in for a
         /// tidy driver, beat Chase in a duel at the old +0.03. The edge grows a cup at a time: Mert is the first wall, Beeman
@@ -143,7 +158,7 @@ namespace KartCup
         {
             string rule = e.mode switch
             {
-                RaceMode.Kind.Duel => (rival != null ? $"One on one against {rival}." : "One on one.") + " Their special charges faster than yours. First over the line wins.",
+                RaceMode.Kind.Duel => (rival != null ? $"One on one against {rival}." : "One on one.") + " A maxed kart, and their special charges twice as fast as yours. First over the line wins.",
                 RaceMode.Kind.Elimination => $"The last kart is knocked out at {Elimination.First:0} seconds, then every {Elimination.Every:0}. Be the last one left.",
                 RaceMode.Kind.Smash => "Alone for a lap. Smash the crates and critters by the road: two in every five for three stars.",
                 _ => e.items switch

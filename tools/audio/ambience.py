@@ -7,6 +7,7 @@ FM chirps), looped seamlessly and levelled to -20 LUFS. AudioSetup plays them as
   alpine    Frost Peak: wind in gusts, a whistle riding the strong ones, a low rumble
   forest    Pine Ridge: wind in the pines, birdsong (short phrases, left and right)
   speedway  Sunset Speedway: a stadium crowd murmuring, swelling now and then
+  volcano   Mount Ember: the mountain's rumble swelling and settling, lava bubbling (low pops), a crackle of fire
   menu      the title's night beach: calmer waves and crickets
 
 Run:  ../beach-buggy/teaser/.venv-audio/bin/python tools/audio/ambience.py [name ...]   (from the repo root)
@@ -159,6 +160,27 @@ def crowd(n, rng):
     return murmur * (0.55 + 0.45 * swell + 0.6 * cheers) + bright
 
 
+def lava(n, rng):
+    """The mountain's rumble (brown noise under 90 Hz, swelling over 6-10 s), lava bubbling (low sine pops that drop
+    in pitch as they burst, from either side) and a sparse crackle (high-passed clicks)."""
+    rumble = band(noise(n, rng, "brown"), 25, 90)
+    swell = 0.55 + 0.45 * smooth(rng.standard_normal(n), 0.12) / 0.35
+    out = np.stack([rumble * np.clip(swell, 0.2, 1.4)] * 2, axis=1) * 0.9
+    t = 0
+    while t < n:
+        t += int(rng.uniform(0.15, 0.9) * SR)
+        f0 = rng.uniform(55, 170); d = int(rng.uniform(0.08, 0.22) * SR)
+        if t + d >= n: break
+        tt = np.arange(d) / SR
+        pop = np.sin(2 * np.pi * np.cumsum(np.linspace(f0, f0 * 0.55, d)) / SR) * np.exp(-tt * rng.uniform(14, 30))
+        pan = rng.uniform(0.15, 0.85); g = rng.uniform(0.12, 0.35)
+        out[t:t + d, 0] += pop * g * (1 - pan); out[t:t + d, 1] += pop * g * pan
+    clicks = np.zeros(n); idx = rng.integers(0, n, int(LEN * 9)); clicks[idx] = rng.uniform(-1, 1, len(idx))
+    crackle = band(clicks, 2500, 9000) * 0.6
+    out[:, 0] += crackle; out[:, 1] += np.roll(crackle, 900)
+    return out
+
+
 def stereo(mono, rng, width=0.35):
     """Decorrelate a mono bed into two channels: a little of a delayed, filtered copy on each side."""
     d = int(0.011 * SR)
@@ -187,6 +209,8 @@ def make(name):
         bed = stereo(wind(n, rng, 0.35, False, 1600), rng, 0.5) + birds(n, rng)
     elif name == "speedway":
         bed = stereo(crowd(n, rng), rng, 0.6)
+    elif name == "volcano":
+        bed = lava(n, rng)
     else:
         raise SystemExit("no ambience called " + name)
     bed = loop(bed)
@@ -200,5 +224,5 @@ def make(name):
 
 
 if __name__ == "__main__":
-    for name in sys.argv[1:] or ["beach", "alpine", "forest", "speedway", "menu"]:
+    for name in sys.argv[1:] or ["beach", "alpine", "forest", "speedway", "volcano", "menu"]:
         make(name)

@@ -217,7 +217,7 @@ public static partial class TrackSetup
         var sites = new List<(int i, float side)>();
         for (int i = 0; i < n; i += Samples(16f))
             foreach (float side in new[] { -1f, 1f })
-                if (Open(i, side, 30f) && Beside(i, side, edge + 34f).y > 0.8f && Slope(i, side, edge + 12f, edge + 40f) < 4.5f) sites.Add((i, side));
+                if (Open(i, side, 30f) && Beside(i, side, edge + 34f).y > V.hazardY + 0.9f && Slope(i, side, edge + 12f, edge + 40f) < 4.5f) sites.Add((i, side));
         // spread them round the lap: a village, then a fire, then a village...
         var used = new List<int>();
         (int i, float side)? Take(float apart)

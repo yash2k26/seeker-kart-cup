@@ -88,6 +88,33 @@ public static class TrackProbe
         if (Application.isBatchMode) EditorApplication.Exit(0);
     }
 
+    /// The ground across the road at every tenth waypoint, and the hazard sheet: what a kart running wide lands on.
+    ///   tools/unity.sh TrackProbe.Across -track N
+    public static void Across()
+    {
+        int track = 1;
+        var args = System.Environment.GetCommandLineArgs();
+        for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-track") int.TryParse(args[i + 1], out track);
+        EditorSceneManager.OpenScene($"Assets/_Game/Scenes/Race{track}.unity", OpenSceneMode.Single);
+        Physics.SyncTransforms();
+        var sheet = GameObject.Find("Hazard");
+        Debug.Log(sheet == null ? "[probe] no hazard sheet" : $"[probe] hazard at y {sheet.transform.position.y:F2}, scale {sheet.transform.localScale.x}, renderer {sheet.GetComponent<MeshRenderer>()?.enabled}, shader {sheet.GetComponent<MeshRenderer>()?.sharedMaterial?.shader?.name}");
+        var wps = GameObject.Find("Waypoints").transform;
+        var offsets = new[] { -40f, -25f, -16f, -12f, -8f, 0f, 8f, 12f, 16f, 25f, 40f };
+        for (int w = 0; w < wps.childCount; w += 10)
+        {
+            var t = wps.GetChild(w);
+            var row = new System.Text.StringBuilder($"[probe] WP{w:00} {t.position.x:F0},{t.position.z:F0}:");
+            foreach (var o in offsets)
+            {
+                var p = t.position + t.right * o + Vector3.up * 60f;
+                row.Append(Physics.Raycast(p, Vector3.down, out var hit, 200f, ~0, QueryTriggerInteraction.Ignore) ? $" {o:+0;-0}:{hit.point.y:F1}" : $" {o:+0;-0}:--");
+            }
+            Debug.Log(row.ToString());
+        }
+        if (Application.isBatchMode) EditorApplication.Exit(0);
+    }
+
     /// The generated ribbons under the Track root, the terrain chunks, and the karts' own colliders are not intruders.
     static bool IsRoad(Collider c)
     {

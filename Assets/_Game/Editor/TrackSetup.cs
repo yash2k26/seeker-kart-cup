@@ -32,8 +32,9 @@ public static partial class TrackSetup
 
     const float Kerb = 1.4f;
     static float HalfWidth => V.halfWidth;
-    static int ControlPoints => V.controlPoints;
-    static int PerSegment => Mathf.Max(8, 384 / V.controlPoints);   // ~384 samples whatever the control count
+    const float Spacing = 3.2f;                                    // metres between centreline samples
+    /// Gates a lap: one every ~100 m, so going out of bounds costs a respawn at most that far back.
+    static int GateCount => Mathf.Clamp(Mathf.RoundToInt(Length() / 100f), 12, 24);
 
     static Vector3[] centre;      // sampled centreline, with elevation once TerrainGen.Profile has run
     static Vector3[] right;       // road right vector per sample
@@ -77,7 +78,7 @@ public static partial class TrackSetup
         Sample();
         // Elevation goes onto the centreline before any geometry exists, so road, kerbs, walls, waypoints,
         // checkpoints, grid and props all inherit it.
-        TerrainGen.Profile(centre, V.shape, Length());
+        Rise();
         Analyse();
         PlanShortcut();                                   // before the terrain: it is levelled along the cut too
 
@@ -278,20 +279,32 @@ public static partial class TrackSetup
     // ---------- geometry ----------
     static void Sample()
     {
-        var ctrl = new Vector3[ControlPoints];
-        for (int i = 0; i < ControlPoints; i++)
+        // Centripetal Catmull-Rom through the layout (no cusp or loop where the points bunch up into a hairpin), drawn
+        // fine and then resampled every Spacing metres, so a sample is the same length of road anywhere on any map.
+        var pts = V.layout; int m = pts.Length; const int per = 40;
+        var dense = new List<Vector3>(m * per);
+        for (int s = 0; s < m; s++)
         {
-            float t = i / (float)ControlPoints * Mathf.PI * 2f;
-            if (V.straight > 0f) { ctrl[i] = Stadium(i); continue; }
-            float r = V.radius * (1f + V.ampA * Mathf.Sin(V.harmA * t) + V.ampB * Mathf.Cos(V.harmB * t));
-            ctrl[i] = new Vector3(Mathf.Sin(t) * r, 0, Mathf.Cos(t) * r);
+            Vector2 p0 = pts[Wrap(s - 1, m)], p1 = pts[s], p2 = pts[Wrap(s + 1, m)], p3 = pts[Wrap(s + 2, m)];
+            float t0 = 0f, t1 = t0 + Mathf.Sqrt(Mathf.Max(Vector2.Distance(p0, p1), 1e-3f)), t2 = t1 + Mathf.Sqrt(Mathf.Max(Vector2.Distance(p1, p2), 1e-3f)), t3 = t2 + Mathf.Sqrt(Mathf.Max(Vector2.Distance(p2, p3), 1e-3f));
+            for (int k = 0; k < per; k++)
+            {
+                float t = Mathf.Lerp(t1, t2, k / (float)per);
+                Vector2 a1 = (t1 - t) / (t1 - t0) * p0 + (t - t0) / (t1 - t0) * p1, a2 = (t2 - t) / (t2 - t1) * p1 + (t - t1) / (t2 - t1) * p2, a3 = (t3 - t) / (t3 - t2) * p2 + (t - t2) / (t3 - t2) * p3;
+                Vector2 b1 = (t2 - t) / (t2 - t0) * a1 + (t - t0) / (t2 - t0) * a2, b2 = (t3 - t) / (t3 - t1) * a2 + (t - t1) / (t3 - t1) * a3;
+                var c = (t2 - t) / (t2 - t1) * b1 + (t - t1) / (t2 - t1) * b2;
+                dense.Add(new Vector3(c.x, 0f, c.y));
+            }
         }
-        int n = ControlPoints * PerSegment;
+        var cum = new float[dense.Count + 1];
+        for (int i = 0; i < dense.Count; i++) cum[i + 1] = cum[i] + Vector3.Distance(dense[i], dense[(i + 1) % dense.Count]);
+        int n = Mathf.RoundToInt(cum[dense.Count] / Spacing);
         centre = new Vector3[n]; right = new Vector3[n];
-        for (int i = 0; i < n; i++)
+        for (int i = 0, j = 0; i < n; i++)
         {
-            int seg = i / PerSegment; float t = (i % PerSegment) / (float)PerSegment;
-            centre[i] = CatmullRom(ctrl[Wrap(seg - 1, ControlPoints)], ctrl[seg], ctrl[Wrap(seg + 1, ControlPoints)], ctrl[Wrap(seg + 2, ControlPoints)], t);
+            float at = i * cum[dense.Count] / n;
+            while (cum[j + 1] < at) j++;
+            centre[i] = Vector3.Lerp(dense[j], dense[(j + 1) % dense.Count], (at - cum[j]) / Mathf.Max(cum[j + 1] - cum[j], 1e-4f));
         }
         for (int i = 0; i < n; i++)
         {
@@ -300,30 +313,12 @@ public static partial class TrackSetup
         }
     }
 
-    /// Control point i of a stadium: straights of V.straight along x, semicircles of V.radius, clockwise from the
-    /// middle of the front straight (so sample 0 is the start line on a straight, like the other circuits), and a
-    /// chicane — two adjacent points pushed out and in by V.chicane — in the middle of the back straight.
-    static Vector3 Stadium(int i)
-    {
-        float R = V.radius, S = V.straight, L = 2f * S + 2f * Mathf.PI * R;
-        float u = i / (float)ControlPoints * L;
-        Vector3 p, normal;
-        if (u < S / 2f) { p = new Vector3(u, 0, R); normal = Vector3.forward; }
-        else if (u < S / 2f + Mathf.PI * R) { float a = (u - S / 2f) / R; normal = new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a)); p = new Vector3(S / 2f, 0, 0) + normal * R; }
-        else if (u < S * 1.5f + Mathf.PI * R) { p = new Vector3(S / 2f - (u - S / 2f - Mathf.PI * R), 0, -R); normal = Vector3.back; }
-        else if (u < S * 1.5f + 2f * Mathf.PI * R) { float a = (u - S * 1.5f - Mathf.PI * R) / R; normal = new Vector3(-Mathf.Sin(a), 0, -Mathf.Cos(a)); p = new Vector3(-S / 2f, 0, 0) + normal * R; }
-        else { p = new Vector3(-S / 2f + (u - S * 1.5f - 2f * Mathf.PI * R), 0, R); normal = Vector3.forward; }
-        int mid = ControlPoints / 2;
-        if (i == mid) p += normal * V.chicane;
-        if (i == mid + 1) p -= normal * V.chicane;
-        return p;
-    }
+    /// The road's elevation (TerrainGen.Profile), held clear of the hazard.
+    static void Rise() => TerrainGen.Profile(centre, V.road ?? V.shape, Length(), float.IsNaN(V.hazardY) ? 0.5f : V.hazardY + 1.3f);
 
     static int Wrap(int i, int n) => ((i % n) + n) % n;
     static Vector3 Forward(int i) => (centre[Wrap(i + 1, centre.Length)] - centre[Wrap(i - 1, centre.Length)]).normalized;
 
-    static Vector3 CatmullRom(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t) =>
-        0.5f * ((2f * p1) + (-p0 + p2) * t + (2f * p0 - 5f * p1 + 4f * p2 - p3) * t * t + (-p0 + 3f * p1 - 3f * p2 + p3) * t * t * t);
 
     static GameObject Road()
     {
@@ -435,7 +430,7 @@ public static partial class TrackSetup
     static BasicWaypoint Waypoints()
     {
         var root = new GameObject("Waypoints").transform;
-        int every = Mathf.Max(1, Mathf.RoundToInt(centre.Length / 48f));       // ~48 points around the lap
+        int every = Mathf.Max(1, Samples(26f));       // ~26 m apart, as they were on the first four (~48 to a lap)
         var list = new List<BasicWaypoint>();
         for (int i = 0; i < centre.Length; i += every)
         {
@@ -483,7 +478,7 @@ public static partial class TrackSetup
 
     static Checkpoint[] Checkpoints()
     {
-        const int count = 12;
+        int count = GateCount;
         var root = new GameObject("Checkpoints").transform;
         var list = new Checkpoint[count];
         for (int i = 0; i < count; i++)
@@ -597,12 +592,19 @@ public static partial class TrackSetup
         }
         EditorUtility.SetDirty(mat);
         terrainMat = mat;
-        TerrainGen.Build(centre, V.shape, HalfWidth + Kerb + 1.5f, V.palette, mat, Offroad(), MeshDir, out terrainTris, shortcut?.path, CutHalf + 6f);
+        bool hazard = !float.IsNaN(V.hazardY);
+        TerrainGen.Build(centre, V.shape, HalfWidth + Kerb + (hazard ? V.shoulder : 1.5f), V.palette, mat, Offroad(), MeshDir, out terrainTris, shortcut?.path, CutHalf + 6f,
+                         hazard ? new TerrainGen.Hazard { y = V.hazardY, bank = V.bank, moat = V.moat, pad = Pad } : null);
 
-        // Water: the sea round the island, or a lake in a basin. One shared material; its surf ring is radial from
-        // the origin at the island's shoreline, so the lake (well inside it) gets the caustics without the surf.
-        if (!float.IsNaN(V.sea)) Water("Water", new Vector3(0, V.sea, 0), 200f);
-        if (V.lakeRadius > 0f) Water("Lake", new Vector3(V.lake.x, -1.3f, V.lake.y), V.lakeRadius * 0.3f).radius = V.lakeRadius;
+        // The hazard: one sheet under the whole map (the sea round Palm Bay's atoll, a glacier lake, a swamp, lava). Its
+        // material's surf ring is radial from the origin at Palm Bay's outer shore; elsewhere it is turned off.
+        if (hazard)
+        {
+            var sheet = Water("Hazard", new Vector3(0, V.hazardY, 0), 200f);
+            sheet.lava = V.lava; sheet.word = V.hazardWord;
+            if (V.lava)          // and the crater's own pool, high on the cone
+                Water("Crater", new Vector3(0, V.shape(0f, 0f) + 2.5f, 0), 3f).radius = 16f;
+        }
 
         // After dark (or at dusk, in mist) the karts spawn with their lamps lit (RaceSpawner reads this marker).
         if (V.night || V.headlights)
@@ -614,6 +616,17 @@ public static partial class TrackSetup
                 s.FindProperty("tail").objectReferenceValue = Emissive("Tail_Lens", new Color(1f, 0.12f, 0.08f), 2.4f);
             });
         }
+    }
+
+    /// Where the land meets the kerb on a map with a hazard: behind a corner's barrier (where a kart running wide is
+    /// stopped anyway) and round the start (the grid, the gantry, the stands). Everywhere else off the road is the hazard.
+    static bool Pad(int i, Vector2 p)
+    {
+        int n = centre.Length;
+        if (Mathf.Min(i, n - i) < Samples(60f)) return true;
+        var c = CornerAt(i);
+        if (!c.HasValue || c.Value.total < 25f || i < c.Value.start + 2 || i > c.Value.start + c.Value.count - 2) return false;
+        return Mathf.Sign(Vector3.Dot(new Vector3(p.x - centre[i].x, 0f, p.y - centre[i].z), right[i])) == c.Value.outside;
     }
 
     static WaterBody Water(string name, Vector3 pos, float scale)
@@ -636,6 +649,11 @@ public static partial class TrackSetup
         var red = LoadOrCreate(Art + "Materials/BarrierRed.mat", unlit, new Color(0.78f, 0.16f, 0.15f));
         var root = new GameObject("Barriers").transform;
         int n = centre.Length;
+        if (V.walls)     // the speedway: walled both sides the whole way round, nowhere to cut
+        {
+            for (int side = -1; side <= 1; side += 2) Wall(root, side < 0 ? "WallL" : "WallR", white, red, (HalfWidth + Kerb + 0.7f) * side, 1.15f, 0, n);
+            return;
+        }
         foreach (var c in corners)
         {
             int from = Wrap(c.start - 3, n), len = Mathf.Min(c.count + 6, n - 1);
@@ -648,7 +666,9 @@ public static partial class TrackSetup
                 bool open = k <= len && !OnCut(centre[i] + right[i] * lateral, 9f);   // wide: a kart turning in runs wide of the cut's middle
                 if (open && run < 0) run = k;
                 if (open || run < 0) continue;
-                if (k - 1 - run >= 2) Wall(root, $"Barrier{Wrap(from + run, n)}", white, red, lateral, 1.15f, Wrap(from + run, n), k - 1 - run);
+                // named by side too: an S-bend's two walls can start on the same sample, and one name meant one mesh
+                // asset written over the other, which left a wall that was drawn and stopped nothing (Mount Ember, 11 Oct)
+                if (k - 1 - run >= 2) Wall(root, $"Barrier{Wrap(from + run, n)}{(c.outside > 0 ? "R" : "L")}", white, red, lateral, 1.15f, Wrap(from + run, n), k - 1 - run);
                 run = -1;
             }
         }
@@ -737,7 +757,8 @@ public static partial class TrackSetup
         root.gameObject.AddComponent<ItemBag>();      // deals each row different items
         for (int lane = 0; lane < 5; lane++)
         {
-            for (int i = centre.Length / 12; i < centre.Length; i += centre.Length / 6)   // offset so no cluster sits on the start line
+            int rows = Mathf.Max(6, Mathf.RoundToInt(Length() / 260f)), every = centre.Length / rows;
+            for (int i = every / 2; i < centre.Length; i += every)   // a row every ~260 m, offset so none sits on the start line
             {
                 var row = root.Find("Row" + i) ?? new GameObject("Row" + i).transform;
                 row.SetParent(root, false);
@@ -782,9 +803,9 @@ public static partial class TrackSetup
             ("Maroo",    "oopi", "Maroo",  0,  0,  1, -1,  1, -1, "Big curls, bigger drifts."),
             ("Andrew",   "ooli", "Andrew", 1,  0,  1,  0, -1, -1, "Reviews every corner. Approves none."),
         };
-        // The four CLOCK IN judges are locked (9 Oct 2026): bought in the shop, or earned by beating them in their Tour boss
-        // duel (Tour.Cups bossSku). The same names are the Tour bosses, so the two tables must agree.
-        var paid = new Dictionary<string, string> { ["Toly"] = "driver.toly", ["Mert"] = "driver.mert", ["Akshay"] = "driver.akshay", ["Chase"] = "driver.chase" };
+        // The CLOCK IN judges are locked (9 Oct 2026; Beeman with them since 11 Oct): bought in the shop, or earned by beating
+        // them in their Tour boss duel (Tour.Cups bossSku). The same names are the Tour bosses, so the two tables must agree.
+        var paid = new Dictionary<string, string> { ["Toly"] = "driver.toly", ["Mert"] = "driver.mert", ["Akshay"] = "driver.akshay", ["Chase"] = "driver.chase", ["Beeman"] = "driver.beeman" };
         var defs = (db.characters ?? System.Array.Empty<CharacterDef>()).Where(d => d != null).ToList();
         foreach (var r in rows)
         {
@@ -1360,11 +1381,24 @@ public static partial class TrackSetup
         var m = AssetDatabase.LoadAssetAtPath<Material>(path);
         if (m != null && V.night)
         {
-            m.SetColor("_DeepColor", new Color(0.02f, 0.05f, 0.10f)); m.SetColor("_ShallowColor", new Color(0.05f, 0.13f, 0.20f));
+            m.SetColor("_DeepColor", new Color(0.03f, 0.07f, 0.13f)); m.SetColor("_ShallowColor", new Color(0.08f, 0.22f, 0.34f));   // lit enough to read as water beside the road
             m.SetColor("_SurfColor", new Color(0.45f, 0.55f, 0.62f));
             float yaw = (V.sun.y + 180f) * Mathf.Deg2Rad;             // the moon is where the light comes from
             m.SetVector("_MoonDir", new Vector4(Mathf.Sin(yaw), Mathf.Cos(yaw), 0, 0));
-            m.SetColor("_Glitter", new Color(1f, 0.85f, 0.6f)); m.SetFloat("_GlitterStrength", 1.6f); m.SetFloat("_GlitterWidth", 0.12f);
+            // a narrow path: the lagoon is beside the road now, and a 28 degree cone of glitter read as a sand floor
+            m.SetColor("_Glitter", new Color(1f, 0.85f, 0.6f)); m.SetFloat("_GlitterStrength", 1.2f); m.SetFloat("_GlitterWidth", 0.035f);
+            EditorUtility.SetDirty(m);
+        }
+        else if (m != null && V.hazardDeep.a > 0f)
+        {
+            // the theme's own sheet: a glacier lake, a swamp, lava (the deep and shallow colours are the caustic bands'
+            // two ends; on lava they are the crust and the glowing cracks, bright enough to bloom). No surf, no glitter.
+            m.SetColor("_DeepColor", V.hazardDeep); m.SetColor("_ShallowColor", V.hazardShallow); m.SetColor("_SurfColor", V.hazardShallow);
+            m.SetFloat("_ShoreRadius", 1e5f); m.SetFloat("_GlitterStrength", 0f);
+            m.SetVector("_SpeedA", V.lava ? new Vector4(0.004f, 0.007f) : new Vector4(0.01f, 0.015f));
+            m.SetVector("_SpeedB", V.lava ? new Vector4(-0.006f, 0.003f) : new Vector4(-0.015f, 0.005f));
+            m.SetFloat("_WaveHeight", V.lava ? 0.02f : 0.04f);
+            m.SetVector("_Edge", V.lava ? new Vector4(0.05f, 0.35f) : new Vector4(0.2f, 0.8f));   // lava: wide glowing veins
             EditorUtility.SetDirty(m);
         }
         return m;

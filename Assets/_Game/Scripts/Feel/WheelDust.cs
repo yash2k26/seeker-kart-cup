@@ -36,6 +36,7 @@ namespace KartCup
                 "alpine" => new Color(0.93f, 0.95f, 1f),
                 "forest" => new Color(0.52f, 0.42f, 0.31f),
                 "speedway" => new Color(0.62f, 0.56f, 0.45f),
+                "volcano" => new Color(0.36f, 0.33f, 0.32f),        // ash
                 _ => new Color(0.88f, 0.76f, 0.56f),            // Palm Bay's sand
             };
             smoke = new Color(0.86f, 0.86f, 0.9f);
@@ -70,7 +71,8 @@ namespace KartCup
                 bool offroad = wheel.surfaceProps != null && wheel.surfaceProps.speed < 0.95f;
                 if (offroad && wheel.grounded) anyOffroad = true;
                 // in the shallows: white spray, bigger and faster (Beach Buggy's curtains of water)
-                bool wet = WaterBody.SurfaceAt(wheel.contactPoint, out float surface) && wheel.contactPoint.y < surface + 0.1f;
+                var sheet = WaterBody.At(wheel.contactPoint);
+                bool wet = sheet != null && !sheet.lava && wheel.contactPoint.y < sheet.transform.position.y + 0.1f;
                 float rate = 0f;
                 if ((wheel.grounded || wet) && speed > 3f && !far)
                     rate = wet ? Mathf.Lerp(30f, 70f, Mathf.InverseLerp(3f, 25f, speed))
@@ -79,7 +81,7 @@ namespace KartCup
                 var e = ps.emission; e.rateOverTime = rate;
                 if (rate > 0f)
                 {
-                    ps.transform.position = wet ? new Vector3(wheel.contactPoint.x, surface + 0.1f, wheel.contactPoint.z) : wheel.contactPoint + Vector3.up * 0.15f;
+                    ps.transform.position = wet ? new Vector3(wheel.contactPoint.x, sheet.transform.position.y + 0.1f, wheel.contactPoint.z) : wheel.contactPoint + Vector3.up * 0.15f;
                     var m = ps.main; m.startColor = wet ? spray : offroad ? ground : smoke;
                     bool tarmacSmoke = !wet && !offroad;
                     m.startSpeedMultiplier = wet ? 3.2f : 1f; m.startSizeMultiplier = wet ? 1.5f : tarmacSmoke ? 2.4f : 1f;   // toy-scale wheels: a 1 m puff vanished behind them

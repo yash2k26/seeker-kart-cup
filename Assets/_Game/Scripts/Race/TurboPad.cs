@@ -19,7 +19,7 @@ namespace KartCup
             }
         }
 
-        /// Lays this race's pads along the waypoints (TrackSetup's ~48 a lap).
+        /// Lays this race's pads along the waypoints (TrackSetup's, ~26 m apart).
         public static void Spawn(int seed)
         {
             var prefab = Resources.Load<GameObject>("TurboPad");
@@ -29,7 +29,7 @@ namespace KartCup
             float lap = 0f;
             for (int i = 0; i < n; i++) lap += Vector3.Distance(wp.GetChild(i).position, wp.GetChild((i + 1) % n).position);
             var rnd = new System.Random(seed);
-            int most = lap < 900f ? 1 : lap < 1200f ? 2 : 3, count = rnd.Next(1, most + 1);
+            int most = Mathf.Clamp(Mathf.RoundToInt(lap / 550f), 1, 5), count = rnd.Next(Mathf.Max(1, most - 1), most + 1);   // 3-4 on a 2 km lap
 
             // on the straights, clear of the grid and of each other
             var open = new List<int>();

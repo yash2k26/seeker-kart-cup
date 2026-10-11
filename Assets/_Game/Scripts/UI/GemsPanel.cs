@@ -55,7 +55,7 @@ namespace KartCup
             }
             var f = Packs[Mathf.Clamp(focus, 0, Packs.Length - 1)];
             var fi = KartApi.Cfg?.Item(f.sku);
-            if (blurbLabel != null) blurbLabel.text = message ?? "Recruit the judges: Mert or Akshay 100, Chase 200, Toly 300. Chests and podium finishes pay gems too.";
+            if (blurbLabel != null) blurbLabel.text = message ?? "Recruit the judges: Mert or Akshay 100, Chase 200, Toly 300, Beeman 400. Chests and podium finishes pay gems too.";
             Set(primaryLabel, primaryButton, fi != null ? $"BUY  ·  {Skr(fi)}" : KartApi.Cfg == null ? "CONNECT TO BUY" : "…", fi != null && !busy);
             Set(secondaryLabel, secondaryButton, fi != null && !string.IsNullOrEmpty(fi.price.GetValueOrDefault("SOL")) ? $"PAY {Sol(fi)}" : "", fi != null && !busy);
             Set(tertiaryLabel, tertiaryButton, Ore(fi) != "" ? $"PAY {Ore(fi)}" : "", fi != null && !busy);

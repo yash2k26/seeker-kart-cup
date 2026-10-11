@@ -23,10 +23,10 @@ const kart = (id: string, name: string, blurb: string, speed: number, turbo: num
 };
 const pack = (id: string, item: string, name: string, blurb: string, qty: number, sol: number): Sku =>
   ({ sku: `item.${id}${qty}`, kind: 'item', name, blurb, item, qty, sol });
-// The four judges (9 Oct 2026): locked drivers, each also earned free by beating them in their Kartel Tour boss duel
+// The judges (9 Oct 2026; Beeman since 11 Oct): locked drivers, each also earned free by beating them in their Kartel Tour boss duel
 // (Tour.cs bossSku). The sku names must match TrackSetup.Roster's paid table.
 const driver = (id: string, name: string, blurb: string, sol: number): Sku => ({ sku: 'driver.' + id, kind: 'driver', name, blurb, sol });
-// Gems (9 Oct 2026): the premium currency that recruits the judges (Mert/Akshay 100, Chase 200, Toly 300); also earned
+// Gems (9 Oct 2026): the premium currency that recruits the judges (Mert/Akshay 100, Chase 200, Toly 300, Beeman 400); also earned
 // from chests and podiums. The phone credits the pack once per verified payment (PendingPurchases).
 const gems = (n: number, sol: number): Sku => ({ sku: `gems.${n}`, kind: 'gems', name: `${n} gems`, blurb: 'Recruit drivers.', qty: n, sol });
 
@@ -54,7 +54,8 @@ export const CATALOG: Sku[] = [
   driver('mert',   'Mert',   'Knows every corner before he takes it. Or beat him in Cup 1.',             0.08),
   driver('akshay', 'Akshay', 'Top speed, turns like a ferry. Or beat him in Cup 2.',                       0.08),
   driver('chase',  'Chase',  'Knows everyone on the grid. Waves at all of them. Or beat him in Cup 3.',   0.08),
-  driver('toly',   'Toly',   'Gone before you've read his number. Or beat him in Cup 4.',          0.12),
+  driver('toly',   'Toly',   "Gone before you've read his number. Or beat him in Cup 4.",          0.12),
+  driver('beeman', 'Beeman', 'Bald, fast, and never blinks first. Or beat him in Cup 5.',              0.15),
   gems(100, 0.012), gems(550, 0.05), gems(1200, 0.09),
 
   // packs: the item name is the ItemManager's, the count is credited to the phone's inventory when the purchase verifies

@@ -41,7 +41,7 @@ namespace KartCup
                 if (!near && !Roofed(wp.GetChild(i))) open.Add(i);
             }
             var parent = new GameObject("Ramps").transform;
-            int count = rnd.Next(1, 3);
+            int count = n > 70 ? rnd.Next(2, 4) : rnd.Next(1, 3);      // two or three on a 2 km lap (waypoints ~26 m apart)
             while (parent.childCount < count && open.Count > 0)
             {
                 int i = open[rnd.Next(open.Count)];

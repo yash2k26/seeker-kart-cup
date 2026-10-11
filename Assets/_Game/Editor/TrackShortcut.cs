@@ -31,7 +31,7 @@ public static partial class TrackSetup
         for (int i = 0; i < Tracks.Count; i++)
         {
             V = System.Array.Find(Themes, t => t.id == Tracks.At(i).id); Index = i;
-            Sample(); TerrainGen.Profile(centre, V.shape, Length()); Analyse();
+            Sample(); Rise(); Analyse();
             PlanShortcut(log: 3);
         }
         if (Application.isBatchMode) EditorApplication.Exit(0);
@@ -44,7 +44,7 @@ public static partial class TrackSetup
         int n = centre.Length;
         float m = Length() / n, edge = HalfWidth + Kerb;
         float gateHalf = HalfWidth + Kerb + GateSlack;
-        int gateEvery = n / 12;
+        int gates = GateCount;
         var found = new List<Cut>();
         // the road's own time through each sample: flat out on the straights, down to 0.6 of it in the tightest corner
         // (KartAi's corner model), so a cut is credited with the corner it skips and not just the metres
@@ -86,7 +86,6 @@ public static partial class TrackSetup
                     for (int i = 0; i < n; i += 2) if (i < a - pad || i > b + pad) other = Mathf.Min(other, Flat2(centre[i] - p));
                     near = Mathf.Sqrt(near); other = Mathf.Sqrt(other);
                     if (near > edge + 21f) ok = false;
-                    if (V.lakeRadius > 0f && Vector2.Distance(new Vector2(p.x, p.z), V.lake) < V.lakeRadius + CutHalf + 6f) ok = false;   // not through the lake
                     maxOff = Mathf.Max(maxOff, near);
                     if (u > 0.3f && u < 0.7f) midOff = Mathf.Max(midOff, near);
                     if (other < edge * 2f + 12f) ok = false;                   // another leg of the circuit: not a cut, a crossing
@@ -94,9 +93,9 @@ public static partial class TrackSetup
                 if (!ok || maxOff > edge + 21f || midOff < edge + CutHalf + 4f) continue;   // the referee's corridor is 25 m past the kerb
 
                 // every gate the road takes between a and b must be crossed by the cut inside its box (with margin)
-                for (int g = 1; g < 12 && ok; g++)
+                for (int g = 1; g < gates && ok; g++)
                 {
-                    int gs = g * n / 12;
+                    int gs = g * n / gates;
                     if (gs <= a || gs >= b) continue;
                     var gp = centre[gs]; var gr = right[gs];
                     // where the chord crosses the gate's line

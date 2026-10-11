@@ -229,7 +229,11 @@ namespace KartCup
                 // the event's pace (Tour cups, bosses), to 1.2 at most: faster than that the AI cannot hold Pine Ridge
                 ai.skill = Mathf.Clamp(ai.skill * RaceMode.Difficulty, 0.8f, 1.2f);
                 ai.cornerBonus = Mathf.Clamp(RaceMode.Difficulty - 1f, 0f, 0.16f) * 0.5f;   // a quicker field is quicker through the corners too
-                if (RaceMode.Current == RaceMode.Kind.Duel) { ai.steady = true; ai.maxCatchUp = 0.24f; }   // a boss makes no unforced mistakes and never lets you go
+                if (RaceMode.Current == RaceMode.Kind.Duel)   // a boss makes no unforced mistakes, never lets you go, and drives a maxed kart
+                {
+                    ai.steady = true; ai.maxCatchUp = 0.24f;
+                    Tour.BossKart.ApplyTo(kart);
+                }
             }
             // a remote kart gets no hooks and no input: RemoteKart poses the driver and spins the wheels itself
             // each driver's special (solo races; never in a Clean Race). A boss's charges faster: the card says so.

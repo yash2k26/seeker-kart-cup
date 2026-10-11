@@ -183,6 +183,7 @@ public static class Playtest
                     {
                         // the collider's own slab (TrackSetup.Wall): per sample its foot, top, and the two set half a metre back.
                         // (The drawn mesh is no use here: static batching has replaced it with the scene's combined one.)
+                        if (wall.sharedMesh == null || wall.sharedMesh.vertexCount < 8) { Debug.LogWarning($"[playtest] barrier {wall.name} has no collider mesh"); continue; }
                         var v = wall.sharedMesh.vertices; int mid = v.Length / 8 * 4;
                         Vector3 foot = wall.transform.TransformPoint(v[mid]), toRoad = wall.transform.TransformDirection(v[mid] - v[mid + 2]).normalized;
                         all++; if (wall.Raycast(new Ray(foot + toRoad * 3f + Vector3.up * 0.9f, -toRoad), out _, 6f)) stops++;

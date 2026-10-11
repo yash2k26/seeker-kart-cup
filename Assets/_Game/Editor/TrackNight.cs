@@ -513,7 +513,7 @@ public static partial class TrackSetup
             int i = rnd.Next(n);
             float side = rnd.Next(2) == 0 ? -1f : 1f, off = HalfWidth + Kerb + 2.5f + (float)rnd.NextDouble() * 20f;
             var p = centre[i] + right[i] * (off * side);
-            p.y = V.shape(p.x, p.z) + 0.5f + (float)rnd.NextDouble() * 3.2f;
+            p.y = Mathf.Max(TerrainGen.Height(p.x, p.z), float.IsNaN(V.hazardY) ? float.MinValue : V.hazardY) + 0.5f + (float)rnd.NextDouble() * 3.2f;   // over the swamp and the lava too
             at.Add(p);
         }
         Glows(root, "Fireflies", at, V.fireflyColor, Own("Firefly_Glow"), new[] { (1.5f, 2.4f, 1.3f), (0.32f, 1.3f, 3.2f) }, 1f);

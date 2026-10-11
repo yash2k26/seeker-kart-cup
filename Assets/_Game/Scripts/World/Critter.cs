@@ -90,6 +90,7 @@ namespace KartCup
         /// two animals each, at different paces so they never walk in step.
         public static void Spawn(int seed, string trackId)
         {
+            if (trackId == "volcano") return;          // nothing lives out on the lava
             var prefab = Resources.Load<GameObject>("Critter_" + trackId) ?? Resources.Load<GameObject>("Chicken");
             var root = GameObject.Find("Waypoints");
             if (prefab == null || root == null || root.transform.childCount < 20 || GameObject.Find("Critters") != null) return;
@@ -110,7 +111,7 @@ namespace KartCup
                 }
             var parent = new GameObject("Critters").transform;
             int crossings = 0;
-            while (crossings < 3 + RaceMode.Hazard / 2 && open.Count > 0)   // a crossing more every second Tour cup
+            while (crossings < 3 + RaceMode.Hazard / 2 + n / 80 && open.Count > 0)   // a crossing more every second Tour cup, and on a long lap
             {
                 int i = open[rnd.Next(open.Count)];
                 open.RemoveAll(j => Mathf.Abs(j - i) < 8);

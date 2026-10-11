@@ -79,13 +79,15 @@ namespace KartCup
 
             // Beach Buggy's out of bounds: in deep water (or off the world) the words come up while the kart goes under,
             // and a moment later it is back on the road. The shallows are drivable: WheelDust throws spray there.
-            bool sunk = WaterBody.SurfaceAt(transform.position, out float water) && transform.position.y < water - 0.7f;
+            var sheet = WaterBody.At(transform.position);
+            bool sunk = sheet != null && transform.position.y < sheet.transform.position.y - sheet.Depth;
             if (outAt < 0f && ((racing && sunk) || lost))
             {
                 outAt = Time.time;
-                if (isPlayer && racing) RaceHud.Instance?.Callout("OUT OF BOUNDS", 1.3f);
-                if (isPlayer && sunk) Achievements.Add(Achievements.Stat.Swims);
-                Debug.Log($"[race] {racerName} out of bounds at {transform.position} ({(lost ? "fell" : "in the water")})");
+                if (isPlayer && racing) RaceHud.Instance?.Callout(sunk ? sheet.word : "OUT OF BOUNDS", 1.3f);
+                if (isPlayer && sunk && !sheet.lava) Achievements.Add(Achievements.Stat.Swims);
+                if (sunk && sheet.lava) Burn();
+                Debug.Log($"[race] {racerName} out of bounds at {transform.position} ({(lost ? "fell" : sheet.lava ? "in the lava" : "in the water")})");
             }
             if (outAt > 0f)
             {
@@ -144,6 +146,14 @@ namespace KartCup
             if (sparkle != null) Instantiate(sparkle, at, Quaternion.identity);
             kart.invulnerableUntil = Time.time + 1.6f;
             StopCoroutine(nameof(Blink)); StartCoroutine(nameof(Blink));
+        }
+
+        /// Into the lava: smoke where it went in, a beat before it is back on the road.
+        void Burn()
+        {
+            var puff = Resources.Load<GameObject>("FX/HitPuff");
+            if (puff != null) Instantiate(puff, transform.position + Vector3.up * 0.6f, Quaternion.identity);
+            if (isPlayer) Haptics.Play(Haptics.Kind.Hit);
         }
 
         bool Crowded(RaceManager race, Vector3 at)

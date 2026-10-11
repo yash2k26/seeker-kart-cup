@@ -65,13 +65,14 @@ public static partial class TrackSetup
             "alpine" => ("Holiday", new[] { "present-a-cube", "present-b-round", "present-a-rectangle", "present-b-cube" }),
             "forest" => ("Nature", new[] { "pot_large", "pot_small", "pot_large" }),
             "speedway" => ("Racing", new[] { "pylon", "pylon", "barrierRed" }),
+            "volcano" => ("Survival", new[] { "barrel", "box", "box-large", "bucket" }),
             _ => ("Pirate", new[] { "crate", "barrel", "crate-bottles", "crate" }),
         };
-        int n = centre.Length, made = 0;
+        int n = centre.Length, made = 0, most = Mathf.RoundToInt(Length() / 50f);   // 26 on the old 1.3 km laps; ~45 on 2.3 km
         keepOnCut = true;                                // a crate on the shortcut is there to be hit
         void Drop(int i, float side, float dist, float h)
         {
-            if (made >= 26) return;
+            if (made >= most || Drowned(Beside(i, side, dist))) return;
             string k = kit, name = names[rnd.Next(names.Length)];
             if (V.id == "speedway" && rnd.NextDouble() < 0.4) { k = "Pirate"; name = "barrel"; }   // oil drums by the pit wall
             MakeSmashable(Prop(root, k, name, Beside(i, side, dist), (float)rnd.NextDouble() * 360f, h));
@@ -150,6 +151,7 @@ public static partial class TrackSetup
     static GameObject Prop(Transform parent, string kit, string name, Vector3 pos, float yaw, float height, Solid solid = Solid.None,
                            float tilt = 0f, float width = 0f, float stretchX = 1f)
     {
+        if (Drowned(pos)) return new GameObject("cleared") { transform = { parent = parent } };      // nothing stands in the hazard
         var go = Place(parent, Art + $"Models/Props/{kit}/{name}.fbx", MatFor(kit), pos, yaw, 1f, Solid.None, tilt);
         var b = Bounds(go);
         float basis = width > 0f ? Mathf.Max(b.size.x, b.size.z) : b.size.y;
@@ -165,6 +167,11 @@ public static partial class TrackSetup
         return go;
     }
 
+    /// Whether a prop standing at `pos` (its foot on the ground) would be in the hazard: the dressing is generous off the
+    /// road and most of it lands in the lagoon or the lava now; it is simply not placed. (Buoys and the wreck are placed
+    /// at the surface, not on the bed, and stay.)
+    static bool Drowned(Vector3 pos) => !float.IsNaN(V.hazardY) && pos.y < V.hazardY + 0.2f;
+
     /// A ring of scenery that closes the horizon. Skips anything that would stand in the sea.
     static void Ring(Transform root, System.Random rnd, string kit, string[] names, float r0, float r1, int count, float h0, float h1, float minY = float.NegativeInfinity)
     {
@@ -172,7 +179,7 @@ public static partial class TrackSetup
         {
             float a = (i + (float)rnd.NextDouble() * 0.6f) / count * Mathf.PI * 2f;
             var p = Polar(a, Mathf.Lerp(r0, r1, (float)rnd.NextDouble()));
-            if (p.y < minY) continue;
+            if (p.y < minY || RoadDistance(p) < HalfWidth + Kerb + 6f) continue;      // rings run inside the circuit now
             Prop(root, kit, names[rnd.Next(names.Length)], p, (float)rnd.NextDouble() * 360f, Mathf.Lerp(h0, h1, (float)rnd.NextDouble()));
         }
     }
@@ -368,6 +375,7 @@ public static partial class TrackSetup
             case "beach": DressBeach(root, rnd); break;
             case "alpine": DressAlpine(root, rnd); break;
             case "forest": DressForest(root, rnd); break;
+            case "volcano": DressVolcano(root, rnd); break;
             default: DressSpeedway(root, rnd); break;
         }
 
@@ -389,6 +397,8 @@ public static partial class TrackSetup
         Studs(root);
         Tunnel(root, rnd);
         Fireflies(root, rnd);
+        foreach (var t in root.GetComponentsInChildren<Transform>(true))       // the placeholders for what the hazard and the cut cleared
+            if (t != null && t.name == "cleared" && t.childCount == 0) Object.DestroyImmediate(t.gameObject);
     }
 
     static void DressBeach(Transform root, System.Random rnd)
@@ -434,6 +444,8 @@ public static partial class TrackSetup
         }
 
         BeachTown(root, rnd);
+        Floaters(root, rnd, "Watercraft", new[] { "buoy", "buoy", "buoy-flag" }, 40, 1.3f, 1.9f, 5f, 26f, -0.25f);
+        Floaters(root, rnd, "Pirate", new[] { "boat-row-small" }, 12, 4f, 5f, 8f, 30f, -0.3f);
 
         // The shore: a palm treeline above the tide line and rocks in the surf, then buoys out past it.
         Ring(root, rnd, "Pirate", palms, 335f, 398f, 120, 8f, 12f, minY: 0.4f);
@@ -484,14 +496,16 @@ public static partial class TrackSetup
             }
         }
 
-        // A parked train on the longest straight: the landmark you line up on before the hairpins.
-        var (s0, count) = LongestStraight();
-        Train(root, Wrap(s0 + count / 6, n), -1);
+        // A parked train beside the grid (the start's land: everywhere else off the road is the lake).
+        Train(root, Wrap(-Samples(56f), n), -1);
 
-        // Outcrops on the lower slopes, then fir stands climbing the mountains and a bigger, further ring on the peaks.
-        Ring(root, rnd, "Holiday", new[] { "rocks-large", "rocks-medium" }, 300f, 420f, 34, 5f, 9f);
-        Ring(root, rnd, "Holiday", firs, 285f, 400f, 150, 9f, 13f);
-        Ring(root, rnd, "Holiday", firs, 410f, 480f, 70, 12f, 15f);
+        // Rocks and firs on the islands, outcrops on the lower slopes, fir stands up the mountains and a further ring on the peaks.
+        Ring(root, rnd, "Holiday", new[] { "rocks-large", "rocks-medium" }, 60f, 330f, 70, 3f, 6f);
+        Ring(root, rnd, "Holiday", firs, 60f, 330f, 120, 7f, 11f);
+        Floaters(root, rnd, "Holiday", new[] { "snow-flat", "snow-flat-large" }, 110, 2.5f, 7f, 3f, 40f, 0.02f);   // ice floes
+        Ring(root, rnd, "Holiday", new[] { "rocks-large", "rocks-medium" }, 340f, 440f, 34, 5f, 9f);
+        Ring(root, rnd, "Holiday", firs, 340f, 440f, 150, 9f, 13f);
+        Ring(root, rnd, "Holiday", firs, 440f, 500f, 70, 12f, 15f);
     }
 
     /// A hut from the Holiday cabin modules: four wall modules on one tile, a corner post at each corner, a pointed
@@ -622,23 +636,73 @@ public static partial class TrackSetup
         {
             int i = Wrap(s0 + count + 8, n);
             var c = CornerAt(i);
-            float side = c.HasValue ? -c.Value.outside : 1f;
+            float side = c.HasValue ? c.Value.outside : 1f;                // behind the barrier: the inside is swamp now
             var camp = Beside(i, side, edge + 12f);
             Prop(root, "Nature", "tent_detailedOpen", camp, Yaw(right[i] * -side), 2.6f, Solid.Solid);
             Prop(root, "Nature", "campfire_logs", Beside(i, side, edge + 8f), 0f, 0.5f);
             Prop(root, "Nature", "log_stack", Beside(Wrap(i + 3, n), side, edge + 11f), Yaw(Forward(i)), 1.3f, Solid.Solid);
         }
 
-        // The lake: a wooden bridge at its near shore, on the line from the water to the road, as the lap's landmark.
-        {
-            var toRoad = -V.lake.normalized;
-            var shore = V.lake + toRoad * (V.lakeRadius + 1f);
-            Prop(root, "Nature", "bridge_wood", At(shore.x, shore.y, 0.3f), Yaw(new Vector3(toRoad.x, 0, toRoad.y)), 0f, Solid.Solid, 0f, width: 9f);
-        }
-
-        // The pines close the horizon on the hills, thinning to a taller far ring on the ridge.
+        // Pines and lily pads on the islands in the swamp; the pines close the horizon on the hills, thinning to a taller far ring on the ridge.
+        Ring(root, rnd, "Nature", pines, 40f, 280f, 200, 7f, 11f);
+        Floaters(root, rnd, "Nature", new[] { "lily_large", "lily_small", "lily_large" }, 240, 1.4f, 3f, 2f, 28f);
+        Ring(root, rnd, "Nature", new[] { "log_large", "stump_old", "stump_oldTall", "hanging_moss" }, 40f, 280f, 60, 1.2f, 2.4f);
         Ring(root, rnd, "Nature", pines, 290f, 390f, 150, 11f, 14f);
         Ring(root, rnd, "Nature", pines, 405f, 470f, 70, 14f, 17f);
+    }
+
+    /// Mount Ember: black basalt columns behind every barrier, stone heads watching the three tightest corners, obelisks
+    /// either side of the grid, dead trunks and boulders on the islands out in the lava. The cone in the middle and the
+    /// caldera's wall are terrain (TrackThemes); the lava's own glow lights it all from below (the theme's ambient).
+    static void DressVolcano(Transform root, System.Random rnd)
+    {
+        var basalt = Plain("Basalt", new Color(0.12f, 0.11f, 0.11f));
+        var carved = Plain("Basalt_Carved", new Color(0.33f, 0.29f, 0.27f));
+        var pillars = new[] { "rock_tallA", "rock_tallB", "rock_tallC", "rock_tallD", "rock_tallE", "stone_tallA", "stone_tallC", "stone_tallE" };
+        var boulders = new[] { "rock_largeA", "rock_largeB", "rock_largeC", "rock_largeD", "stone_largeA", "stone_largeC" };
+        float edge = HalfWidth + Kerb;
+        int n = centre.Length;
+        void Paint(GameObject go, Material m) { foreach (var r in go.GetComponentsInChildren<MeshRenderer>()) r.sharedMaterial = m; }
+
+        StartLine(root, 3, null);
+        for (int side = -1; side <= 1; side += 2)
+            Paint(Prop(root, "Nature", "statue_obelisk", Beside(Wrap(-Samples(30f), n), side, edge + 6f), Yaw(right[0] * -side), 10f, Solid.Solid), carved);
+
+        // columns behind the barrier on every real corner's outside, closer and taller on the tightest three
+        var tight = Tightest();
+        foreach (var c in corners)
+        {
+            if (c.total < 25f) continue;
+            bool big = tight.IndexOf(c) < 3;
+            for (int j = 0; j < c.count; j += Samples(big ? 6f : 10f))
+            {
+                int i = Wrap(c.start + j, n);
+                var go = Prop(root, "Nature", pillars[rnd.Next(pillars.Length)], Beside(i, c.outside, edge + (big ? 3.5f : 5f) + (float)rnd.NextDouble() * 9f),
+                              (float)rnd.NextDouble() * 360f, (big ? 6f : 3.5f) + (float)rnd.NextDouble() * 5f, Solid.Solid);
+                PushClear(go, centre[i], right[i], c.outside, Clear + 1f);
+                Paint(go, basalt);
+            }
+        }
+        for (int k = 0; k < Mathf.Min(3, tight.Count); k++)
+        {
+            var c = tight[k];
+            var head = Prop(root, "Nature", "statue_head", Beside(c.apex, c.outside, edge + 17f), Yaw(right[c.apex] * -c.outside), 10f, Solid.Solid);
+            PushClear(head, centre[c.apex], right[c.apex], c.outside, Clear + 6f);
+            Paint(head, carved);
+        }
+
+        // the islands: dead trunks, boulders and the odd ruined column; on the shoulders, loose stones (never solid)
+        Ring(root, rnd, "Survival", new[] { "tree-trunk", "tree-log" }, 100f, 420f, 160, 4f, 8f);
+        Ring(root, rnd, "Nature", boulders, 100f, 420f, 120, 3f, 7f);
+        Ring(root, rnd, "Nature", new[] { "statue_column", "statue_columnDamaged", "statue_block" }, 120f, 400f, 30, 4f, 8f);
+        Cover(root, rnd, "Nature", new[] { "rock_smallA", "rock_smallC", "rock_smallFlatA", "stone_smallB", "stone_smallFlatB" }, 140, 0.4f, 0.9f, 0.6f, 2.6f);
+        foreach (var r in root.GetComponentsInChildren<MeshRenderer>())
+        {
+            var top = PrefabUtility.GetOutermostPrefabInstanceRoot(r.gameObject);
+            string name = top != null ? top.name : r.name;
+            if (name.StartsWith("rock_") || name.StartsWith("stone_")) r.sharedMaterial = basalt;
+            else if (name.StartsWith("statue_")) r.sharedMaterial = carved;
+        }
     }
 
     static void DressSpeedway(Transform root, System.Random rnd)
@@ -649,27 +713,33 @@ public static partial class TrackSetup
         StartLine(root, 0, glow);
 
         // Grandstands the length of both long straights, on the outside; the pits and paddock inside the start straight.
+        // (Which side is out is worked out from the oval's middle: the start straight runs the other way round now.)
+        float Out(int i) => Mathf.Sign(Vector3.Dot(right[i], centre[i] - new Vector3(47f, 0f, 0f)));
         int per = Samples(10f);
-        foreach (int centreSample in new[] { 0, n / 2 })
+        foreach (var straight in new[] { new Vector3(0f, 0f, -160f), new Vector3(0f, 0f, 160f) })
+        {
+            int mid = 0; float near = float.MaxValue;
+            for (int i = 0; i < n; i++) { float d = Flat2(centre[i] - straight); if (d < near) { near = d; mid = i; } }
             for (int k = -11; k <= 11; k++)
             {
-                int i = Wrap(centreSample + k * per, n);
+                int i = Wrap(mid + k * per, n);
                 if (CornerAt(i).HasValue) continue;
                 bool covered = ((k % 4) + 4) % 4 == 1;
-                Prop(root, "Racing", covered ? "grandStandCovered" : "grandStand", Beside(i, -1, edge + 12f), Yaw(-right[i]), covered ? 11.9f : 9f, Solid.Solid);
+                Prop(root, "Racing", covered ? "grandStandCovered" : "grandStand", Beside(i, Out(i), edge + 12f), Yaw(right[i] * -Out(i)), covered ? 11.9f : 9f, Solid.Solid);
             }
+        }
         int pit = Samples(8.6f);
         for (int k = 0; k < 7; k++)
         {
-            int i = Wrap(-40 + k * pit, n);
-            Prop(root, "Racing", k < 5 ? "pitsGarage" : "pitsOffice", Beside(i, 1, edge + 9f), Yaw(right[i]), k < 5 ? 6f : 4.4f, Solid.Solid);
+            int i = Wrap(-Samples(128f) + k * pit, n);
+            Prop(root, "Racing", k < 5 ? "pitsGarage" : "pitsOffice", Beside(i, -Out(i), edge + 9f), Yaw(right[i] * -Out(i)), k < 5 ? 6f : 4.4f, Solid.Solid);
         }
         var cars = new[] { "raceCarRed", "raceCarGreen", "raceCarOrange", "raceCarWhite" };
         for (int k = 0; k < 4; k++)
         {
-            int i = Wrap(-36 + k * Samples(12f), n);
-            Prop(root, "Racing", k % 2 == 0 ? "tent" : "tentLong", Beside(i, 1, edge + 24f), Yaw(right[i]), 5f, Solid.Solid);
-            Prop(root, "Racing", cars[k], Beside(Wrap(i + 2, n), 1, edge + 18f), (float)rnd.NextDouble() * 360f, 1.5f, Solid.Solid);
+            int i = Wrap(-Samples(115f) + k * Samples(12f), n);
+            Prop(root, "Racing", k % 2 == 0 ? "tent" : "tentLong", Beside(i, -Out(i), edge + 24f), Yaw(right[i] * -Out(i)), 5f, Solid.Solid);
+            Prop(root, "Racing", cars[k], Beside(Wrap(i + 2, n), -Out(i), edge + 18f), (float)rnd.NextDouble() * 360f, 1.5f, Solid.Solid);
         }
 
         // Floodlights every 35 m both sides, overhead signs at the entry to the two big turns, banners and billboards
@@ -706,19 +776,52 @@ public static partial class TrackSetup
         Rhythm(root, "Racing", "barrierWall", 7f, 0.9f, 1.8f, Solid.Solid, 90f);
         Rhythm(root, "Racing", "pylon", 20f, 0.6f, 0.5f, Solid.None, 0f, Samples(10f));
 
-        // A few trees in the infield, and a ring of them on the bank so the stands have a skyline behind them.
-        for (int k = 0; k < 14; k++)
-            Prop(root, "Racing", k % 3 == 0 ? "treeSmall" : "treeLarge", At((float)(rnd.NextDouble() * 180 - 90), (float)(rnd.NextDouble() * 110 - 55)), (float)rnd.NextDouble() * 360f, 8f + (float)rnd.NextDouble() * 3f, Solid.Trunk);
-        for (int k = 0; k < 110; k++)
+        // A few trees in the infield, clear of its road, and a ring of them on the bank so the stands have a skyline behind them.
+        for (int k = 0, placed = 0; k < 80 && placed < 18; k++)
         {
-            float a = (k + (float)rnd.NextDouble() * 0.6f) / 110f * Mathf.PI * 2f, e = 1.42f + (float)rnd.NextDouble() * 0.2f;
-            Prop(root, "Racing", k % 4 == 0 ? "treeSmall" : "treeLarge", At(250f * e * Mathf.Sin(a), 150f * e * Mathf.Cos(a)), (float)rnd.NextDouble() * 360f, 10f + (float)rnd.NextDouble() * 4f);
+            var p = At(47f + (float)(rnd.NextDouble() * 2 - 1) * 260f, (float)(rnd.NextDouble() * 2 - 1) * 130f);
+            if (RoadDistance(p) < edge + 10f) continue;
+            Prop(root, "Racing", k % 3 == 0 ? "treeSmall" : "treeLarge", p, (float)rnd.NextDouble() * 360f, 8f + (float)rnd.NextDouble() * 3f, Solid.Trunk);
+            placed++;
+        }
+        for (int k = 0; k < 130; k++)
+        {
+            float a = (k + (float)rnd.NextDouble() * 0.6f) / 130f * Mathf.PI * 2f, e = 1.32f + (float)rnd.NextDouble() * 0.2f;
+            Prop(root, "Racing", k % 4 == 0 ? "treeSmall" : "treeLarge", At(47f + 310f * e * Mathf.Sin(a), 175f * e * Mathf.Cos(a)), (float)rnd.NextDouble() * 360f, 10f + (float)rnd.NextDouble() * 4f);
         }
     }
 
     static IEnumerable<GameObject> Lamps(Transform root)
     {
         foreach (Transform t in root) if (t.name.StartsWith("lightPost")) yield return t.gameObject;
+    }
+
+    /// Things afloat in the hazard beside the road (buoys in the lagoon, ice floes, lily pads): what tells you at a glance
+    /// that off the road is water. Only where it is deep enough to sink in, `from`-`to` metres past the shoulder.
+    static void Floaters(Transform root, System.Random rnd, string kit, string[] names, int count, float w0, float w1, float from, float to, float lift = 0.03f)
+    {
+        float edge = HalfWidth + Kerb + V.shoulder;
+        int n = centre.Length, made = 0;
+        for (int k = 0; k < count; k++)
+        {
+            int i = rnd.Next(n); float side = rnd.Next(2) == 0 ? -1f : 1f;
+            var p = centre[i] + right[i] * (side * (edge + from + (float)rnd.NextDouble() * (to - from)));
+            if (TerrainGen.Height(p.x, p.z) > V.hazardY - 0.8f || RoadDistance(p) < edge + from - 1f) continue;
+            p.y = V.hazardY + lift;
+            var go = Place(root, Art + $"Models/Props/{kit}/{names[rnd.Next(names.Length)]}.fbx", MatFor(kit), p, (float)rnd.NextDouble() * 360f, 1f);
+            var b = Bounds(go); float w = Mathf.Max(b.size.x, b.size.z);
+            if (w > 0.001f) go.transform.localScale *= Mathf.Lerp(w0, w1, (float)rnd.NextDouble()) / w;
+            made++;
+        }
+        Debug.Log($"[track] {made} {kit} floaters");
+    }
+
+    /// Metres from `p` to the centreline, on the ground plane.
+    static float RoadDistance(Vector3 p)
+    {
+        float best = float.MaxValue;
+        for (int i = 0; i < centre.Length; i += 2) best = Mathf.Min(best, Flat2(centre[i] - p));
+        return Mathf.Sqrt(best);
     }
 
     static void Count(GameObject go)

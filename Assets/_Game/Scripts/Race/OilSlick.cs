@@ -29,7 +29,7 @@ namespace KartCup
         }
 
         /// Lays this race's slicks along the waypoints: 1 + the circuit's difficulty (1-3) + the Tour cup's hazard level
-        /// (RaceMode.Hazard, 0-4), one more on a long lap, never on the grid, near a turbo pad or near each other.
+        /// (RaceMode.Hazard, 0-4), one more for every 700 m of lap, never on the grid, near a turbo pad or near each other.
         public static void Spawn(int seed, int difficulty)
         {
             var prefab = Resources.Load<GameObject>("OilSlick");
@@ -39,7 +39,7 @@ namespace KartCup
             float lap = 0f;
             for (int i = 0; i < n; i++) lap += Vector3.Distance(wp.GetChild(i).position, wp.GetChild((i + 1) % n).position);
             var rnd = new System.Random(seed);
-            int count = 1 + Mathf.Clamp(difficulty, 1, 7) + (lap > 1200f ? 1 : 0);
+            int count = 1 + Mathf.Clamp(difficulty, 1, 7) + Mathf.FloorToInt(lap / 700f);   // and one more every 700 m of lap
 
             var pads = GameObject.Find("TurboPads");
             var open = new List<int>();

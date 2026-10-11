@@ -17,10 +17,11 @@ namespace KartCup
 
         public static readonly Def[] All =
         {
-            new("beach",    "Palm Bay",        "THE COAST AT NIGHT", "Wide sweepers under the lamps, the lighthouse sweeping the bay. Run wide onto the sand and pay for it.", 1),
-            new("alpine",   "Frost Peak",      "ALPINE PASS",      "Hairpins up the pass. Brake early: the cabins are closer than they look.",        2),
-            new("forest",   "Pine Ridge",      "MOUNTAIN FOREST",  "Tight and technical through the pines. Every corner hides the next one.",         3),
-            new("speedway", "Sunset Speedway", "STADIUM CIRCUIT",  "Two long straights and a chicane under the floodlights. Pure top speed.",         2),
+            new("beach",    "Palm Bay",        "THE COAST AT NIGHT", "Sand causeways across the lagoon, the lighthouse sweeping the bay. Run wide and you swim.", 1),
+            new("alpine",   "Frost Peak",      "ALPINE PASS",      "Switchbacks across a glacier lake. Brake early: the water is colder than it looks.", 2),
+            new("forest",   "Pine Ridge",      "MOUNTAIN FOREST",  "Tight and technical on causeways through a flooded forest. Every corner hides the next one.", 3),
+            new("speedway", "Sunset Speedway", "STADIUM CIRCUIT",  "The big oval, then down into the infield's hairpins. Walls both sides, nowhere to cut.", 2),
+            new("volcano",  "Mount Ember",     "LAVA FIELDS",      "A basalt road across a lake of lava, round a smoking volcano. Miss a corner and you're toast.", 3),
         };
 
         public static int Count => All.Length;
@@ -32,7 +33,9 @@ namespace KartCup
         public static int IndexOf(string id) { for (int i = 0; i < All.Length; i++) if (All[i].id == id) return i; return 0; }
 
         // ---- personal bests, per track, on this phone (the Worker keeps the signed-in ones) ----
-        static string BestKey(string id) => "kc.best." + id;
+        /// "kc.best2.": the circuits were relaid longer on 11 Oct 2026 (1.0-1.4 km to 1.8-2.3 km), so a best from before
+        /// could never be beaten again; the old keys are left where they are.
+        static string BestKey(string id) => "kc.best2." + id;
         public static float Best(string id) => PlayerPrefs.GetFloat(BestKey(id), 0f);
 
         /// Returns true when `seconds` is a new best for the track.
