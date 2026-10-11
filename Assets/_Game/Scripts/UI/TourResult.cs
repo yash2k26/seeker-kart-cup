@@ -23,9 +23,10 @@ namespace KartCup
             }
             var r = Tour.Last;
             if (r == null) { line.text = ""; return; }
-            line.text = r.prize ?? r.unlocked ?? (r.stars == 0 ? "No stars this time: a podium earns them"
+            line.text = (r.prize ?? r.unlocked ?? (r.stars == 0 ? "No stars this time: a podium earns them"
                 : r.gained > 0 ? $"{r.title.ToUpperInvariant()}  ·  {r.stars} STAR{(r.stars > 1 ? "S" : "")}  ·  +{r.gained} NEW"
-                : $"{r.title.ToUpperInvariant()}  ·  {r.stars} STAR{(r.stars > 1 ? "S" : "")}  ·  your best stands");
+                : $"{r.title.ToUpperInvariant()}  ·  {r.stars} STAR{(r.stars > 1 ? "S" : "")}  ·  your best stands"))
+                + (Fuel.LastRefund ? "  ·  FUEL BACK" : "");
         }
     }
 }

@@ -66,6 +66,7 @@ public static partial class MenuSetup
         var gemsScreen = GemsScreen(safe);
         var front = FrontScreen(safe);
         var connect = ConnectScreen(safe);
+        FuelOverlay(safe);                                    // over every panel: an empty tank opens it
         // the title's hero: the chosen driver by the chosen kart on the street's home stage
         var home = title.AddComponent<HomeStage>();
         new SerializedObject(home).Do(s =>
@@ -532,7 +533,7 @@ public static partial class MenuSetup
                              new Vector2(1, 1), new Vector2(-196, -32), new Vector2(380, 104), icon: "user");
         var chip = chipBtn.gameObject.AddComponent<ProfileChip>();
         var toast = Label("Toast", corner, body, "", 28, Paper, TextAlignmentOptions.Right,
-                          new Vector2(1, 1), new Vector2(-64, -150), new Vector2(900, 44));
+                          new Vector2(1, 1), new Vector2(-64, -270), new Vector2(900, 44));   // under the fuel chip
         var toastGroup = toast.gameObject.AddComponent<CanvasGroup>();
         toastGroup.alpha = 0f; toastGroup.blocksRaycasts = false;
         new SerializedObject(chip).Do(s =>
@@ -545,6 +546,7 @@ public static partial class MenuSetup
         var cog = IconButton("Settings", corner, "icon_cog", new Vector2(1, 1), new Vector2(-64, -32), new Vector2(104, 104));
         Wire(cog, nameof(ScreenFlow.ShowSettings));
         GemChip(corner, new Vector2(-600, -32));
+        FuelChip(corner, new Vector2(1, 1), new Vector2(-600, -146), new Vector2(260, 104));   // under the gems: a race takes a can
         var boardBtn = IconButton("Board", corner, "trophy", new Vector2(1, 1), new Vector2(-880, -32), new Vector2(104, 104));
         Wire(boardBtn, nameof(ScreenFlow.ShowLeaderboard));
         var awardsBtn = IconButton("Awards", corner, "star", new Vector2(1, 1), new Vector2(-1000, -32), new Vector2(104, 104));

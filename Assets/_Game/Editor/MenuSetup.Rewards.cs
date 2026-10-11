@@ -100,8 +100,8 @@ public static partial class MenuSetup
             }
         }
 
-        // the toast: one line, one action, under the profile chip, over the hoarding
-        var toastRoot = Rect("Toast", screen.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-64, -156), new Vector2(1060, 108));
+        // the toast: one line, one action, under the profile chip and the fuel chip, over the hoarding
+        var toastRoot = Rect("Toast", screen.transform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-64, -272), new Vector2(1060, 108));
         toastRoot.pivot = new Vector2(1, 1);
         var group = toastRoot.gameObject.AddComponent<CanvasGroup>();
         group.alpha = 0f; group.blocksRaycasts = false;
@@ -152,6 +152,7 @@ public static partial class MenuSetup
         var starIcon = Rect("Star", bar, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-330, 0), new Vector2(56, 56));
         var si = starIcon.gameObject.AddComponent<Image>(); si.sprite = IconSprite("star"); si.color = Accent; si.raycastTarget = false;
         var total = Label("Total", bar, display, "0 / 60", 48, Paper, TextAlignmentOptions.Left, new Vector2(1, 0.5f), new Vector2(-290, 0), new Vector2(240, 64));
+        FuelChip(bar, new Vector2(1, 0.5f), new Vector2(-420, 0), new Vector2(250, 96));   // every event takes a can
 
         // Beach Buggy's Choose Series: a row of cards, one a series. The name on top, a picture of its first circuit, a
         // padlock with the boss's face while it is locked, the stars in it (or what opens it) along the bottom. A tap
@@ -279,15 +280,17 @@ public static partial class MenuSetup
         Design.AsRow(goalRow, Design.Ink700).raycastTarget = false;
         Label("GoalCap", goalRow, strong, "GOAL", 30, Muted, TextAlignmentOptions.Center, new Vector2(0.25f, 1), new Vector2(0, -18), new Vector2(300, 40)).characterSpacing = 6f;
         Label("RewardCap", goalRow, strong, "REWARD", 30, Muted, TextAlignmentOptions.Center, new Vector2(0.75f, 1), new Vector2(0, -18), new Vector2(300, 40)).characterSpacing = 6f;
-        var cGoal = Label("Goal", goalRow, display, "1ST", 64, Paper, TextAlignmentOptions.Center, new Vector2(0.25f, 0), new Vector2(0, 18), new Vector2(300, 90));
-        cGoal.enableAutoSizing = true; cGoal.fontSizeMin = 32; cGoal.fontSizeMax = 64;
-        var cPrize = Label("Reward", goalRow, display, "5 GEMS", 64, Accent, TextAlignmentOptions.Center, new Vector2(0.75f, 0), new Vector2(0, 18), new Vector2(300, 90));
-        cPrize.enableAutoSizing = true; cPrize.fontSizeMin = 28; cPrize.fontSizeMax = 64;
+        // each value in its own half with room between: "1ST" ran into "ALL STARS" at 300 wide (11 Oct 2026)
+        var cGoal = Label("Goal", goalRow, display, "1ST", 64, Paper, TextAlignmentOptions.Center, new Vector2(0.25f, 0), new Vector2(0, 18), new Vector2(270, 90));
+        cGoal.enableAutoSizing = true; cGoal.fontSizeMin = 20; cGoal.fontSizeMax = 64;
+        var cPrize = Label("Reward", goalRow, display, "5 GEMS", 64, Accent, TextAlignmentOptions.Center, new Vector2(0.75f, 0), new Vector2(0, 18), new Vector2(270, 90));
+        cPrize.enableAutoSizing = true; cPrize.fontSizeMin = 20; cPrize.fontSizeMax = 64;
         Label("BestCap", right, strong, "HIGH SCORE", 32, Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -36), new Vector2(390, 44)).characterSpacing = 6f;
         var cBest = Label("BestTime", right, display, "--:--", 76, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -90), new Vector2(390, 96));
         var cRule = Label("Rule", right, body, "", 32, Paper, TextAlignmentOptions.Top, new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(360, 220));
         cRule.textWrappingMode = TextWrappingModes.Normal;
         var raceBtn = Button("Race", cardRoot, "PLAY", Accent, Paper, 64, new Vector2(1, 0), new Vector2(-64, 40), new Vector2(480, 150), icon: "flag");
+        FuelChip(cardRoot, new Vector2(1, 0), new Vector2(-64, 206), new Vector2(300, 100));   // where PLAY takes its can: 5 -> 4 shows here
         UnityEditor.Events.UnityEventTools.AddPersistentListener(raceBtn.onClick, panel.Race);
         Shine(raceBtn);
         cardRoot.gameObject.SetActive(false);

@@ -293,6 +293,16 @@ public static class MenuPreview
                 foreach (var garage in Object.FindObjectsByType<GaragePanel>(FindObjectsSortMode.None)) garage.ShowInEditor(2, Paints.IndexOf("gold") + 1);
                 Canvas.ForceUpdateCanvases(); Shot(cam, "menu7-gold-locked");
             }
+            if (i == 0)   // the fuel panel, a can down
+            {
+                Fuel.Preview(0, 130);
+                foreach (var f in Object.FindObjectsByType<FuelChip>(FindObjectsSortMode.None)) f.ShowInEditor();
+                Canvas.ForceUpdateCanvases(); Shot(cam, "menu0-fuelchip");
+                foreach (var fp in Object.FindObjectsByType<FuelPanel>(FindObjectsInactive.Include, FindObjectsSortMode.None)) fp.ShowInEditor();
+                Canvas.ForceUpdateCanvases(); Shot(cam, "menu0-fuel");
+                foreach (var fp in Object.FindObjectsByType<FuelPanel>(FindObjectsInactive.Include, FindObjectsSortMode.None)) fp.HideInEditor();
+                Fuel.Preview(Fuel.Max);
+            }
             if (i == 0)   // the daily wheel, open on the gold chest
             {
                 foreach (var w in Object.FindObjectsByType<SpinWheel>(FindObjectsSortMode.None)) w.ShowInEditor(7);

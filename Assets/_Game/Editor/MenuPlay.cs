@@ -60,15 +60,17 @@ public static class MenuPlay
             (19.8, () => Object.FindFirstObjectByType<CharacterCarousel>().Pick(9)), (20.5, () => Shot("pick", ui: true)),
             (20.6, () => flow.ShowTitle()), (21.4, () => Shot("back", ui: true)),
             (21.6, () => flow.Play()), (22.7, () => flow.ShowTrack()), (23.9, () => Shot("track", ui: true)),
-            (24.1, () => flow.StartTourEvent(Tour.Cups[0].events[0], Tour.Cups[0])), (24.22, () => Shot("curtain", ui: true)),
-            (31.9, () => { Debug.Log($"[menuplay] race scene: {UnityEngine.SceneManagement.SceneManager.GetActiveScene().name}, curtain alpha {LoadingCurtain.Instance?.GetComponent<CanvasGroup>()?.alpha}"); Shot("race", ui: true); }),
+            // the series, its first event's card, PLAY: the card's fuel chip goes 6 -> 5 (a "-1" pops off it) before the race loads
+            (23.95, () => flow.ShowTour()), (24.6, () => Object.FindFirstObjectByType<TourPanel>()?.Pick(0)), (25.2, () => Object.FindFirstObjectByType<TourPanel>()?.Play(0)),
+            (26.0, () => Object.FindFirstObjectByType<TourPanel>()?.Race()), (26.3, () => Shot("fuel-spent", ui: true)), (26.9, () => Shot("curtain", ui: true)),
+            (34.7, () => { Debug.Log($"[menuplay] race scene: {UnityEngine.SceneManagement.SceneManager.GetActiveScene().name}, curtain alpha {LoadingCurtain.Instance?.GetComponent<CanvasGroup>()?.alpha}"); Shot("race", ui: true); }),
             // a win: the podium, then the card with the chest it earned, OPEN, three taps, what was inside
-            (47.9, () => { var race = Object.FindFirstObjectByType<RaceManager>(); if (race != null && race.Player != null) race.Finish(race.Player); }),
-            (58.9, () => { Debug.Log($"[menuplay] chest earned: {Chests.LastEarn.tier} (+{Chests.LastEarn.stars} stars), waiting {Chests.Pending}"); Shot("results", ui: true); }),
-            (59.1, () => Object.FindFirstObjectByType<ChestBadge>()?.Open()), (60.3, () => Shot("chest-drop", ui: true)),
-            (60.5, () => ChestReveal.Instance?.Tap()), (60.9, () => ChestReveal.Instance?.Tap()), (61.3, () => ChestReveal.Instance?.Tap()),
-            (61.52, () => Shot("chest-burst", ui: true)), (62.05, () => Shot("chest-fly", ui: true)), (62.5, () => Shot("chest-fly2", ui: true)),
-            (65.1, () => Shot("chest-cards", ui: true)),
+            (50.7, () => { var race = Object.FindFirstObjectByType<RaceManager>(); if (race != null && race.Player != null) race.Finish(race.Player); }),
+            (61.7, () => { Debug.Log($"[menuplay] chest earned: {Chests.LastEarn.tier} (+{Chests.LastEarn.stars} stars), waiting {Chests.Pending}"); Shot("results", ui: true); }),
+            (61.9, () => Object.FindFirstObjectByType<ChestBadge>()?.Open()), (63.1, () => Shot("chest-drop", ui: true)),
+            (63.3, () => ChestReveal.Instance?.Tap()), (63.7, () => ChestReveal.Instance?.Tap()), (64.1, () => ChestReveal.Instance?.Tap()),
+            (64.32, () => Shot("chest-burst", ui: true)), (64.85, () => Shot("chest-fly", ui: true)), (65.3, () => Shot("chest-fly2", ui: true)),
+            (67.9, () => Shot("chest-cards", ui: true)),
         };
         if (stage < steps.Length) { if (t >= steps[stage].at) steps[stage++].act(); return; }
         EditorApplication.update -= Tick;

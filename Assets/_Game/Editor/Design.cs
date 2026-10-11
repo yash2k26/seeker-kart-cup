@@ -242,7 +242,7 @@ public static class Design
     /// White glyph on clear, 128 px, made once into Gen/Icons. play, back, next, globe, trophy, kart, user, flag; the
     /// race items (rocket, homing, bomb, nitro, bouncer, sunbomb, trap); arc (the loading spinner).
     public static readonly string[] Drawn = { "play", "back", "next", "globe", "trophy", "kart", "user", "flag",
-                                              "rocket", "homing", "bomb", "nitro", "bouncer", "sunbomb", "trap", "arc", "download", "star", "swap", "lock" };
+                                              "rocket", "homing", "bomb", "nitro", "bouncer", "sunbomb", "trap", "arc", "download", "star", "swap", "lock", "fuel" };
     /// The race items' glyphs by ItemManager name.
     public static string ItemGlyph(string item) => item switch
     {
@@ -285,6 +285,11 @@ public static class Design
             "arc" => (x, y) => Arc(x, y),
             "swap" => (x, y) => Swap(x, y),
             "lock" => (x, y) => Mathf.Min(Box(x, y, 64, 44, 36, 28, 8), Mathf.Max(Ring(x, y, 64, 78, 22, 11), 72f - y)),   // a body and the shackle over it
+            // a jerry can (Fuel): the body with an X pressed into it, the handle on top, the spout at its shoulder
+            "fuel" => (x, y) => Mathf.Min(Mathf.Min(
+                                     Mathf.Max(Box(x, y, 64, 50, 32, 40, 10), -Mathf.Min(Seg(x, y, 48, 30, 80, 70, 7), Seg(x, y, 48, 70, 80, 30, 7))),
+                                     Mathf.Max(Box(x, y, 72, 100, 20, 12, 6), -Box(x, y, 72, 100, 10, 4, 2))),
+                                 Seg(x, y, 38, 92, 24, 112, 11)),
             "download" => (x, y) => Mathf.Min(Mathf.Min(Seg(x, y, 64, 108, 64, 46, 13), Mathf.Min(Seg(x, y, 38, 70, 64, 44, 13), Seg(x, y, 90, 70, 64, 44, 13))),
                                          Box(x, y, 64, 20, 46, 7, 4)),
             _ => null,

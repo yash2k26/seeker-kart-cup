@@ -57,6 +57,8 @@ namespace KartCup
             if (Weekly.Racing) { TimeTrial(who); return; }
             Debug.Log($"[race] the player finished {RaceHud.Ordinal(place)} of {order.Count} in {who.finishTime:0.00} s ({RaceMode.EventId}{(RaceMode.Current == RaceMode.Kind.Duel ? ", a duel" : "")})");
             if (RaceMode.Alone) place = SmashUp.Place;   // a Smash-Up places by its stars, so the gems and the chest pay the same
+            Fuel.ClearLast();
+            if (place == 1 && !Weekly.Racing) Fuel.Refund();   // a win hands its can back (BBR1's ticket)
             Cup.Record(order.Select(r => r.characterIndex).ToList());
             // knocked out of an Elimination is not a lap: its "time" is a ranking placeholder (Elimination.Knock), never a best
             bool lapped = who.finishTime < 1e5f;
@@ -79,7 +81,7 @@ namespace KartCup
                 status.text = (single ? $"You finished {RaceHud.Ordinal(place)}" + (best > 0 ? $" · best lap {RaceHud.Clock(best)}" : "")
                         : final ? "Final standings"
                         : $"You finished {RaceHud.Ordinal(place)}   +{gained} pts" + (best > 0 ? $"   best lap {RaceHud.Clock(best)}" : ""))
-                    + (newBest ? "  NEW BEST" : "");
+                    + (newBest ? "  NEW BEST" : "") + (Fuel.LastRefund ? "  ·  FUEL BACK FOR THE WIN" : "");
 
             if (table != null) table.text = single ? TimesText(order) : StandingsText();
             if (final) Cup.MarkFinished();   // so a kill-and-relaunch offers a new cup, not this one's last race again
@@ -328,6 +330,13 @@ namespace KartCup
                 var client = RoomClient.Instance;
                 if (client == null || !client.IsHost || verdict?.results == null) return;
                 client.Send(new { t = verdict.results.final ? "again" : "next" });
+                return;
+            }
+            // another race is another can (Fuel); with an empty tank, back to the menu and its FuelPanel
+            if (!Weekly.Racing && !Fuel.TrySpend("again"))
+            {
+                FuelPanel.OpenOnMenu = true;
+                ScreenFlow.Instance?.BackToMenu();
                 return;
             }
             // RACE AGAIN and NEW CUP are the same thing: the track list this cup ran, from the top.

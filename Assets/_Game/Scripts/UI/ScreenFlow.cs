@@ -178,26 +178,26 @@ namespace KartCup
         /// A Tour event with the selected driver: its circuit, mode, rival and pace.
         public void StartTourEvent(Tour.Event e, Tour.CupDef c)
         {
-            if (loading) return;
+            if (loading || !HasFuel()) return;
             AudioDirector.Instance?.Confirm();
             Weekly.Racing = false;
             Tour.Arm(e, c);
             Cup.Begin(CharacterDatabase.SelectedIndex, RosterSize, new[] { e.track });
             Cup.StartAtBack();
-            Load(Cup.SceneName);
+            SpendAndLoad(e.id, Cup.SceneName);
         }
 
         /// Today's Daily Challenge with the selected driver.
         public void StartDaily()
         {
-            if (loading) return;
+            if (loading || !HasFuel()) return;
             AudioDirector.Instance?.Confirm();
             Weekly.Racing = false;
             var c = Daily.Current;
             Daily.Arm(c);
             Cup.Begin(CharacterDatabase.SelectedIndex, RosterSize, new[] { c.track });
             Cup.StartAtBack();
-            Load(Cup.SceneName);
+            SpendAndLoad("daily", Cup.SceneName);
         }
 
         /// Kartel Weekly's time trial: this week's circuit with the selected driver, alone on track (RaceSpawner).
@@ -215,11 +215,11 @@ namespace KartCup
         /// A single race on one circuit with the selected driver (the rival toast's RACE).
         public void RaceOn(int track)
         {
-            if (loading || track < 0 || track >= Tracks.Count) return;
+            if (loading || track < 0 || track >= Tracks.Count || !HasFuel()) return;
             AudioDirector.Instance?.Confirm();
             RaceMode.Clear();
             Cup.Begin(CharacterDatabase.SelectedIndex, RosterSize, new[] { track });
-            Load(Cup.SceneName);
+            SpendAndLoad("rival", Cup.SceneName);
         }
 
         /// Starts a NEW cup — every track, or the one chosen on the track panel — with the selected character.
@@ -227,21 +227,47 @@ namespace KartCup
         public void StartRace()
         {
             if (loading || Time.unscaledTime - lastShow < 0.3f) return;   // RACE sits exactly under NEXT: a double tap must not skip track select
+            if (!HasFuel()) return;
             AudioDirector.Instance?.Confirm();
             RaceMode.Clear();
             int player = CharacterDatabase.SelectedIndex, track = TrackCarousel.Selection;
             KartApi.Event("cup_start", new { character = player, track });
             if (track < 0) Cup.Begin(player, RosterSize);
             else Cup.Begin(player, RosterSize, new[] { track });
-            Load(Cup.SceneName);
+            SpendAndLoad(track < 0 ? "grandprix" : "quick", Cup.SceneName);
         }
 
         /// Title screen, when a cup is already in flight: drop straight back into the race it stopped at.
         public void ContinueCup()
         {
-            if (loading || !Cup.Active) return;
+            if (loading || !Cup.Active || !HasFuel()) return;
             AudioDirector.Instance?.Confirm();
-            Load(Cup.SceneName);
+            SpendAndLoad("cup", Cup.SceneName);
+        }
+
+        /// Fuel (Fuel, Beach Buggy's tickets): a solo race needs a can. With an empty tank FuelPanel opens and nothing is
+        /// set up (a Grand Prix in flight must not be thrown away for a race that cannot start).
+        bool HasFuel()
+        {
+            if (Fuel.Count > 0) return true;
+            AudioDirector.Instance?.Error();
+            FuelPanel.Open();
+            return false;
+        }
+
+        /// The can is spent, then the race loads a beat later: the chip on screen shows 5 -> 4 first.
+        void SpendAndLoad(string race, string scene)
+        {
+            if (!Fuel.TrySpend(race)) { FuelPanel.Open(); return; }
+            loading = true;
+            StartCoroutine(LoadSoon(scene));
+        }
+
+        System.Collections.IEnumerator LoadSoon(string scene)
+        {
+            yield return new WaitForSecondsRealtime(0.65f);
+            loading = false;
+            Load(scene);
         }
 
         int RosterSize => roster != null && roster.characters.Length > 0 ? roster.characters.Length : 8;

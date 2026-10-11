@@ -19,6 +19,7 @@ public static class CupTest
         SingleRace();
         SurvivesARestart();
         TourShape();
+        FuelTank();
         Debug.Log(failures == 0 ? "[cuptest] PASS — all checks" : $"[cuptest] {failures} FAILURE(S)");
         if (Application.isBatchMode) EditorApplication.Exit(failures == 0 ? 0 : 1);
     }
@@ -166,6 +167,33 @@ public static class CupTest
         Check("the rookie field fires less than the Grand Tour's", Tour.Cups[0].fire < 1f && Tour.Cups[^1].fire > 1f);
         RaceMode.Clear();
         Tour.Preview();
+    }
+
+    /// Fuel: a can a race, one back every RefillSeconds, the clock only running while the tank is not full.
+    static void FuelTank()
+    {
+        long now = 1_000_000; var clock = Fuel.Clock;
+        Fuel.Clock = () => now;
+        try
+        {
+            Fuel.Preview(Fuel.Max);
+            Check("a full tank starts a race", Fuel.TrySpend("test") && Fuel.Count == Fuel.Max - 1);
+            Check("the next can is a full refill away", Fuel.SecondsToNext == Fuel.RefillSeconds);
+            now += Fuel.RefillSeconds;
+            Check("a can comes back after RefillSeconds", Fuel.Count == Fuel.Max && Fuel.SecondsToNext == 0);
+            now += 5000;
+            Check("a full tank does not bank time", Fuel.TrySpend("test") && Fuel.SecondsToNext == Fuel.RefillSeconds);
+            Fuel.Preview(0);
+            Check("an empty tank starts nothing", !Fuel.TrySpend("test") && Fuel.Count == 0);
+            now += Fuel.RefillSeconds * 2 + 50;
+            Check("two cans and 50 s toward a third", Fuel.Count == 2 && Fuel.SecondsToNext == Fuel.RefillSeconds - 50);
+            Fuel.Refund();
+            Check("a win hands its can back", Fuel.Count == 3 && Fuel.LastRefund);
+            Fuel.Preview(Fuel.Max);
+            Fuel.Refund();
+            Check("never over a full tank", Fuel.Count == Fuel.Max && !Fuel.LastRefund);
+        }
+        finally { Fuel.Clock = clock; Fuel.Preview(Fuel.Max); Fuel.ClearLast(); }
     }
 
     static void Check(string what, bool ok)
