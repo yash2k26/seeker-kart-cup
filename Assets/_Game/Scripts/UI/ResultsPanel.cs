@@ -110,7 +110,23 @@ namespace KartCup
                 var wallet = paid?.standings != null && i < paid.standings.Count ? paid.players.Find(p => p.id == paid.standings[i].id)?.wallet : null;
                 if (wallet != null && shares.TryGetValue(wallet, out var amount) && amount > 0) w.prize = WalletFlow.Amount(amount.ToString(), paid.currency);
                 return w;
-            }).ToList(), heading, 2.6f));   // after the finish line's moment: the place, the swing to the driver's face
+            }).ToList(), heading, 2.6f, Board(race, cupPodium, single)));   // after the finish line's moment: the place, the swing to the driver's face
+        }
+
+        /// The ceremony's leaderboard, read again while it plays (the field is still finishing below): after a cup's last
+        /// race the cup's standings and points; otherwise this race's order, its times, and the points each place takes in a cup.
+        System.Func<IList<PodiumShow.Row>> Board(RaceManager race, bool cupPodium, bool single)
+        {
+            if (cupPodium)
+                return () => Cup.Standings.Select(st => new PodiumShow.Row { name = Name(st.character), face = Name(st.character), time = st.points + " PTS", me = st.character == Cup.PlayerCharacter }).ToList();
+            return () => FinishOrder(race).Select((r, i) => new PodiumShow.Row
+            {
+                name = r.remote || r.isPlayer && online ? r.racerName : Name(r.characterIndex),
+                face = Name(r.characterIndex),
+                time = !r.finished || r.finishTime >= float.MaxValue ? "RACING" : r.finishTime >= 1e5f ? "OUT" : RaceHud.Clock(r.finishTime),
+                prize = !single && i < Cup.PointsFor.Length ? "+" + Cup.PointsFor[i] + " PTS" : "",
+                me = r.isPlayer,
+            }).ToList();
         }
 
         // ---------- the podium, then the card ----------
@@ -122,16 +138,25 @@ namespace KartCup
 
         /// The finish callout lands, then the top three take the podium (party poppers, trophies, the winner jumping),
         /// and after a few seconds, or a tap, the card comes up over it with the celebration still going behind.
-        IEnumerator Ceremony(List<PodiumShow.Winner> top, string heading, float delay)
+        IEnumerator Ceremony(List<PodiumShow.Winner> top, string heading, float delay, System.Func<IList<PodiumShow.Row>> board = null)
         {
             yield return new WaitForSecondsRealtime(delay);
             var show = top.Count > 0 && top.Any(w => w.driver != null) ? PodiumShow.Ensure() : null;
             if (show != null)
             {
                 if (panel != null) panel.SetActive(false);
-                show.Winners(heading, top);
-                float until = Time.unscaledTime + PodiumShow.CeremonySeconds, skippable = Time.unscaledTime + 1f;
-                while (Time.unscaledTime < until && !(Time.unscaledTime > skippable && PodiumShow.Tapped())) yield return null;
+                show.Winners(heading, top, board);
+                // a tap in the drum roll jumps to the winner (never past them); a tap after that brings the card up
+                float until = Time.unscaledTime + PodiumShow.CeremonySeconds, skippable = Time.unscaledTime + 0.8f;
+                while (Time.unscaledTime < until)
+                {
+                    if (Time.unscaledTime > skippable && PodiumShow.Tapped())
+                    {
+                        if (!show.SkipToWinner()) break;
+                        until = Time.unscaledTime + PodiumShow.CeremonySeconds - PodiumShow.WinAt; skippable = Time.unscaledTime + 1f;
+                    }
+                    yield return null;
+                }
             }
             ShowCard(podium: show != null);
         }
@@ -143,6 +168,9 @@ namespace KartCup
             var dim = panel.GetComponent<Image>();
             if (dim != null) { var c = dim.color; c.a = podium ? 0.5f : 0.74f; dim.color = c; }
             if (podium) FindAnyObjectByType<PodiumShow>()?.HideWords();
+            // a single race's times again: the field crossed the line during the ceremony, and the card should agree with it
+            if (!online && table != null && Cup.IsSingleRace && !Weekly.Racing && RaceManager.Instance != null && RaceManager.Instance.Player != null && RaceManager.Instance.Player.finished)
+                table.text = TimesText(FinishOrder(RaceManager.Instance));
             UiMotion.Show(panel, panel.transform.childCount > 0 ? panel.transform.GetChild(0) : null);
         }
 
@@ -238,8 +266,15 @@ namespace KartCup
                 string heading = iWon ? (cupPodium ? "YOU TAKE THE CUP!" : "YOU WIN!")
                     : top.Count > 0 ? $"{top[0].name.ToUpperInvariant()} {(cupPodium ? "TAKES THE CUP!" : "WINS!")}" : "";
                 var podium = top.Select(t => Podium(room.players.Find(p => p.id == t.id)?.character ?? -1, t.name)).ToList();
+                // the room's order for the leaderboard: its times, its points, a DNF where someone never made it round
+                var rows = res.order.Select(o => new PodiumShow.Row
+                {
+                    name = o.name, face = Name(room.players.Find(p => p.id == o.id)?.character ?? -1),
+                    time = o.dnf ? "DNF" : o.ms.HasValue ? RaceHud.Clock(o.ms.Value / 1000f) : "—",
+                    prize = o.points > 0 ? "+" + o.points + " PTS" : "", me = o.id == client.MyId,
+                }).ToList();
                 StopAllCoroutines();
-                StartCoroutine(Ceremony(podium, heading, 0.2f));
+                StartCoroutine(Ceremony(podium, heading, 0.2f, () => rows));
             }
         }
 

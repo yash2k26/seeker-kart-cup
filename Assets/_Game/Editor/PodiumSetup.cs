@@ -18,8 +18,9 @@ public static class PodiumSetup
     const string Drivers = "Assets/_Game/Prefabs/Drivers/";
 
     // The podium, in the stage's space: the camera is at -Z looking +Z, so second place stands on the left.
-    static readonly (float x, float h)[] Blocks = { (0f, 1.25f), (-1.8f, 0.85f), (1.8f, 0.6f) };
-    const float BlockW = 1.7f, BlockD = 1.5f;
+    static readonly (float x, float h)[] Blocks = { (0f, 1.45f), (-2.0f, 1.0f), (2.0f, 0.72f) };
+    const float BlockW = 1.95f, BlockD = 1.7f;
+    const float Deck = 0.6f;                 // the dais's top: the blocks stand on it
     static readonly string[] Place = { "1", "2", "3" };
 
     [MenuItem("Build/Podium Stage")]
@@ -60,56 +61,123 @@ public static class PodiumSetup
         var cylinder = Resources.GetBuiltinResource<Mesh>("Cylinder.fbx");
 
         // ---- the stage ----
-        // A night stage in the game's own gold: a black gloss floor ringed in light, the sun turning slowly behind the
-        // podium, the blocks dark with their place lit on the front, glitter rising through all of it. Nothing
-        // borrowed from a paddock (the banner towers, the flags and the red carpet are gone).
+        // A show stage in the dark (11 Oct 2026, the user: "lights off ... the platform should be better"): a two-tier round
+        // dais ringed in gold light, three stepped blocks capped in their metal with the place lit on the front, a violet
+        // wall behind with the Kartel sign in a frame of bulbs, a lighting truss with a can over each block, and a moving
+        // head on each tower. All of it is dark until PodiumShow calls it: a cool backlight alone shows their outlines.
         var root = new GameObject("PodiumStage");
         var show = root.AddComponent<PodiumShow>();
         var goldC = Hex("FFC83A"); var silverC = new Color(0.83f, 0.88f, 0.95f); var bronzeC = new Color(0.95f, 0.55f, 0.28f);
+        var tints = new[] { goldC, silverC, bronzeC };
         Part(root.transform, "Floor", cylinder, floorMat, new Vector3(0, -0.1f, 0), new Vector3(30, 0.1f, 30));
         // The stage brings its own night: a dark drum round it, drawn from the inside, so the ceremony looks the same
         // on a snowfield at blue hour as on the coast after dark.
-        var drum = Part(root.transform, "Drum", cylinder, Inside("Podium_Drum", new Color(0.025f, 0.04f, 0.065f)), new Vector3(0, 13f, 0), new Vector3(40f, 15f, 40f));
-        var ringMat = Glow("Podium_Ring", "fx_ring", goldC * 0.75f);
-        var ring = Part(root.transform, "FloorRing", quad, ringMat, new Vector3(0, 0.02f, 0.2f), new Vector3(13f, 13f, 1f));
-        ring.localRotation = Quaternion.Euler(90, 0, 0);
-        var sunMat = Glow("Podium_Sun", SunTexture(), goldC * 0.62f);
-        var sun = Part(root.transform, "Sun", quad, sunMat, new Vector3(0, 4.6f, 5.2f), new Vector3(9.5f, 9.5f, 1f));
-        var turn = sun.gameObject.AddComponent<Rotor>(); turn.period = 46f; turn.axis = Vector3.forward;
-        Part(root.transform, "SunHalo", quad, Glow("Podium_Halo", "fx_dot", goldC * 0.42f), new Vector3(0, 4.6f, 5.6f), new Vector3(22f, 22f, 1f));
+        Part(root.transform, "Drum", cylinder, Inside("Podium_Drum", new Color(0.02f, 0.02f, 0.045f)), new Vector3(0, 13f, 0), new Vector3(40f, 15f, 40f));
+        var winnerShow = new List<GameObject>();
+
+        // the dais: two tiers, each with a ring of gold light just under its lip (lit with the winner)
+        var daisMat = Plain("Podium_Dais", lit, new Color(0.07f, 0.05f, 0.13f), 0.86f);
+        Part(root.transform, "DaisLow", cylinder, daisMat, new Vector3(0, 0.15f, 0.3f), new Vector3(12.8f, 0.15f, 12.8f));
+        Part(root.transform, "DaisHigh", cylinder, daisMat, new Vector3(0, 0.45f, 0.3f), new Vector3(10.4f, 0.15f, 10.4f));
+        var ringGlow = Emit("Podium_RingGlow", lit, goldC, 3f);
+        winnerShow.Add(Part(root.transform, "RingLow", cylinder, ringGlow, new Vector3(0, 0.27f, 0.3f), new Vector3(12.95f, 0.02f, 12.95f)).gameObject);
+        winnerShow.Add(Part(root.transform, "RingHigh", cylinder, ringGlow, new Vector3(0, 0.57f, 0.3f), new Vector3(10.55f, 0.02f, 10.55f)).gameObject);
+        var floorRing = Part(root.transform, "FloorRing", quad, Glow("Podium_Ring", "fx_ring", goldC * 0.6f), new Vector3(0, 0.02f, 0.3f), new Vector3(17f, 17f, 1f));
+        floorRing.localRotation = Quaternion.Euler(90, 0, 0);
+        winnerShow.Add(floorRing.gameObject);
+
+        // the wall behind, the sign on it and its frame of bulbs (the sign and the bulbs light with the winner)
+        Part(root.transform, "Wall", cube, Plain("Podium_Wall", lit, new Color(0.11f, 0.06f, 0.24f), 0.5f), new Vector3(0, 5.1f, 5.6f), new Vector3(17f, 10f, 0.3f));
+        var sign = Part(root.transform, "Sign", quad, Sign("Podium_Sign", "Assets/_Game/Art/Textures/UI/kartel_lockup.png"), new Vector3(0, 7.5f, 5.4f), new Vector3(6.4f, 6.4f * 439f / 1199f, 1f));   // high: the gold held up over the winner's head is under it
+        winnerShow.Add(sign.gameObject);
+        {
+            var bulbs = new List<Vector3>();
+            float w = 7.6f, h = 3.4f, cy = 7.5f;
+            for (float x = -w / 2f; x <= w / 2f + 0.01f; x += 0.43f) { bulbs.Add(new Vector3(x, cy + h / 2f, 5.38f)); bulbs.Add(new Vector3(x, cy - h / 2f, 5.38f)); }
+            for (float y = cy - h / 2f + 0.43f; y < cy + h / 2f - 0.2f; y += 0.43f) { bulbs.Add(new Vector3(-w / 2f, y, 5.38f)); bulbs.Add(new Vector3(w / 2f, y, 5.38f)); }
+            var go = new GameObject("Bulbs"); go.transform.SetParent(root.transform, false);
+            go.AddComponent<MeshFilter>().sharedMesh = Save(Quads(bulbs, 0.34f), "podium_bulbs");
+            var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = Glow("Podium_Bulb", "fx_dot", goldC * 2.6f); r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            winnerShow.Add(go);
+        }
+
+        // the truss: two towers and a bar across, a can over each block and a moving head on each tower top
+        var trussMat = Plain("Podium_Truss", lit, new Color(0.22f, 0.22f, 0.26f), 0.6f);
+        foreach (float side in new[] { -1f, 1f }) Part(root.transform, side < 0 ? "TowerL" : "TowerR", cube, trussMat, new Vector3(7.2f * side, 4.6f, 1.2f), new Vector3(0.45f, 9.2f, 0.45f));
+        Part(root.transform, "Bar", cube, trussMat, new Vector3(0, 9.2f, 1.2f), new Vector3(14.9f, 0.45f, 0.45f));
+        var canMat = Plain("Podium_Can", lit, new Color(0.08f, 0.08f, 0.1f), 0.5f);
 
         var metals = new[] { gold, silver, bronze };
-        var glows = new[] { Emit("Podium_GlowGold", lit, goldC, 2.2f), Emit("Podium_GlowSilver", lit, silverC, 1.6f), Emit("Podium_GlowBronze", lit, bronzeC, 1.8f) };
-        var tints = new[] { goldC, silverC, bronzeC };
-        var spots = new Transform[3]; var trophies = new Transform[3];
+        var caps = new[] { LitMetal("Podium_CapGold", lit, goldC), LitMetal("Podium_CapSilver", lit, silverC), LitMetal("Podium_CapBronze", lit, bronzeC) };
+        var glows = new[] { Emit("Podium_GlowGold", lit, goldC, 2.4f), Emit("Podium_GlowSilver", lit, silverC, 1.8f), Emit("Podium_GlowBronze", lit, bronzeC, 2f) };
+        var beamMats = new[] { Beam("Podium_BeamGold", new Color(1f, 0.86f, 0.55f)), Beam("Podium_BeamSilver", new Color(0.82f, 0.9f, 1f)), Beam("Podium_BeamBronze", new Color(1f, 0.7f, 0.45f)) };
+        var spots = new Transform[3]; var trophies = new Transform[3]; var placeLights = new Light[3]; var placeShow = new GameObject[3];
         for (int i = 0; i < 3; i++)
         {
             var (x, h) = Blocks[i];
-            Part(root.transform, "Block" + Place[i], cube, blockMat, new Vector3(x, h / 2f, 0), new Vector3(BlockW, h, BlockD));
-            // a lit edge along the top and the foot of each block, in its metal
-            Part(root.transform, "Trim" + Place[i], cube, glows[i], new Vector3(x, h - 0.03f, -BlockD / 2f - 0.02f), new Vector3(BlockW, 0.06f, 0.04f));
-            Part(root.transform, "Foot" + Place[i], cube, glows[i], new Vector3(x, 0.03f, -BlockD / 2f - 0.02f), new Vector3(BlockW, 0.06f, 0.04f));
-            var number = Text3D(root.transform, "Number" + Place[i], Place[i], Design.Display, Mathf.Min(h * 9f, 9f), tints[i],
-                                new Vector3(x, h * 0.47f, -BlockD / 2f - 0.02f), new Vector2(BlockW, h * 0.9f));
+            float top = Deck + h + 0.14f;
+            Part(root.transform, "Block" + Place[i], cube, blockMat, new Vector3(x, Deck + h / 2f, 0), new Vector3(BlockW, h, BlockD));
+            Part(root.transform, "Cap" + Place[i], cube, caps[i], new Vector3(x, Deck + h + 0.07f, 0), new Vector3(BlockW + 0.12f, 0.14f, BlockD + 0.12f));
+            var number = Text3D(root.transform, "Number" + Place[i], Place[i], Design.Display, Mathf.Min(h * 8f, 9f), tints[i],
+                                new Vector3(x, Deck + h * 0.47f, -BlockD / 2f - 0.02f), new Vector2(BlockW, h * 0.9f));
             number.fontStyle = FontStyles.Normal;
+
+            // what lights with this place: the strips up the block's front corners and along its foot, the beam, the pool on top
+            var lights = new GameObject("Show" + Place[i]); lights.transform.SetParent(root.transform, false);
+            foreach (float side in new[] { -1f, 1f })
+                Part(lights.transform, "Strip", cube, glows[i], new Vector3(x + side * (BlockW / 2f - 0.05f), Deck + h / 2f, -BlockD / 2f - 0.03f), new Vector3(0.07f, h, 0.07f));
+            Part(lights.transform, "Foot", cube, glows[i], new Vector3(x, Deck + 0.03f, -BlockD / 2f - 0.03f), new Vector3(BlockW, 0.05f, 0.05f));
+            var can = new Vector3(x, 8.85f, 1.2f); var aim = new Vector3(x, top + 1f, 0f);
+            var beam = new GameObject("Beam"); beam.transform.SetParent(lights.transform, false);
+            beam.transform.localPosition = can; beam.transform.localRotation = Quaternion.LookRotation(aim - can, Vector3.up);
+            beam.AddComponent<MeshFilter>().sharedMesh = Save(Cone(0.22f, Vector3.Distance(can, aim) + 1.4f, 11f), "podium_beam" + Place[i]);
+            var br = beam.AddComponent<MeshRenderer>(); br.sharedMaterial = beamMats[i]; br.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            var pool = Part(lights.transform, "Pool", quad, Glow("Podium_Pool" + Place[i], "fx_dot", tints[i] * 0.9f), new Vector3(x, top + 0.02f, 0f), new Vector3(2.6f, 2.6f, 1f));
+            pool.localRotation = Quaternion.Euler(90, 0, 0);
+            placeShow[i] = lights;
+
+            var fixture = Part(root.transform, "Can" + Place[i], cylinder, canMat, can + Vector3.up * 0.1f, new Vector3(0.42f, 0.22f, 0.42f));
+            fixture.localRotation = Quaternion.LookRotation(aim - can, Vector3.up) * Quaternion.Euler(90, 0, 0);
+            var l = new GameObject("Light" + Place[i]).AddComponent<Light>();
+            l.transform.SetParent(root.transform, false);
+            l.transform.localPosition = can; l.transform.localRotation = Quaternion.LookRotation(aim - can, Vector3.up);
+            l.type = LightType.Spot; l.spotAngle = 34f; l.innerSpotAngle = 20f; l.range = 16f; l.intensity = 170f; l.shadows = LightShadows.None;
+            l.color = Color.Lerp(Color.white, tints[i], 0.35f);
+            placeLights[i] = l;
 
             var spot = new GameObject("Spot" + Place[i]).transform;
             spot.SetParent(root.transform, false);
-            spot.localPosition = new Vector3(x, h, 0.1f);
+            spot.localPosition = new Vector3(x, top, 0.1f);
             spot.localRotation = Quaternion.Euler(0, 180, 0);          // drivers face the camera, at -Z
             spots[i] = spot;
 
-            trophies[i] = Trophy(root.transform, "Trophy" + Place[i], cup, metals[i], plinthMat, cube, new Vector3(x, h, -0.1f));
+            trophies[i] = Trophy(root.transform, "Trophy" + Place[i], cup, metals[i], plinthMat, cube, new Vector3(x, top, -0.1f));
         }
 
-        // Party poppers either side, aimed up over the podium; confetti rains through the ceremony.
+        // the moving heads: a beam from each tower top, swung by PodiumShow once the winner is called (toward the audience)
+        var movers = new List<Transform>();
+        foreach (float side in new[] { -1f, 1f })
+        {
+            var holder = new GameObject(side < 0 ? "HeadL" : "HeadR").transform;
+            holder.SetParent(root.transform, false);
+            holder.localPosition = new Vector3(7.2f * side, 9.6f, 1.2f); holder.localRotation = Quaternion.Euler(0, 180, 0);
+            Part(holder, "Body", cube, canMat, Vector3.zero, new Vector3(0.5f, 0.5f, 0.5f));
+            var pivot = new GameObject("Pivot").transform; pivot.SetParent(holder, false);
+            var beam = new GameObject("Beam"); beam.transform.SetParent(pivot, false);
+            beam.AddComponent<MeshFilter>().sharedMesh = Save(Cone(0.16f, 19f, 4.5f), "podium_head_beam");
+            var br = beam.AddComponent<MeshRenderer>(); br.sharedMaterial = Beam("Podium_BeamHead", new Color(1f, 0.8f, 0.4f), 0.55f); br.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            movers.Add(pivot);
+            winnerShow.Add(beam);
+        }
+
+        // Party poppers either side on the deck, aimed up over the podium; confetti rains once the winner is called.
         var poppers = new List<ParticleSystem>();
         foreach (float side in new[] { -1f, 1f })
         {
             var holder = new GameObject(side < 0 ? "PopperLeft" : "PopperRight").transform;
             holder.SetParent(root.transform, false);
-            holder.localPosition = new Vector3(3.3f * side, 0.05f, -1.9f);
-            var aim = (new Vector3(0, 4.2f, 0.4f) - holder.localPosition).normalized;
+            holder.localPosition = new Vector3(3.7f * side, Deck, -2.3f);
+            var aim = (new Vector3(0, 4.6f, 0.4f) - holder.localPosition).normalized;
             holder.localRotation = Quaternion.FromToRotation(Vector3.up, aim);
             Part(holder, "Cone", cone, popperMat, Vector3.zero, Vector3.one * 2.6f);
             var burst = Particles(holder, "Burst", confettiMat, quad, rain: false);
@@ -120,9 +188,9 @@ public static class PodiumSetup
         var rain = Particles(root.transform, "Rain", confettiMat, quad, rain: true);
         rain.transform.localPosition = new Vector3(0, 9f, 0.5f);
 
-        // gold dust rising off the floor the whole time, each mote flaring and dimming
+        // gold dust rising off the deck once the winner is called, each mote flaring and dimming
         {
-            var go = new GameObject("Glitter"); go.transform.SetParent(root.transform, false); go.transform.localPosition = new Vector3(0, 0.3f, 0.5f);
+            var go = new GameObject("Glitter"); go.transform.SetParent(root.transform, false); go.transform.localPosition = new Vector3(0, Deck + 0.2f, 0.5f);
             var ps = go.AddComponent<ParticleSystem>();
             var m = ps.main; m.loop = true; m.playOnAwake = true; m.prewarm = true; m.startLifetime = new ParticleSystem.MinMaxCurve(2.5f, 5f);
             m.startSpeed = new ParticleSystem.MinMaxCurve(0.25f, 0.9f); m.startSize = new ParticleSystem.MinMaxCurve(0.12f, 0.38f); m.maxParticles = 90;
@@ -133,25 +201,40 @@ public static class PodiumSetup
             var sz = ps.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, tw);
             var r = go.GetComponent<ParticleSystemRenderer>(); r.sharedMaterial = Glow("Podium_Glitter", "fx_sparkle", goldC * 3.2f);
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            winnerShow.Add(go);
         }
 
-        // Stage light: the ceremony plays in the race scene, and after dark the coast's moon is not enough to see a
-        // face by. Two warm spots from the front corners, a gold rim from behind; no shadows.
+        // The house lights: two warm spots from the front corners and a gold rim from behind, up with the winner. And a cool
+        // backlight that stays on, so in the dark the three are outlines against the wall.
+        var house = new List<Light>();
         foreach (float side in new[] { -1f, 1f })
         {
             var l = new GameObject(side < 0 ? "StageLightL" : "StageLightR").AddComponent<Light>();
             l.transform.SetParent(root.transform, false);
             l.transform.localPosition = new Vector3(6f * side, 7.5f, -8f);
-            l.transform.LookAt(root.transform.position + new Vector3(0, 1.6f, 0));
+            l.transform.LookAt(root.transform.position + new Vector3(0, 2.2f, 0));
             l.type = LightType.Spot; l.spotAngle = 85f; l.innerSpotAngle = 50f; l.range = 30f; l.intensity = 120f;   // a 10 m throw
             l.color = new Color(1f, 0.95f, 0.88f); l.shadows = LightShadows.None;
+            house.Add(l);
         }
-        var rim = new GameObject("StageRim").AddComponent<Light>();          // the sun behind them, on their shoulders
+        var rim = new GameObject("StageRim").AddComponent<Light>();
         rim.transform.SetParent(root.transform, false);
-        rim.transform.localPosition = new Vector3(0, 6.5f, 5.5f);
-        rim.transform.LookAt(root.transform.position + new Vector3(0, 1.8f, 0));
+        rim.transform.localPosition = new Vector3(0, 6.5f, 5.0f);
+        rim.transform.LookAt(root.transform.position + new Vector3(0, 2.4f, 0));
         rim.type = LightType.Spot; rim.spotAngle = 80f; rim.innerSpotAngle = 40f; rim.range = 24f; rim.intensity = 90f;
         rim.color = new Color(1f, 0.74f, 0.3f); rim.shadows = LightShadows.None;
+        house.Add(rim);
+        var back = new GameObject("Backlight").AddComponent<Light>();
+        back.transform.SetParent(root.transform, false);
+        back.transform.localPosition = new Vector3(0, 7.5f, 4.6f);
+        back.transform.LookAt(root.transform.position + new Vector3(0, 2f, -0.5f));
+        back.type = LightType.Spot; back.spotAngle = 70f; back.innerSpotAngle = 40f; back.range = 20f; back.intensity = 28f;
+        back.color = new Color(0.45f, 0.55f, 1f); back.shadows = LightShadows.None;
+
+        // the drum roll on its own source (2D), so a tap that skips to the winner can cut it
+        var roll = root.AddComponent<AudioSource>();
+        roll.clip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Game/Audio/SFX/podium/drumroll.wav");
+        roll.playOnAwake = false; roll.spatialBlend = 0f; roll.volume = 0.95f;
 
         var camGo = new GameObject("PodiumCam");
         camGo.transform.SetParent(root.transform, false);
@@ -178,7 +261,8 @@ public static class PodiumSetup
 
         var title = Words("Kicker", canvasGo.transform, Design.Strong, "PRIZE POOL", 40, Design.Paper, new Vector2(0, 1), new Vector2(120, -96), new Vector2(1200, 56));
         title.characterSpacing = 14f;
-        var subtitle = Words("Big", canvasGo.transform, Design.Hero, "", 168, goldC, new Vector2(0, 1), new Vector2(112, -158), new Vector2(1500, 220));
+        // as wide as the leaderboard under it: wider, a winner's name ran into the Kartel sign over the podium
+        var subtitle = Words("Big", canvasGo.transform, Design.Hero, "", 168, goldC, new Vector2(0, 1), new Vector2(112, -158), new Vector2(960, 220));
         subtitle.enableAutoSizing = true; subtitle.fontSizeMin = 84; subtitle.fontSizeMax = 168;   // "0.54 SOL" at full size, "YOU TAKE THE CUP!" as wide as the frame allows
         var hint = Words("Hint", canvasGo.transform, Design.Strong, "TAP TO SKIP", 28, Design.Muted, new Vector2(1, 0), new Vector2(-110, 64), new Vector2(500, 40));
         hint.alignment = TextAlignmentOptions.Right; hint.characterSpacing = 10f;
@@ -199,6 +283,30 @@ public static class PodiumSetup
             notes[i].alignment = TextAlignmentOptions.Left;
             cards[i] = card;
         }
+        // The leaderboard: the whole field in finishing order down the left, under the headline. Each line a card: the place
+        // (the podium's three in their metal), the driver's face, the name, the time, and what the place pays.
+        var boardRt = UI("Board", canvasGo.transform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(120 + 470, -400 - 4 * 74), new Vector2(940, 8 * 74));
+        var boardGroup = boardRt.gameObject.AddComponent<CanvasGroup>(); boardGroup.interactable = false; boardGroup.blocksRaycasts = false;
+        var rowRts = new List<RectTransform>(); var rowPlace = new List<TMP_Text>(); var rowName = new List<TMP_Text>(); var rowTime = new List<TMP_Text>(); var rowPrize = new List<TMP_Text>();
+        var rowFace = new List<UnityEngine.UI.Image>(); var rowBack = new List<UnityEngine.UI.Image>();
+        for (int i = 0; i < 8; i++)
+        {
+            var row = UI("Row" + i, boardRt, new Vector2(0, 1), new Vector2(0, 1), new Vector2(470, -33 - i * 74), new Vector2(940, 66));
+            row.gameObject.AddComponent<CanvasGroup>();
+            var backImg = Design.AsCard(row, new Color(0.06f, 0.05f, 0.14f, 0.86f)); backImg.raycastTarget = false;
+            Color placeColour = i < 3 ? tints[i] : Design.Paper;
+            if (i < 3) { var bar = UI("Bar", row, new Vector2(0, 0), new Vector2(0, 1), new Vector2(10, 0), new Vector2(8, -18)); var bi = bar.gameObject.AddComponent<UnityEngine.UI.Image>(); bi.color = placeColour; bi.raycastTarget = false; }
+            var place = Words("Place", row, Design.Display, (i + 1) + "TH", 46, placeColour, new Vector2(0, 0.5f), new Vector2(28, 0), new Vector2(120, 60)); place.alignment = TextAlignmentOptions.Left;
+            var face = UI("Face", row, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(178, 0), new Vector2(56, 56));
+            var faceImg = face.gameObject.AddComponent<UnityEngine.UI.Image>(); faceImg.preserveAspect = true; faceImg.raycastTarget = false;
+            var nm = Words("Name", row, Design.Display, "", 42, Design.Paper, new Vector2(0, 0.5f), new Vector2(222, 0), new Vector2(390, 60)); nm.alignment = TextAlignmentOptions.Left;
+            nm.enableAutoSizing = true; nm.fontSizeMin = 26; nm.fontSizeMax = 42;
+            var time = Words("Time", row, Design.Strong, "", 36, Design.Paper, new Vector2(0, 0.5f), new Vector2(620, 0), new Vector2(170, 52)); time.alignment = TextAlignmentOptions.Right;
+            var prize = Words("Prize", row, Design.Strong, "", 30, goldC, new Vector2(0, 0.5f), new Vector2(800, 0), new Vector2(124, 52)); prize.alignment = TextAlignmentOptions.Right;
+            prize.enableAutoSizing = true; prize.fontSizeMin = 20; prize.fontSizeMax = 30;
+            rowRts.Add(row); rowPlace.Add(place); rowName.Add(nm); rowTime.Add(time); rowPrize.Add(prize); rowFace.Add(faceImg); rowBack.Add(backImg);
+        }
+        boardRt.gameObject.SetActive(false);
         canvasGo.SetActive(false);                       // PodiumShow raises it with its camera
 
         var so = new SerializedObject(show);
@@ -229,6 +337,23 @@ public static class PodiumSetup
             e.FindPropertyRelative("outRight").quaternionValue = g.outRight;
         }
         so.FindProperty("pop").objectReferenceValue = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Game/Audio/SFX/podium/popper.wav");
+        Fill(so.FindProperty("placeLights"), placeLights);
+        Fill(so.FindProperty("placeShow"), placeShow);
+        Fill(so.FindProperty("houseLights"), house.ToArray());
+        Fill(so.FindProperty("winnerShow"), winnerShow.ToArray());
+        Fill(so.FindProperty("movers"), movers.ToArray());
+        so.FindProperty("roll").objectReferenceValue = roll;
+        so.FindProperty("reveal").objectReferenceValue = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Game/Audio/SFX/podium/reveal.wav");
+        so.FindProperty("crash").objectReferenceValue = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Game/Audio/SFX/podium/crash.wav");
+        so.FindProperty("board").objectReferenceValue = boardGroup;
+        Fill(so.FindProperty("rows"), rowRts.ToArray());
+        Fill(so.FindProperty("rowPlace"), rowPlace.ToArray());
+        Fill(so.FindProperty("rowName"), rowName.ToArray());
+        Fill(so.FindProperty("rowTime"), rowTime.ToArray());
+        Fill(so.FindProperty("rowPrize"), rowPrize.ToArray());
+        Fill(so.FindProperty("rowFace"), rowFace.ToArray());
+        Fill(so.FindProperty("rowBack"), rowBack.ToArray());
+        Fill(so.FindProperty("faces"), Directory.GetFiles("Assets/_Game/Art/Textures/UI/Portraits", "*.png").Select(AssetDatabase.LoadAssetAtPath<Sprite>).Where(f => f != null).ToArray());
         so.ApplyModifiedPropertiesWithoutUndo();
 
         PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
@@ -640,6 +765,67 @@ public static class PodiumSetup
         return m;
     }
 
+    /// A metal that takes the stage's lights (the trophies' Polished paints its own and would shine in the dark).
+    static Material LitMetal(string name, Shader lit, Color c)
+    {
+        var m = Mat(name, lit);
+        m.SetColor("_BaseColor", c); m.SetFloat("_Metallic", 0.85f); m.SetFloat("_Smoothness", 0.72f);
+        return m;
+    }
+
+    /// A picture on a quad, unlit, its own alpha (the Kartel sign), a little past 1 so it blooms.
+    static Material Sign(string name, string texture)
+    {
+        var m = Mat(name, Shader.Find("Universal Render Pipeline/Particles/Unlit"));
+        m.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(texture)); m.SetColor("_BaseColor", new Color(1.35f, 1.35f, 1.35f, 1f));
+        m.SetFloat("_Surface", 1); m.SetFloat("_Blend", 0); m.SetFloat("_ZWrite", 0); m.SetFloat("_Cull", 0);
+        m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha); m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        m.renderQueue = 3000; m.SetOverrideTag("RenderType", "Transparent"); m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        return m;
+    }
+
+    /// A shaft of light (the lighthouse's beam shader), faded in a metre and a half from the camera instead of six.
+    static Material Beam(string name, Color c, float strength = 0.4f)
+    {
+        var m = Mat(name, Shader.Find("KartCup/Beam") ?? Shader.Find("Universal Render Pipeline/Unlit"));
+        m.SetColor("_Color", c); m.SetFloat("_Strength", strength); m.SetFloat("_Falloff", 0.55f); m.SetFloat("_Edge", 1.6f); m.SetFloat("_Near", 1.5f);
+        return m;
+    }
+
+    /// An open cone along +Z: `r0` at the lamp, widening at `halfAngle` over `length`.
+    static Mesh Cone(float r0, float length, float halfAngle, int segs = 24)
+    {
+        float r1 = r0 + length * Mathf.Tan(halfAngle * Mathf.Deg2Rad);
+        var v = new Vector3[segs * 2]; var nrm = new Vector3[segs * 2]; var uv = new Vector2[segs * 2]; var tris = new int[segs * 6];
+        for (int i = 0; i < segs; i++)
+        {
+            float a = Mathf.PI * 2f * i / segs; var radial = new Vector3(Mathf.Cos(a), Mathf.Sin(a), 0);
+            v[i] = radial * r0; v[segs + i] = radial * r1 + Vector3.forward * length;
+            nrm[i] = nrm[segs + i] = radial;
+            uv[i] = new Vector2(i / (float)segs, 0); uv[segs + i] = new Vector2(i / (float)segs, 1);
+            int j = (i + 1) % segs, t = i * 6;
+            tris[t] = i; tris[t + 1] = j; tris[t + 2] = segs + j; tris[t + 3] = i; tris[t + 4] = segs + j; tris[t + 5] = segs + i;
+        }
+        var mesh = new Mesh { vertices = v, normals = nrm, uv = uv, triangles = tris };
+        mesh.RecalculateBounds();
+        return mesh;
+    }
+
+    /// Camera-facing (-Z) quads of `size` at each point, one mesh: the sign's bulbs in one draw.
+    static Mesh Quads(List<Vector3> at, float size)
+    {
+        var v = new List<Vector3>(); var uv = new List<Vector2>(); var tris = new List<int>();
+        foreach (var p in at)
+        {
+            int k = v.Count; float h = size / 2f;
+            v.Add(p + new Vector3(-h, -h, 0)); v.Add(p + new Vector3(h, -h, 0)); v.Add(p + new Vector3(-h, h, 0)); v.Add(p + new Vector3(h, h, 0));
+            uv.Add(new Vector2(0, 0)); uv.Add(new Vector2(1, 0)); uv.Add(new Vector2(0, 1)); uv.Add(new Vector2(1, 1));
+            tris.AddRange(new[] { k, k + 2, k + 1, k + 1, k + 2, k + 3 });
+        }
+        var mesh = new Mesh(); mesh.SetVertices(v); mesh.SetUVs(0, uv); mesh.SetTriangles(tris, 0); mesh.RecalculateNormals(); mesh.RecalculateBounds();
+        return mesh;
+    }
+
     static Material Plain(string name, Shader lit, Color c, float smooth)
     {
         var m = Mat(name, lit);
@@ -704,15 +890,23 @@ public static class PodiumSetup
 
         var top = new[] { "Driver_Toly", "Driver_Mert", "Driver_Bitsy" }.Select((n, k) => new PodiumShow.Winner {
             driver = AssetDatabase.LoadAssetAtPath<GameObject>(Drivers + n + ".prefab"), name = n.Replace("Driver_", ""), prize = k == 0 ? "+0.351 SOL" : k == 1 ? "+0.189 SOL" : "" }).ToList();
-        show.Winners("TOLY WINS!", top);
-        foreach (var pose in Object.FindObjectsByType<PodiumPose>(FindObjectsSortMode.None)) pose.Apply(0.26f);   // top of a hop
+        var board = new List<PodiumShow.Row>
+        {
+            new() { name = "Toly", face = "Toly", time = "1:01.22", prize = "+10 PTS" }, new() { name = "Mert", face = "Mert", time = "1:01.80", prize = "+8 PTS" },
+            new() { name = "Bitsy", face = "Bitsy", time = "1:02.41", prize = "+6 PTS" }, new() { name = "Andrew", face = "Andrew", time = "1:03.05", prize = "+5 PTS", me = true },
+            new() { name = "Akshay", face = "Akshay", time = "1:04.90", prize = "+4 PTS" }, new() { name = "Pip", face = "Pip", time = "RACING", prize = "+3 PTS" },
+        };
+        RenderSettings.sun = sun;                        // so the ceremony puts it out, as it does a race scene's
+        float t0 = Time.unscaledTime;
+        show.Winners("TOLY WINS!", top, () => board);
         foreach (var smr in stage.scene.GetRootGameObjects().SelectMany(g => g.GetComponentsInChildren<SkinnedMeshRenderer>())) smr.updateWhenOffscreen = true;
-        Simulate(systems, 1.1f);
-        show.PoseCamera(1f); Canvas.ForceUpdateCanvases(); Shot(cam, "podium-winners");
-        show.PoseCamera(5f); Canvas.ForceUpdateCanvases(); Shot(cam, "podium-winners-close");
-        Simulate(systems, 3.2f);
-        foreach (var pose in Object.FindObjectsByType<PodiumPose>(FindObjectsSortMode.None)) pose.Apply(0.03f);   // landing
-        show.PoseCamera(3f); Canvas.ForceUpdateCanvases(); Shot(cam, "podium-winners-late");
+        // the ceremony's clock, a still at each beat: the dark and the roll, third's light, second's, the crash, after
+        foreach (var (at, shot) in new[] { (0.95f, "podium-dark"), (1.75f, "podium-third"), (2.75f, "podium-second"), (4.4f, "podium-winners"), (7.2f, "podium-winners-late") })
+        {
+            foreach (var pose in Object.FindObjectsByType<PodiumPose>(FindObjectsSortMode.None)) pose.Apply(t0 + at);
+            if (at >= PodiumShow.WinAt) { foreach (var p in show.GetComponentsInChildren<ParticleSystem>(true)) if (p.name == "Burst" || p.name == "Rain") p.Play(); Simulate(systems, 0.6f); }
+            show.PoseCamera(at); Canvas.ForceUpdateCanvases(); Shot(cam, shot);
+        }
 
         Preview.Batcher(true);
         Debug.Log("[podium] wrote Builds/podium-*.png");

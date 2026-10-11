@@ -99,6 +99,7 @@ public static class ContractTest
         if (done && finishedAt < 0) finishedAt = t;
         if (done && s != null && s.LastSubmit == null && t - finishedAt < 10) return;
         if (done && t - finishedAt < 9) return;
+        if (done && cardAt < 0 && t - finishedAt < 15) return;     // the ceremony runs ~9 s from 2.6 s after the line (PodiumShow.CeremonySeconds)
 
         EditorApplication.update -= Tick;
         Report(race, done, t);

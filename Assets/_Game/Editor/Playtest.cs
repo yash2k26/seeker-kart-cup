@@ -321,7 +321,8 @@ public static class Playtest
         lastAmmo = ammo;
         if (kart != null && kart.spinningOut && !wasSpinning && hits < 3) { hits++; moments.Add((t + 0.35, $"hit{track}-{hits}a")); moments.Add((t + 0.8, $"hit{track}-{hits}b")); }
         wasSpinning = kart != null && kart.spinningOut;
-        if (p.finished && !wasFinished) foreach (var d in new[] { 0.3, 1.0, 1.7, 2.4, 3.2, 10.0, 14.0 }) moments.Add((t + d, d < 5 ? $"finish{track}-{d:0.0}" : $"card{track}-{d:0}"));   // and the results card after the podium
+        // the finish, the ceremony's beats (it starts 2.6 s after the line: the dark, second's light, the winner) and the card after it
+        if (p.finished && !wasFinished) foreach (var d in new[] { 0.3, 1.0, 1.7, 2.4, 4.0, 5.2, 7.0, 15.0 }) moments.Add((t + d, d < 3 ? $"finish{track}-{d:0.0}" : d < 10 ? $"podium{track}-{d:0.0}" : $"card{track}-{d:0}"));
         wasFinished = p.finished;
         for (int i = moments.Count - 1; i >= 0; i--)
             if (t >= moments[i].at)

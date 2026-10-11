@@ -16,9 +16,13 @@ namespace KartCup
         bool raiseRight, raiseLeft;
         float pump;                                   // the winner's arms: 0 out beside the chin, 1 up in the V
 
-        public void Init(int place, PodiumShow.Rig r)
+        /// When this racer's light comes on (PodiumShow): until then they stand still in the dark, holding their trophy.
+        public float From { get; private set; } = float.NegativeInfinity;
+        public void Wake() => From = Mathf.Min(From, Time.unscaledTime);
+
+        public void Init(int place, PodiumShow.Rig r, float from = float.NegativeInfinity)
         {
-            rig = r; winner = place == 0;
+            rig = r; winner = place == 0; From = from;
             raiseRight = place != 2;                  // second holds it on its right, third on its left, the winner both
             raiseLeft = place != 1;
             home = transform.position;
@@ -36,6 +40,13 @@ namespace KartCup
         public void Apply(float time)
         {
             float t = time + phase;
+            if (time < From)
+            {
+                transform.position = home; transform.localRotation = BaseYaw();
+                if (armLeft != null) armLeft.localRotation = holdLeft;
+                if (armRight != null) armRight.localRotation = holdRight;
+                return;
+            }
             if (!winner)
             {
                 // A proud little sway and the trophy arm up, never a jump: the jumping is the winner's.

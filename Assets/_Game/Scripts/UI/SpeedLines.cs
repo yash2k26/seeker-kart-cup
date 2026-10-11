@@ -22,7 +22,8 @@ namespace KartCup
             if (player == null) { var p = RaceManager.Instance != null ? RaceManager.Instance.Player : null; if (p != null) player = p.GetComponent<Kart>(); }
             // any boost start (drift release, pad, nitro, turbo: CameraFeel's window) or boost still being spent
             bool boosting = (CameraFeel.Instance != null && CameraFeel.Instance.Boosting) || (player != null && player.boostReserve > 0f);
-            bool on = player != null && boosting && player.velMag > 8f && Time.timeScale > 0f;
+            bool on = player != null && boosting && player.velMag > 8f && Time.timeScale > 0f
+                      && !(PodiumShow.Instance != null && PodiumShow.Instance.Active);   // never over the ceremony (the kart cruises on under it)
             alpha = Mathf.MoveTowards(alpha, on ? strength : 0f, Time.unscaledDeltaTime * (on ? 4f : 1.6f));
             SetAlpha(alpha);
             if (alpha <= 0.001f || Time.unscaledTime < nextJitter) return;

@@ -120,7 +120,12 @@ namespace KartCup
         /// The race clock now. Online that is this frame's room clock, not the value Update left last frame: a gate or
         /// the line is crossed in the physics steps that run before Update, and the finish-moment state the room's
         /// referee times the crossing by carries this frame's clock.
-        public float Now => goAt > 0 && state != State.Idle && state != State.Countdown ? (float)(Time.unscaledTimeAsDouble - goAt) : raceTime;
+        /// Solo, the HUD's clock (raceTime) stops when the player crosses the line, but the field is still racing: their
+        /// times run on from it. (Every kart over the line after the player got the player's own time, and the ceremony's
+        /// leaderboard put them in any order: 11 Oct 2026.)
+        public float Now => goAt > 0 && state != State.Idle && state != State.Countdown ? (float)(Time.unscaledTimeAsDouble - goAt)
+                          : state == State.Finished && playerDoneAt >= 0 ? raceTime + (float)(Time.timeAsDouble - playerDoneAt) : raceTime;
+        double playerDoneAt = -1;
 
         public void Finish(KartProgress p)
         {
@@ -140,7 +145,7 @@ namespace KartCup
                 if (RoomClient.InRaceRoom) Achievements.Add(Achievements.Stat.Races);
                 else if (!Weekly.Racing) Achievements.Race(place, Cup.TrackId, playerWasLast);
             }
-            if (p.isPlayer) state = State.Finished;
+            if (p.isPlayer) { state = State.Finished; playerDoneAt = Time.timeAsDouble; }
             onFinish.Invoke(p);
         }
 

@@ -43,6 +43,25 @@ namespace KartCup
         }
         [SerializeField] Rig[] rigs = new Rig[0];
         [SerializeField] float[] trophyScale = { 1f, 0.8f, 0.68f };
+        // ---- the winners' ceremony, lights down (11 Oct 2026, the user: "make a drum roll, lights off ... the platform should
+        // be better ... we can also have a leaderboard"). The stage starts dark under a drum roll while the leaderboard fills
+        // from the back of the field; a spotlight slams on over third, then over second; on the roll's last stroke the crash:
+        // the winner's light, every stage light up, the moving heads sweeping, the poppers and the winner's name.
+        [SerializeField] Light[] placeLights = new Light[3];          // the spot over each block, winner first
+        [SerializeField] GameObject[] placeShow = new GameObject[3];  // what comes on with it: its beam, the pool, the block's strips
+        [SerializeField] Light[] houseLights = new Light[0];          // the key lights and the rim, up with the winner
+        [SerializeField] GameObject[] winnerShow = new GameObject[0]; // the backdrop's sign and bulbs, the rings, the glitter, the heads
+        [SerializeField] Transform[] movers = new Transform[0];       // the moving heads on the towers
+        [SerializeField] AudioSource roll;                            // the drum roll on its own source, so a skip can cut it
+        [SerializeField] AudioClip reveal, crash;
+        [SerializeField] CanvasGroup board;                           // the leaderboard, left of the podium
+        [SerializeField] RectTransform[] rows = new RectTransform[0];
+        [SerializeField] TMP_Text[] rowPlace = new TMP_Text[0], rowName = new TMP_Text[0], rowTime = new TMP_Text[0], rowPrize = new TMP_Text[0];
+        [SerializeField] UnityEngine.UI.Image[] rowFace = new UnityEngine.UI.Image[0], rowBack = new UnityEngine.UI.Image[0];
+        [SerializeField] Sprite[] faces = new Sprite[0];              // the drivers' portraits, by name
+        public const float Reveal3 = 1.5f, Reveal2 = 2.45f, WinAt = 3.6f;   // the drum roll's last stroke is WinAt
+        /// A leaderboard line, in finishing order: who, the face to show (a driver's name), the time, what the place pays.
+        public struct Row { public string name, face, time, prize; public bool me; }
         // The racers stand taller on the podium than in their karts, and the trophies are made to be seen from a phone.
         [SerializeField] float driverScale = 1.7f, trophySize = 2.1f;
         const float TrophyHeight = 0.62f;                 // plinth and cup at scale 1 (PodiumSetup.CupMesh)
@@ -51,7 +70,7 @@ namespace KartCup
         public const float PrizeSeconds = 4.5f;       // the pre-race shot on the stage (online it runs until 3-2-1)
         /// How long the pre-race shot wants: the drone's lap and a beat behind the grid, or the stage's reveal.
         public float IntroSeconds => flying ? flySeconds + 0.7f : PrizeSeconds;
-        public const float CeremonySeconds = 5f;      // the podium before the results card comes up
+        public const float CeremonySeconds = 9f;      // the podium before the results card comes up: the reveal, then a few seconds of it
 
         Camera raceCam;
         // the drone's lap: the race camera taken off its rig, and the stage put away meanwhile
@@ -71,6 +90,12 @@ namespace KartCup
         Vector3 focus;
 
         public struct Winner { public GameObject driver; public string name; public string prize; }
+        readonly bool[] present = new bool[3];
+        System.Func<IList<Row>> boardRows;
+        IList<Row> shownRows;
+        float nextRows;
+        int cue;
+        float[] placeBase, houseBase, rowX;
 
         // the big line, when it is an amount ("0.54 SOL"): counted up from nothing
         float amount; string amountUnit, amountFormat, bigText;
@@ -91,11 +116,13 @@ namespace KartCup
         }
 
         void Awake() { Instance = this; if (cam != null) cam.enabled = false; Init(); }
+        Color gold = new(1f, 0.78f, 0.23f);
 
         /// Where each trophy rests on its block, remembered before any racer picks one up. (Lazy, so an edit-mode
         /// preview, where Awake never runs, gets it too.)
         void Init()
         {
+            if (subtitle != null && subtitle.color.a > 0f && subtitle.color != Color.white) gold = subtitle.color;
             if (trophyHome != null) return;
             trophyHome = new Vector3[trophies.Length];
             trophyParent = new Transform[trophies.Length];
@@ -114,6 +141,8 @@ namespace KartCup
             flying = FlightPath();
             Begin();
             winnersShot = false;
+            boardRows = null; shownRows = null;
+            if (board != null) board.gameObject.SetActive(false);
             ClearDrivers();
             for (int i = 0; i < trophies.Length; i++) ResetTrophy(i);
             if (title != null) title.text = heading;
@@ -134,7 +163,7 @@ namespace KartCup
 
         /// After the race: the top three, winner first, on the podium with their trophies. Fewer than three racers
         /// leaves the empty places' trophies on their blocks.
-        public void Winners(string heading, IList<Winner> top)
+        public void Winners(string heading, IList<Winner> top, System.Func<IList<Row>> board = null)
         {
             Init();
             Land();
@@ -143,12 +172,19 @@ namespace KartCup
             ClearDrivers();
             if (title != null) title.text = "RACE OVER";
             Big(heading);
+            amountUnit = null;                               // the winner's name is said, never counted up
             cardsFrom = 0.8f;
+            cue = 0;
+            boardRows = board; shownRows = null; nextRows = 0f;
+            LightsDown();
+            if (roll != null) { roll.Stop(); roll.Play(); }
+            AudioDirector.Instance?.Duck(WinAt + 0.6f);
             for (int i = 0; i < spots.Length && i < trophies.Length; i++)
             {
                 ResetTrophy(i);
                 bool there = top != null && i < top.Count && top[i].driver != null;
-                Card(i, there ? top[i].name.ToUpperInvariant() : "", there ? top[i].prize : "");
+                present[i] = there;
+                Card(i, "", "");                             // the leaderboard says who and what, not the cards
                 if (!there) continue;
                 var d = Instantiate(top[i].driver, spots[i].position, spots[i].rotation);
                 d.name = "Podium_" + top[i].name;
@@ -157,7 +193,7 @@ namespace KartCup
                 var rig = RigFor(top[i].driver.name);
                 var torso = Stand(d, rig.hold);
                 var holder = d.AddComponent<PodiumPose>();
-                holder.Init(i, rig);
+                holder.Init(i, rig, Time.unscaledTime + RevealAt(i));   // still in the dark until their light comes on
                 if (torso != null && trophies[i] != null)
                 {
                     var t = trophies[i];
@@ -171,8 +207,22 @@ namespace KartCup
                 }
             }
             focus = spots.Length > 0 && spots[0] != null ? spots[0].position + Vector3.up * 1.4f : transform.position;
-            Pop();
-            if (rain != null) { rain.Clear(); rain.Play(); }
+            if (rain != null) rain.Clear();
+            RefreshBoard();
+            PoseStage(0f);
+        }
+
+        /// When place `i` (0 the winner) is called.
+        static float RevealAt(int i) => i == 0 ? WinAt : i == 1 ? Reveal2 : Reveal3;
+
+        /// A tap during the drum roll jumps to the winner; after it, the caller moves on. True if it jumped.
+        public bool SkipToWinner()
+        {
+            if (!Active || !winnersShot || Time.unscaledTime - shotAt >= WinAt - 0.05f) return false;
+            shotAt = Time.unscaledTime - WinAt;
+            cue = 2;                                         // straight to the crash: no stage-light hits stacked on it
+            foreach (var p in FindObjectsByType<PodiumPose>(FindObjectsSortMode.None)) p.Wake();
+            return true;
         }
 
         /// Any tap on the screen (skips a shot).
@@ -194,16 +244,149 @@ namespace KartCup
             foreach (var go in hiddenHud) if (go != null) go.SetActive(true);
             hiddenHud.Clear();
             if (rain != null) rain.Stop();
+            if (roll != null) roll.Stop();
+            LightsBack();
         }
 
         // ---------- camera ----------
 
-        void LateUpdate() { if (Active) PoseCamera(Time.unscaledTime - shotAt); }
+        void LateUpdate()
+        {
+            if (!Active) return;
+            float t = Time.unscaledTime - shotAt;
+            Cues(t);
+            if (boardRows != null && Time.unscaledTime >= nextRows) RefreshBoard();
+            PoseCamera(t);
+        }
+
+        /// The ceremony's sounds and bursts, each once, on the shot's clock.
+        void Cues(float t)
+        {
+            if (!winnersShot) return;
+            if (cue < 1 && t >= Reveal3) { cue = 1; if (present[2]) Hit(); }
+            if (cue < 2 && t >= Reveal2) { cue = 2; if (present[1]) Hit(); }
+            if (cue < 3 && t >= WinAt)
+            {
+                cue = 3;
+                if (roll != null) roll.Stop();
+                if (crash != null) AudioDirector.Instance?.Play(crash, 1f);
+                Pop();
+                if (rain != null) { rain.Clear(); rain.Play(); }
+            }
+        }
+
+        void Hit()
+        {
+            if (reveal != null) AudioDirector.Instance?.Play(reveal, 0.9f, Random.Range(0.97f, 1.03f));
+            Haptics.Play(Haptics.Kind.Tick);
+        }
+
+        // ---------- the lights ----------
+
+        /// A light slamming on: nothing before `s` = 0, then on, a stutter, and on for good.
+        static float Slam(float s) => s < 0f ? 0f : s < 0.06f ? 1f : s < 0.11f ? 0.12f : 1f;
+
+        /// Every stage light at `t` into the shot. The pre-race shot is lit all through.
+        void PoseStage(float t)
+        {
+            placeBase ??= System.Array.ConvertAll(placeLights, l => l != null ? l.intensity : 0f);
+            houseBase ??= System.Array.ConvertAll(houseLights, l => l != null ? l.intensity : 0f);
+            for (int i = 0; i < placeLights.Length; i++)
+            {
+                float on = !winnersShot ? 1f : present[i] ? Slam(t - RevealAt(i)) : 0f;
+                if (placeLights[i] != null) placeLights[i].intensity = placeBase[i] * on;
+                if (i < placeShow.Length && placeShow[i] != null) placeShow[i].SetActive(on > 0.5f);
+            }
+            float house = !winnersShot ? 1f : Mathf.Clamp01((t - WinAt) / 0.35f);
+            for (int i = 0; i < houseLights.Length; i++) if (houseLights[i] != null) houseLights[i].intensity = houseBase[i] * house;
+            foreach (var go in winnerShow) if (go != null) go.SetActive(house > 0f);
+            for (int k = 0; k < movers.Length; k++)          // the heads sweep the stage and the roof
+                if (movers[k] != null) movers[k].localRotation = Quaternion.Euler(28f + Mathf.Sin(t * 1.3f + k * 2.1f) * 22f, (k == 0 ? 25f : -25f) + Mathf.Sin(t * 0.9f + k) * 40f, 0f);
+            if (dimmed)
+            {
+                // the house in the dark: barely there, then the stage's own violet once the winner's light is on
+                float lit = Mathf.Max(house, 0.18f * (Slam(t - Reveal3) + Slam(t - Reveal2)) * 0.5f);
+                RenderSettings.ambientSkyColor = Color.Lerp(new Color(0.03f, 0.03f, 0.06f), new Color(0.32f, 0.28f, 0.48f), lit);
+                RenderSettings.ambientEquatorColor = Color.Lerp(new Color(0.02f, 0.02f, 0.04f), new Color(0.24f, 0.20f, 0.34f), lit);
+                RenderSettings.ambientGroundColor = Color.Lerp(Color.black, new Color(0.10f, 0.08f, 0.12f), lit);
+            }
+        }
+
+        // the race scene's own light, put away while the stage plays and given back after
+        bool dimmed; UnityEngine.Rendering.AmbientMode ambMode; Color ambSky, ambEq, ambGround; float reflections; bool fogOn; Light sun; bool sunOn;
+        void LightsDown()
+        {
+            if (dimmed) return;
+            dimmed = true;
+            ambMode = RenderSettings.ambientMode; ambSky = RenderSettings.ambientSkyColor; ambEq = RenderSettings.ambientEquatorColor; ambGround = RenderSettings.ambientGroundColor;
+            reflections = RenderSettings.reflectionIntensity; fogOn = RenderSettings.fog;
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+            RenderSettings.reflectionIntensity = 0.15f; RenderSettings.fog = false;
+            sun = RenderSettings.sun; sunOn = sun != null && sun.enabled;
+            if (sun != null) sun.enabled = false;
+        }
+        void LightsBack()
+        {
+            if (!dimmed) return;
+            dimmed = false;
+            RenderSettings.ambientMode = ambMode; RenderSettings.ambientSkyColor = ambSky; RenderSettings.ambientEquatorColor = ambEq; RenderSettings.ambientGroundColor = ambGround;
+            RenderSettings.reflectionIntensity = reflections; RenderSettings.fog = fogOn;
+            if (sun != null) sun.enabled = sunOn;
+        }
+
+        // ---------- the leaderboard ----------
+
+        /// The finishing order as it stands: the field below is still racing, so the times fill in as they cross the line.
+        void RefreshBoard()
+        {
+            nextRows = Time.unscaledTime + 0.5f;
+            shownRows = boardRows?.Invoke();
+            if (board != null) board.gameObject.SetActive(winnersShot && shownRows != null && shownRows.Count > 0);
+            if (shownRows == null) return;
+            string[] ord = { "1ST", "2ND", "3RD" };
+            for (int i = 0; i < rows.Length; i++)
+            {
+                bool on = i < shownRows.Count;
+                if (rows[i] != null) rows[i].gameObject.SetActive(on);
+                if (!on) continue;
+                var r = shownRows[i];
+                if (i < rowPlace.Length && rowPlace[i] != null) rowPlace[i].text = i < 3 ? ord[i] : (i + 1) + "TH";
+                if (i < rowName.Length && rowName[i] != null) rowName[i].text = (r.name ?? "").ToUpperInvariant();
+                if (i < rowTime.Length && rowTime[i] != null) rowTime[i].text = r.time ?? "";
+                if (i < rowPrize.Length && rowPrize[i] != null) rowPrize[i].text = r.prize ?? "";
+                if (i < rowFace.Length && rowFace[i] != null)
+                {
+                    Sprite face = null; foreach (var f in faces) if (f != null && f.name == r.face) face = f;
+                    rowFace[i].sprite = face; rowFace[i].enabled = face != null;
+                }
+                if (i < rowBack.Length && rowBack[i] != null) rowBack[i].color = r.me ? new Color(0.26f, 0.16f, 0.52f, 0.96f) : new Color(0.06f, 0.05f, 0.14f, 0.86f);
+            }
+        }
+
+        /// Each line slides in when its place is called: the back of the field during the roll, then third, second, first.
+        void PoseBoard(float t)
+        {
+            if (board == null || shownRows == null) return;
+            rowX ??= System.Array.ConvertAll(rows, r => r != null ? r.anchoredPosition.x : 0f);   // where each line rests
+            int n = shownRows.Count;
+            for (int i = 0; i < rows.Length && i < n; i++)
+            {
+                if (rows[i] == null) continue;
+                float at = i < 3 ? RevealAt(i) : Mathf.Min(0.35f + (n - 1 - i) * 0.28f, Reveal3 - 0.2f);
+                float k = Ease(Mathf.Clamp01((t - at) / 0.3f));
+                var cg = rows[i].GetComponent<CanvasGroup>();
+                if (cg != null) cg.alpha = k;
+                var p = rows[i].anchoredPosition; rows[i].anchoredPosition = new Vector2(rowX[i] - 80f * (1f - k), p.y);
+                rows[i].localScale = Vector3.one * (i == 0 && t >= WinAt ? Mathf.Max(1f, Pop(t, WinAt, 0.4f)) : 1f);
+            }
+        }
 
         /// The camera `t` seconds into the current shot.
         public void PoseCamera(float t)
         {
             PoseOverlay(t);
+            PoseStage(t);
+            PoseBoard(t);
             if (flying) { Fly(t); return; }
             if (cam == null) return;
             var stage = transform;
@@ -222,14 +405,16 @@ namespace KartCup
             }
             else
             {
-                // Low and wide on the podium, easing in on the winner, drifting a little from side to side.
-                float k = Ease(Mathf.Clamp01(t / 4.5f));
-                float orbit = Mathf.Sin(t * 0.35f) * 9f;
+                // In the dark: wide and low, creeping in on the podium while the roll builds. On the crash a push in on the
+                // winner, then a slow drift from side to side. The leaderboard owns the left: the podium sits right of it.
+                aside = stage.right * -3.6f;
+                float creep = Mathf.Clamp01(t / WinAt), push = Ease(Mathf.Clamp01((t - WinAt) / 0.7f));
+                float orbit = Mathf.Sin(Mathf.Max(0f, t - WinAt) * 0.35f) * 9f;
                 var dir = Quaternion.AngleAxis(orbit, Vector3.up) * -stage.forward;
-                var pos = stage.position + dir * Mathf.Lerp(11.5f, 8.2f, k) + Vector3.up * Mathf.Lerp(1.8f, 2.6f, k);
-                pos += aside;
+                float dist = Mathf.Lerp(Mathf.Lerp(14f, 12.5f, creep), 10.2f, push);
+                var pos = stage.position + dir * dist + Vector3.up * Mathf.Lerp(2.2f, 3.1f, push) + aside;
                 cam.transform.position = pos;
-                cam.transform.rotation = Quaternion.LookRotation(Vector3.Lerp(stage.position + Vector3.up * 2.9f, focus, k * 0.5f) + aside - pos, Vector3.up);
+                cam.transform.rotation = Quaternion.LookRotation(Vector3.Lerp(stage.position + Vector3.up * 2.8f, focus + Vector3.up * 0.8f, push * 0.5f) + aside - pos, Vector3.up);
             }
         }
 
@@ -353,7 +538,15 @@ namespace KartCup
             if (overlay == null) return;
             overlay.alpha = Mathf.Clamp01(t / 0.25f);
             if (title != null) title.rectTransform.anchoredPosition = new Vector2(Mathf.Lerp(40f, 120f, Ease(Mathf.Clamp01(t / 0.4f))), title.rectTransform.anchoredPosition.y);
-            if (subtitle != null)
+            if (subtitle != null && winnersShot)
+            {
+                // "AND THE WINNER IS..." in white, a dot a beat, under the roll; then the name in gold, popping in on the crash
+                bool called = t >= WinAt;
+                subtitle.text = called ? bigText : "AND THE WINNER IS" + new string('.', Mathf.Clamp(Mathf.FloorToInt(t / 0.8f), 0, 3));
+                subtitle.color = called ? gold : Color.white;
+                subtitle.rectTransform.localScale = Vector3.one * Mathf.Max(0.001f, called ? Pop(t, WinAt, 0.45f) : Pop(t, 0.15f, 0.4f) * 0.62f);
+            }
+            else if (subtitle != null)
             {
                 subtitle.rectTransform.localScale = Vector3.one * Mathf.Max(0.001f, Pop(t, 0.15f, 0.5f));
                 // the pot counts up as the camera pulls back
