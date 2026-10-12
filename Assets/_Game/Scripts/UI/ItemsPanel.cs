@@ -15,13 +15,75 @@ namespace KartCup
         [SerializeField] TMP_Text blurbLabel, loadoutLabel, primaryLabel, secondaryLabel, tertiaryLabel;
         [SerializeField] Button primaryButton, secondaryButton, tertiaryButton;   // tertiary: PAY in ORE, the right half of the SOL row
         [SerializeField] Color rowIdle = new(0.13f, 0.17f, 0.22f), rowFocus = new(0.2f, 0.26f, 0.33f);
+        // the stage (13 Oct 2026, the user: "why not showing rockets, bombs and etc"): the karts tab turns its kart on the
+        // turntable and this tab left it bare. The focused pack's own race model turns there now, one per pack in
+        // Inventory.Packs order; nitro has no model in the race, so it is a bottle, painted blue.
+        [SerializeField] Transform podium;
+        [SerializeField] GameObject[] models = System.Array.Empty<GameObject>();
+        [SerializeField] Material nitroMaterial;
+        [SerializeField] float baseYaw = 65f, spin = 24f, size = 2.4f, hover = 0.9f;
+        GameObject shown; int shownIndex = -1; float shownY;
 
         int focus;
         bool busy;
         string message;
 
-        void OnEnable() { message = null; WalletFlow.ProfileChanged += OnProfile; Show(); _ = LoadPrices(); }
-        void OnDisable() { WalletFlow.ProfileChanged -= OnProfile; }
+        void OnEnable() { message = null; shownIndex = -1; WalletFlow.ProfileChanged += OnProfile; Show(); _ = LoadPrices(); }
+        void OnDisable()
+        {
+            WalletFlow.ProfileChanged -= OnProfile;
+            if (shown != null) Destroy(shown);
+            shown = null; shownIndex = -1;
+            var backdrop = FindFirstObjectByType<MenuBackdrop>(); if (backdrop != null) backdrop.Fit = 1f;
+        }
+
+        void Update()
+        {
+            if (podium != null && shown != null) podium.localRotation = Quaternion.Euler(0, baseYaw + Time.time * spin, 0);
+            if (shown != null) shown.transform.localPosition = new Vector3(shown.transform.localPosition.x, shownY + Mathf.Sin(Time.time * 2f) * 0.08f, shown.transform.localPosition.z);
+        }
+
+        /// The pack's race model on the turntable: a copy with only what draws (no scripts, bodies or colliders: a rocket
+        /// must not fly off, a bomb must not go off), scaled to fill the stage and hovering over it.
+        void Stage(int i)
+        {
+            if (i == shownIndex || podium == null || !Application.isPlaying) return;
+            shownIndex = i;
+            if (shown != null) Destroy(shown);
+            shown = null;
+            var prefab = i < models.Length ? models[i] : null;
+            if (prefab == null) return;
+            var holder = new GameObject("ItemOnStage");
+            holder.SetActive(false);                                  // nothing in the copy wakes up before it is stripped
+            holder.transform.SetParent(podium, false);
+            var copy = Instantiate(prefab, holder.transform);
+            copy.transform.localPosition = Vector3.zero; copy.transform.localRotation = Quaternion.Euler(0f, 0f, i == 0 || i == 1 ? 35f : 0f);   // rockets tilted up, ready to go
+            for (int pass = 0; pass < 3; pass++)                      // components another one requires go on a later pass
+                foreach (var c in copy.GetComponentsInChildren<Component>(true))
+                    if (c is MonoBehaviour || c is Rigidbody || c is Collider || c is AudioSource || c is Joint) DestroyImmediate(c);
+            if (Inventory.Packs[i].id == "nitro" && nitroMaterial != null)
+            {
+                var block = new MaterialPropertyBlock(); block.SetColor("_BaseColor", new Color(0.25f, 0.75f, 1.6f));
+                foreach (var r in copy.GetComponentsInChildren<MeshRenderer>(true)) { r.sharedMaterial = nitroMaterial; r.SetPropertyBlock(block); }
+            }
+            holder.SetActive(true);
+            var b = new Bounds(); bool any = false;
+            foreach (var r in copy.GetComponentsInChildren<Renderer>())
+                if (r is MeshRenderer || r is SkinnedMeshRenderer) { if (any) b.Encapsulate(r.bounds); else { b = r.bounds; any = true; } }
+            if (any)
+            {
+                float k = size / Mathf.Max(0.01f, Mathf.Max(b.size.x, b.size.y, b.size.z));
+                holder.transform.localScale = Vector3.one * k;
+                var centre = podium.InverseTransformPoint(b.center);       // centred on the turntable, its foot over the deck
+                var foot = podium.InverseTransformPoint(new Vector3(b.center.x, b.min.y, b.center.z));
+                shownY = hover - foot.y * k + (podium.InverseTransformPoint(holder.transform.position).y);
+                holder.transform.localPosition = new Vector3(-centre.x * k, shownY, -centre.z * k);
+            }
+            shown = holder;
+            var backdrop = FindFirstObjectByType<MenuBackdrop>();
+            if (backdrop != null) { backdrop.Spot = null; backdrop.Fit = 0.85f; }   // the camera on the turntable, as the karts tab frames it
+            PrimeTween.Tween.Scale(holder.transform, holder.transform.localScale * 0.6f, holder.transform.localScale, 0.28f, PrimeTween.Ease.OutBack);
+        }
         void OnProfile(KartApi.Profile _) { if (isActiveAndEnabled) Show(); }
 
         /// The first open waits on the Worker's quote; redraw when it lands.
@@ -86,6 +148,7 @@ namespace KartCup
                 var img = rows[i] != null ? rows[i].GetComponent<Image>() : null;
                 if (img != null) img.color = i == focus ? rowFocus : rowIdle;
             }
+            Stage(Mathf.Clamp(focus, 0, packs.Length - 1));
             var f = packs[Mathf.Clamp(focus, 0, packs.Length - 1)];
             var fi = KartApi.Cfg?.Item(f.sku);
             if (blurbLabel != null)

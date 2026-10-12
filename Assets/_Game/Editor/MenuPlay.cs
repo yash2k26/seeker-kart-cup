@@ -53,9 +53,16 @@ public static class MenuPlay
         (double at, System.Action act)[] steps =
         {
             // the purchase sheet's stamp coming down (a gem buy: no wallet), frame by frame, on the menu before the tour starts
-            (2.0, () => PurchaseSheet.Bought("Hatchback Sports", "kart:hatchback-sports", "0.05 SOL", "Yours to race, on every phone you sign in to.")),
-            (2.15, () => Shot("buy-0", ui: true)), (2.4, () => Shot("buy-1", ui: true)), (2.52, () => Shot("buy-2", ui: true)), (3.1, () => Shot("buy-3", ui: true)),
-            (3.3, () => PurchaseSheet.Instance?.Close()),
+            (1.2, () => PurchaseSheet.Bought("Hatchback Sports", "kart:hatchback-sports", "0.05 SOL", "Yours to race, on every phone you sign in to.")),
+            (1.35, () => Shot("buy-0", ui: true)), (1.6, () => Shot("buy-1", ui: true)), (1.72, () => Shot("buy-2", ui: true)), (2.3, () => Shot("buy-3", ui: true)),
+            (2.5, () => PurchaseSheet.Instance?.Close()),
+            (3.0, () => Object.FindFirstObjectByType<ScreenFlow>().ShowItems()), (3.7, () => Shot("items", ui: true)),
+            (3.75, () => Object.FindFirstObjectByType<ItemsPanel>().Focus(2)), (4.1, () => Shot("items-bomb", ui: true)),
+            (4.15, () => Object.FindFirstObjectByType<ItemsPanel>().Focus(3)), (4.5, () => Shot("items-nitro", ui: true)),
+            (4.55, () => Object.FindFirstObjectByType<ItemsPanel>().Focus(4)), (4.85, () => Shot("items-bouncer", ui: true)),
+            (4.9, () => Object.FindFirstObjectByType<ItemsPanel>().Focus(5)), (4.93, () => Shot("items-sunbomb", ui: true)),
+            (4.94, () => Object.FindFirstObjectByType<ItemsPanel>().Focus(0)), (4.98, () => Shot("items-rocket", ui: true)),
+            (4.99, () => Object.FindFirstObjectByType<ScreenFlow>().ShowTitle()),
             (5, () => Report("title-a")), (9, () => Report("title-b")), (14, () => Report("title-c")),
             (14.2, () => flow.ShowTitle()), (15.4, () => Shot("hub", ui: true)),                                         // the front door, then the hub: your pair on the stage
             (15.5, () => flow.ChooseSeries()), (16.0, () => Shot("drive-a", ui: true)), (16.5, () => Shot("drive-b", ui: true)), (17.0, () => Shot("drive-c", ui: true)),

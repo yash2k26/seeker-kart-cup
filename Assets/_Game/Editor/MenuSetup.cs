@@ -59,7 +59,7 @@ public static partial class MenuSetup
         var rooms = RoomsScreen(safe);
         var lobby = LobbyScreen(safe);
         var garage = GarageScreen(safe, podium, carousel);
-        var items = ItemsScreen(safe);
+        var items = ItemsScreen(safe, podium);
         var weeklyScreen = WeeklyScreen(safe);
         var tourScreen = TourScreen(safe);
         var achievementsScreen = AchievementsScreen(safe);
@@ -1302,7 +1302,7 @@ public static partial class MenuSetup
     }
 
     /// The shop's items tab: five packs of race consumables, how many of each you hold, and the one you start with.
-    static GameObject ItemsScreen(RectTransform parent)
+    static GameObject ItemsScreen(RectTransform parent, Transform podium)
     {
         var screen = Rect("Items", parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject;
         var panel = screen.AddComponent<ItemsPanel>();
@@ -1358,6 +1358,16 @@ public static partial class MenuSetup
         so.FindProperty("tertiaryButton").objectReferenceValue = tertiary;
         so.FindProperty("rowIdle").colorValue = Design.Ink700;
         so.FindProperty("rowFocus").colorValue = Design.Ink600;
+        so.FindProperty("podium").objectReferenceValue = podium;
+        // one model per pack, in Inventory.Packs order (rocket, homing, bomb, nitro, bouncer, sun bomb)
+        var modelPaths = new System.Collections.Generic.Dictionary<string, string>
+        {
+            ["rocket"] = "Assets/_Game/Prefabs/Items/Rocket.prefab", ["homing"] = "Assets/_Game/Prefabs/Items/Homing.prefab",
+            ["bomb"] = "Assets/_Game/Prefabs/Items/Bomb.prefab", ["nitro"] = "Assets/_Game/Art/Models/Props/Survival/bottle-large.fbx",
+            ["bouncer"] = "Assets/ThirdParty/PowerslideKartPhysics/Prefabs/Items/BounceItem.prefab", ["sunbomb"] = "Assets/_Game/Prefabs/Items/SunBomb.prefab",
+        };
+        Fill(so.FindProperty("models"), packs.Select(p => (Object)(modelPaths.TryGetValue(p.id, out var path) ? AssetDatabase.LoadAssetAtPath<GameObject>(path) : null)).ToArray());
+        so.FindProperty("nitroMaterial").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Game/Art/Materials/Survival.mat");
         so.ApplyModifiedPropertiesWithoutUndo();
         return screen;
     }
