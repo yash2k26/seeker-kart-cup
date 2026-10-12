@@ -317,16 +317,24 @@ namespace KartCup
             return true;
         }
 
+        /// Whether the wallet holds `amount` of a token. Reads its own token account's balance, a plain account read: the
+        /// owner-wide token search this used is an indexed call the Worker's free RPC refuses, and waiting on that refusal
+        /// took 20 s of a payment's blockhash life (13 Oct 2026). Unread in 5 s is not "not enough": the wallet judges.
         async Awaitable<bool> HasToken(string mint, ulong amount)
         {
             try
             {
-                var accs = await Web3.Rpc.GetTokenAccountsByOwnerAsync(Web3.Wallet.Account.PublicKey.Key, mint, null, Commitment.Confirmed);
-                if (accs == null || !accs.WasSuccessful) { Debug.LogWarning("[wallet] token balance: " + accs?.Reason); return true; }   // unread is not "not enough"
-                ulong total = 0;
-                if (accs.Result?.Value != null)
-                    foreach (var a in accs.Result.Value) total += a.Account?.Data?.Parsed?.Info?.TokenAmount?.AmountUlong ?? 0;
-                return total >= amount;
+                var ata = AssociatedTokenAccountProgram.DeriveAssociatedTokenAccount(Web3.Wallet.Account.PublicKey, new PublicKey(mint));
+                var read = Web3.Rpc.GetTokenAccountBalanceAsync(ata, Commitment.Confirmed);
+                if (await System.Threading.Tasks.Task.WhenAny(read, System.Threading.Tasks.Task.Delay(5000)) != read) { Debug.LogWarning("[wallet] token balance: no answer in 5 s"); return true; }
+                var bal = read.Result;
+                if (bal == null || !bal.WasSuccessful)
+                {
+                    // no such account: none of this token at all
+                    if (bal?.Reason != null && bal.Reason.IndexOf("could not find account", StringComparison.OrdinalIgnoreCase) >= 0) return false;
+                    Debug.LogWarning("[wallet] token balance: " + bal?.Reason); return true;
+                }
+                return (bal.Result?.Value?.AmountUlong ?? 0) >= amount;
             }
             catch (Exception e) { Debug.LogWarning("[wallet] token balance: " + e.Message); return true; }   // let the wallet be the judge
         }

@@ -447,14 +447,33 @@ namespace Solana.Unity.SDK
             if (transactions.Any(t => t.Signatures != null && t.Signatures.Any(p => p.Signature != null && p.Signature.Any(b => b != 0)))) return;
             // A plain HTTP call: the SDK's RPC client goes through Unity's main thread, which Android pauses while the
             // wallet is in front, so awaiting it here hung the session until the player came back (build 170).
+            const string request = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getLatestBlockhash\",\"params\":[{\"commitment\":\"confirmed\"}]}";
             try
             {
-                using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(6) };
-                var body = new System.Net.Http.StringContent(
-                    "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getLatestBlockhash\",\"params\":[{\"commitment\":\"confirmed\"}]}",
-                    System.Text.Encoding.UTF8, "application/json");
-                var reply = await http.PostAsync(ActiveRpcClient.NodeAddress, body).ConfigureAwait(false);
-                var json = JObject.Parse(await reply.Content.ReadAsStringAsync().ConfigureAwait(false));
+                string text = null;
+#if UNITY_ANDROID && !UNITY_EDITOR
+                // Android's own HTTP stack first (MwaHttp.java): Mono's HttpClient failed here on the phone, 13 Oct 2026.
+                // This runs off Unity's main thread (paused while the wallet is in front), so the thread is attached to the JVM.
+                try
+                {
+                    var url = ActiveRpcClient.NodeAddress.ToString();
+                    text = await Task.Run(() =>
+                    {
+                        AndroidJNI.AttachCurrentThread();
+                        using var http = new AndroidJavaClass("com.solana.unity.mwa.MwaHttp");
+                        return http.CallStatic<string>("post", url, request, 6000);
+                    }).ConfigureAwait(false);
+                }
+                catch (Exception e) { Debug.LogWarning("[MWA] fresh blockhash over Android HTTP failed: " + e.Message); }
+#endif
+                if (string.IsNullOrEmpty(text))
+                {
+                    using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(6) };
+                    var body = new System.Net.Http.StringContent(request, System.Text.Encoding.UTF8, "application/json");
+                    var reply = await http.PostAsync(ActiveRpcClient.NodeAddress, body).ConfigureAwait(false);
+                    text = await reply.Content.ReadAsStringAsync().ConfigureAwait(false);
+                }
+                var json = JObject.Parse(text);
                 var hash = (string)json.SelectToken("result.value.blockhash");
                 var slot = (ulong?)json.SelectToken("result.context.slot");
                 if (string.IsNullOrEmpty(hash)) { Debug.LogWarning("[MWA] fresh blockhash unavailable: " + json); return; }
@@ -462,7 +481,7 @@ namespace Solana.Unity.SDK
                 if (options != null && slot != null) options.MinContextSlot = slot;
                 Debug.Log($"[MWA] fresh blockhash {hash[..8]}… at slot {slot}");
             }
-            catch (Exception e) { Debug.LogWarning("[MWA] fresh blockhash failed, keeping the one built with: " + e.Message); }
+            catch (Exception e) { Debug.LogWarning("[MWA] fresh blockhash failed, keeping the one built with: " + e.Message + (e.InnerException != null ? " / " + e.InnerException.Message : "")); }
         }
 
         private static byte[] ForWallet(Transaction t)
