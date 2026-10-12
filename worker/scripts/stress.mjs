@@ -51,7 +51,7 @@ const rpc = http.createServer((req, res) => {
 }).listen(RPC_PORT);
 
 // ---------- the Worker, real payment checks, on the fake RPC ----------
-const vars = { MOCK_CHAIN: '0', HELIUS_URL: `http://127.0.0.1:${RPC_PORT}`, TREASURY_OWNER: TREASURY, RATES_JSON: '{"SKR":0.0176,"SOL":112,"ORE":119}' };
+const vars = { MOCK_CHAIN: '0', RPC_FALLBACKS: 'none', HELIUS_URL: `http://127.0.0.1:${RPC_PORT}`, TREASURY_OWNER: TREASURY, RATES_JSON: '{"SKR":0.0176,"SOL":112,"ORE":119}' };
 const wrangler = spawn('npx', ['wrangler', 'dev', '--port', String(PORT), ...Object.entries(vars).flatMap(([k, v]) => ['--var', `${k}:${v}`])], { stdio: ['ignore', 'pipe', 'pipe'] });
 let wlog = ''; wrangler.stdout.on('data', d => wlog += d); wrangler.stderr.on('data', d => wlog += d);
 const stop = () => { try { wrangler.kill('SIGTERM'); } catch {} rpc.close(); };

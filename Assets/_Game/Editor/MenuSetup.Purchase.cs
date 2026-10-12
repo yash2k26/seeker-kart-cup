@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using KartCup;
 using TMPro;
@@ -11,6 +12,30 @@ using UnityEngine.UI;
 // grey with what went wrong in red, and DONE / CLOSE.
 public static partial class MenuSetup
 {
+    const string GreyDir = "Assets/_Game/Art/Textures/UI/Grey/";
+
+    /// A grey copy of a picture (a little darker than its luminance), imported as a sprite: the purchase sheet's kart when
+    /// a buy did not go through. A plain sprite, so it draws the same on every phone.
+    static Sprite Grey(string src)
+    {
+        if (!File.Exists(src)) return null;
+        Directory.CreateDirectory(GreyDir);
+        string dst = GreyDir + Path.GetFileName(src);
+        var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+        tex.LoadImage(File.ReadAllBytes(src));
+        var px = tex.GetPixels32();
+        for (int i = 0; i < px.Length; i++) { byte g = (byte)((px[i].r * 0.299f + px[i].g * 0.587f + px[i].b * 0.114f) * 0.82f); px[i] = new Color32(g, g, g, px[i].a); }
+        tex.SetPixels32(px);
+        File.WriteAllBytes(dst, tex.EncodeToPNG());
+        Object.DestroyImmediate(tex);
+        AssetDatabase.ImportAsset(dst);
+        var imp = (TextureImporter)AssetImporter.GetAtPath(dst);
+        imp.textureType = TextureImporterType.Sprite; imp.spriteImportMode = SpriteImportMode.Single; imp.alphaIsTransparency = true;
+        imp.mipmapEnabled = false; imp.textureCompression = TextureImporterCompression.Uncompressed;
+        imp.SaveAndReimport();
+        return AssetDatabase.LoadAssetAtPath<Sprite>(dst);
+    }
+
     static void PurchaseOverlay()
     {
         var go = new GameObject("PurchaseSheet", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster), typeof(CanvasGroup));
@@ -67,18 +92,13 @@ public static partial class MenuSetup
         UnityEditor.Events.UnityEventTools.AddPersistentListener(close.onClick, sheet.Close);
         close.gameObject.SetActive(false);
 
-        // the gray material for a picture that did not get bought
-        const string grayPath = "Assets/_Game/Art/Materials/UI_Gray.mat";
-        var gray = AssetDatabase.LoadAssetAtPath<Material>(grayPath);
-        if (gray == null) { gray = new Material(Shader.Find("KartCup/UIGray")); AssetDatabase.CreateAsset(gray, grayPath); }
-
-        // pictures by key: karts, drivers, item packs, gems
-        var keys = new List<string>(); var sprites = new List<Object>();
-        foreach (var id in KartSetup.Karts) { keys.Add("kart:" + id); sprites.Add(AssetDatabase.LoadAssetAtPath<Sprite>(KartThumbs.Dir + id + ".png")); }
+        // pictures by key: karts, drivers, item packs, gems; the karts and drivers also in grey, for a buy that failed
+        var keys = new List<string>(); var sprites = new List<Object>(); var greys = new List<Object>();
+        foreach (var id in KartSetup.Karts) { keys.Add("kart:" + id); sprites.Add(AssetDatabase.LoadAssetAtPath<Sprite>(KartThumbs.Dir + id + ".png")); greys.Add(Grey(KartThumbs.Dir + id + ".png")); }
         var roster = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset");
-        if (roster != null) foreach (var c in roster.characters.Where(c => c != null)) { keys.Add("driver:" + c.driverId); sprites.Add(AssetDatabase.LoadAssetAtPath<Sprite>(PortraitSetup.Dir + c.driverId + ".png")); }
-        foreach (var p in Inventory.Packs) { keys.Add("item:" + p.id); sprites.Add(Design.Icon(Design.ItemGlyph(p.item))); }
-        keys.Add("gems"); sprites.Add(Design.Icon("gem"));
+        if (roster != null) foreach (var c in roster.characters.Where(c => c != null)) { keys.Add("driver:" + c.driverId); sprites.Add(AssetDatabase.LoadAssetAtPath<Sprite>(PortraitSetup.Dir + c.driverId + ".png")); greys.Add(Grey(PortraitSetup.Dir + c.driverId + ".png")); }
+        foreach (var p in Inventory.Packs) { keys.Add("item:" + p.id); sprites.Add(Design.Icon(Design.ItemGlyph(p.item))); greys.Add(null); }
+        keys.Add("gems"); sprites.Add(Design.Icon("gem")); greys.Add(null);
 
         new SerializedObject(sheet).Do(s =>
         {
@@ -95,11 +115,11 @@ public static partial class MenuSetup
             s.FindProperty("reason").objectReferenceValue = reason;
             s.FindProperty("closeLabel").objectReferenceValue = close.GetComponentInChildren<TMP_Text>(true);
             s.FindProperty("closeButton").objectReferenceValue = close.gameObject;
-            s.FindProperty("gray").objectReferenceValue = gray;
             s.FindProperty("stampClip").objectReferenceValue = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Game/Audio/SFX/stamp.wav");
             var k = s.FindProperty("pictureKeys"); k.arraySize = keys.Count;
             for (int i = 0; i < keys.Count; i++) k.GetArrayElementAtIndex(i).stringValue = keys[i];
             Fill(s.FindProperty("pictures"), sprites.ToArray());
+            Fill(s.FindProperty("grayPictures"), greys.ToArray());
             s.FindProperty("fallback").objectReferenceValue = IconSprite("kart");
         });
     }

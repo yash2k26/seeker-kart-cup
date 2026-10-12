@@ -21,16 +21,19 @@ namespace KartCup
         [SerializeField] Image picture;
         [SerializeField] TMP_Text title, price, step, result, reason, closeLabel;
         [SerializeField] GameObject closeButton;
-        [SerializeField] Material gray;
         [SerializeField] AudioClip stampClip;
         // pictures by key: "kart:<id>", "driver:<driverId>", "item:<id>", "gems"; anything else gets the fallback
         [SerializeField] string[] pictureKeys = Array.Empty<string>();
         [SerializeField] Sprite[] pictures = Array.Empty<Sprite>();
+        // the same pictures in grey (built by MenuSetup.Purchase), for a buy that did not go through. 12 Oct 2026: a grey
+        // UI shader drew the kart as a black box on the phone, so the grey is in the picture itself
+        [SerializeField] Sprite[] grayPictures = Array.Empty<Sprite>();
         [SerializeField] Sprite fallback;
         [SerializeField] Color gold = new(1f, 0.694f, 0.149f), red = new(1f, 0.36f, 0.38f), muted = new(0.706f, 0.655f, 0.871f);
 
         bool working;
-        string doneLine;   // what a success means for this buy: unlocked, added to your items, added to your gems
+        string doneLine;
+        int pictureIndex = -1;   // what a success means for this buy: unlocked, added to your items, added to your gems
         public bool Showing => group != null && group.blocksRaycasts;
 
         void Awake() { Instance = this; Hide(instant: true); }
@@ -82,9 +85,9 @@ namespace KartCup
             working = true; doneLine = done;
             group.blocksRaycasts = true;
             title.text = what.ToUpperInvariant();
-            int i = Array.IndexOf(pictureKeys, key);
-            picture.sprite = i >= 0 && i < pictures.Length && pictures[i] != null ? pictures[i] : fallback;
-            picture.material = null; picture.color = Color.white;
+            pictureIndex = Array.IndexOf(pictureKeys, key);
+            picture.sprite = pictureIndex >= 0 && pictureIndex < pictures.Length && pictures[pictureIndex] != null ? pictures[pictureIndex] : fallback;
+            picture.color = Color.white;
             price.text = priceText; price.color = gold;
             step.text = "Getting today's price…"; step.gameObject.SetActive(true); spinner.gameObject.SetActive(true);
             result.text = ""; reason.text = "";
@@ -134,7 +137,9 @@ namespace KartCup
             }
             else
             {
-                picture.material = gray; picture.color = new Color(1f, 1f, 1f, 0.6f);
+                var grey = pictureIndex >= 0 && pictureIndex < grayPictures.Length ? grayPictures[pictureIndex] : null;
+                if (grey != null) { picture.sprite = grey; picture.color = new Color(1f, 1f, 1f, 0.85f); }
+                else picture.color = new Color(0.45f, 0.45f, 0.5f, 0.8f);                  // an icon: dimmed grey
                 price.color = muted;
                 result.text = "NOT BOUGHT"; result.color = red;
                 reason.text = string.IsNullOrEmpty(why) ? "Nothing was charged." : why; reason.color = red;

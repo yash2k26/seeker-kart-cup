@@ -18,6 +18,7 @@ export interface Env {
   TREASURY_ATA?: string;
   PRICES_JSON: string;
   HELIUS_URL: string;
+  RPC_FALLBACKS?: string;            // "none": no public nodes after HELIUS_URL (the stress test's fake node)
   SESSION_HMAC_KEY: string;
   DEMO_CODE?: string;   // secret; reviewer/demo unlock of the SGT cosmetics (no Seeker on hand)
   // ---- rooms & tournaments ----

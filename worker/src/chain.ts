@@ -16,7 +16,7 @@ const RPC_ALLOW = new Set([
 ]);
 
 export { rpc } from './rpc';
-import { rpc } from './rpc';
+import { rpc, rpcPost } from './rpc';
 
 // The APK never holds an RPC key: it talks to /rpc, which forwards an allow-list of methods, a few at a time.
 const RPC_MAX_CALLS = 8, RPC_MAX_BYTES = 64 * 1024;
@@ -27,8 +27,8 @@ export async function rpcProxy(req: Request, env: Env) {
   const calls = Array.isArray(body) ? body : [body];
   if (calls.length > RPC_MAX_CALLS) return bad('too many calls in one request', 413);
   if (!calls.every(c => c && RPC_ALLOW.has(c.method))) return bad('method not allowed', 403);
-  const r = await fetch(env.HELIUS_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-  return new Response(r.body, { status: r.status, headers: { 'content-type': 'application/json' } });
+  const r = await rpcPost(env, JSON.stringify(body));
+  return new Response(r.text, { status: r.status, headers: { 'content-type': 'application/json' } });
 }
 
 /** Returns the SGT mint address the wallet holds, or null. Two plain RPC calls, no packages. */

@@ -152,7 +152,7 @@ namespace KartCup
                 await KartApi.ConfirmTx(sig, RaceSession.Instance.RaceId);
                 KartApi.Event("memo_pb", new { sig });
             }
-            catch (Exception e) { Debug.LogWarning("[wallet] memo failed: " + e); Status("Could not record. Try again."); }
+            catch (Exception e) { Debug.LogWarning("[wallet] memo failed: " + e); Status(e is NoBlockhashException ? SolanaBusy : "Could not record. Try again."); }
             finally { Busy = false; }
         }
 
@@ -197,7 +197,7 @@ namespace KartCup
                 if (sig != null) KartApi.Event("pay", new { what, currency, amount, sig });
                 return sig;
             }
-            catch (Exception e) { Debug.LogWarning("[wallet] payment failed: " + e); Status("Payment failed. Nothing was charged unless the wallet showed success."); return null; }
+            catch (Exception e) { Debug.LogWarning("[wallet] payment failed: " + e); Status(e is NoBlockhashException ? SolanaBusy : "Payment failed. Nothing was charged unless the wallet showed success."); return null; }
             finally { Busy = false; }
         }
 
@@ -289,7 +289,7 @@ namespace KartCup
                 Status("Stake sent · the room is reading it from the chain…");
                 return true;
             }
-            catch (Exception e) { Debug.LogWarning("[wallet] stake failed: " + e); Status("Stake failed. Nothing was taken unless the wallet showed success."); return false; }
+            catch (Exception e) { Debug.LogWarning("[wallet] stake failed: " + e); Status(e is NoBlockhashException ? SolanaBusy : "Stake failed. Nothing was taken unless the wallet showed success."); return false; }
             finally
             {
                 if (holding) RoomClient.Instance?.Send(new { t = "paying", off = true });   // declined or failed: let the seat go back to normal
@@ -333,12 +333,26 @@ namespace KartCup
             Data = new byte[] { 1 },
         };
 
+        /// Thrown before the wallet opens when no Solana node gave a blockhash: there is nothing the wallet could sign.
+        sealed class NoBlockhashException : Exception { public NoBlockhashException() : base("no recent blockhash") { } }
+        const string SolanaBusy = "Solana is busy right now. Nothing was charged: try again in a moment.";
+
         async Awaitable<Transaction> BuildTx()
         {
+            // Fresh every time: a blockhash lives ~60–90 s and the wallet may sit open for most of that. 12 Oct 2026: a
+            // rate-limited node answered nothing, the transaction went to the wallet without one, and the wallet opened with
+            // nothing to sign. So: ask again, and never open the wallet without one.
+            string hash = null;
+            for (int i = 0; i < 4 && string.IsNullOrEmpty(hash); i++)
+            {
+                if (i > 0) await Awaitable.WaitForSecondsAsync(0.6f * i);
+                try { hash = await Web3.Wallet.GetBlockHash(Commitment.Confirmed, useCache: false); }
+                catch (Exception e) { Debug.LogWarning("[wallet] blockhash: " + e.Message); }
+            }
+            if (string.IsNullOrEmpty(hash)) throw new NoBlockhashException();
             return new Transaction
             {
-                // Fresh every time: a blockhash lives ~60–90 s and the wallet may sit open for most of that.
-                RecentBlockHash = await Web3.Wallet.GetBlockHash(Commitment.Confirmed, useCache: false),
+                RecentBlockHash = hash,
                 FeePayer = Web3.Wallet.Account.PublicKey,
                 Instructions = new List<TransactionInstruction>(),
                 Signatures = new List<SignaturePubKeyPair>(),
@@ -355,7 +369,7 @@ namespace KartCup
                 {
                     case SignAndSendTxResult.Success s: return Encoders.Base58.EncodeData(s.Signatures[0]);
                     case SignAndSendTxResult.UserDeclined: Status("Cancelled"); return null;
-                    case SignAndSendTxResult.Failed f: Status($"Wallet error {f.Code}"); return null;
+                    case SignAndSendTxResult.Failed f: Debug.LogWarning($"[wallet] wallet failed: {f.Code} {f.Message}"); Status("The wallet couldn't send it. Nothing was charged: try again."); return null;
                     default: break;   // NotSupported / NotSubmitted → sign + our RPC (Backpack path)
                 }
             }
