@@ -43,6 +43,7 @@ public static class EconomyStress
             TourUnderStress(rng);
             DailyUnderStress();
             AchievementsUnderStress();
+            CloudSaveRoundTrip();
         }
         catch (System.Exception e) { failures++; Debug.Log("[economy] FAIL  threw: " + e); }
         finally
@@ -256,6 +257,42 @@ public static class EconomyStress
         for (int d = day0; d < day0 + 200; d++) { var c = Daily.For(d); if (c.mode != RaceMode.Kind.Duel) continue; Daily.Arm(c); if (RaceMode.Rival == me) clashes++; }
         Check("daily: a duel is never against your own driver", clashes == 0);
         RaceMode.Clear();
+    }
+
+    // ---------- cloud save: everything a player has made survives a wipe (a reinstall) and comes back exactly ----------
+    static void CloudSaveRoundTrip()
+    {
+        var backup = CloudSave.Snapshot();
+        try
+        {
+            CloudSave.Apply("{}");
+            Check("cloud save: a wiped phone reads the defaults (20 gems, no items, no best, no trial spent)",
+                  Gems.Balance == 20 && Inventory.Count("rocket") == 0 && Tracks.Best("beach") == 0f && !KartDatabase.TrialUsed("k_test"));
+            Gems.Earn(757, "test");
+            Inventory.Add("rocket", 5); Inventory.Loadout = "rocket";
+            Tracks.RecordBest("beach", 61.25f); Tracks.RecordBest(RaceMode.BestKey("alpine", true, 2, RaceMode.Items.Nitro), 70.5f);
+            KartDatabase.SpendTrial("k_test"); Unlocks.Earn("driver.test");
+            Chests.AddStars(4); Chests.Give(Chests.Tier.Gold);
+            Tour.Record(Tour.Cups[0].events[0].id, 1, 50f);
+            var made = CloudSave.Snapshot();
+            int stars = Tour.Stars(Tour.Cups[0].events[0].id);
+
+            CloudSave.Apply("{}");
+            Check("cloud save: a wipe drops what the game had in memory too", Gems.Balance == 20 && Tour.Stars(Tour.Cups[0].events[0].id) == 0);
+            CloudSave.Apply(made);
+            Check("cloud save: the save brings back gems, items, loadout, bests, trials, recruits, Tour",
+                  Gems.Balance == 777 && Inventory.Count("rocket") == 5 && Inventory.Loadout == "rocket" && Mathf.Approximately(Tracks.Best("beach"), 61.25f)
+                  && Mathf.Approximately(Tracks.Best(RaceMode.BestKey("alpine", true, 2, RaceMode.Items.Nitro)), 70.5f)
+                  && KartDatabase.TrialUsed("k_test") && Unlocks.Has("driver.test") && stars > 0 && Tour.Stars(Tour.Cups[0].events[0].id) == stars,
+                  $"gems {Gems.Balance} rocket {Inventory.Count("rocket")} best {Tracks.Best("beach")} tour {Tour.Stars(Tour.Cups[0].events[0].id)}/{stars}");
+            Check("cloud save: the same progress gives the same snapshot (no needless saves)", CloudSave.Snapshot() == made);
+            CloudSave.Apply("{\"i\":{\"kc.gems\":5,\"kc.device\":1},\"s\":{\"kc.session\":\"forged\",\"kc.unlocks\":\"kart.gold\"}}");
+            Check("cloud save: a save sets only progress, never the session, device id or bought unlocks",
+                  Gems.Balance == 5 && PlayerPrefs.GetString("kc.session", "") != "forged" && !Unlocks.Has("kart.gold"));
+            CloudSave.Apply("not json {");
+            Check("cloud save: an unreadable save is a fresh start, not a crash", Gems.Balance == 20);
+        }
+        finally { CloudSave.Apply(backup); }
     }
 
     // ---------- achievements: done waits for a claim, a claim pays once, an old save's done ones count as claimed ----------

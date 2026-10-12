@@ -10,6 +10,8 @@ namespace KartCup
     {
         const string Key = "kc.gems";
         static int? cache;
+        /// CloudSave: the balance was replaced underneath; read it again.
+        internal static void Reload() { cache = null; Changed?.Invoke(); }
         public static event Action Changed;
 
         public static int Balance { get { cache ??= PlayerPrefs.GetInt(Key, 20); return cache.Value; } }   // a new phone starts with a few

@@ -155,9 +155,34 @@ export async function deleteMe(_req: Request, env: Env, _ctx: ExecutionContext, 
     env.DB.prepare("UPDATE tx_log SET wallet = 'deleted' WHERE wallet = ?1").bind(wallet),
     env.DB.prepare('DELETE FROM pending_tx WHERE wallet = ?1').bind(wallet),
     env.DB.prepare('DELETE FROM events WHERE wallet = ?1').bind(wallet),
+    env.DB.prepare('DELETE FROM saves WHERE wallet = ?1').bind(wallet),
     env.DB.prepare('DELETE FROM players WHERE wallet = ?1').bind(wallet),
   ]);
   return json({ deleted: true });
+}
+
+/** GET /v1/save (session) — the wallet's progress (gems, chests, Tour, achievements, items, bests...) as the phone last
+ *  saved it, so a reinstall or a new phone signs back into the same game. rev 0 = nothing saved yet. */
+export async function saveGet(_req: Request, env: Env, _ctx: ExecutionContext, wallet: string | null) {
+  if (!wallet) return bad('unauthorized', 401);
+  const r = await env.DB.prepare('SELECT data, rev, updated_at FROM saves WHERE wallet = ?1').bind(wallet).first<any>();
+  return json(r ? { rev: r.rev, data: r.data, updatedAt: r.updated_at } : { rev: 0, data: null, updatedAt: 0 });
+}
+
+/** POST /v1/save { rev, data } (session) — `rev` is the save this phone last had. A phone behind (another one has saved
+ *  since) gets 409 with the newer save and overwrites nothing. The phone owns the snapshot's shape; this only keeps it. */
+export async function savePut(req: Request, env: Env, _ctx: ExecutionContext, wallet: string | null) {
+  if (!wallet) return bad('unauthorized', 401);
+  const { rev, data } = await body(req);
+  if (typeof data !== 'string' || data.length > 65536 || !Number.isInteger(rev) || rev < 0) return bad('bad save');
+  const res = rev === 0
+    ? await env.DB.prepare('INSERT OR IGNORE INTO saves (wallet, data, rev, updated_at) VALUES (?1, ?2, 1, ?3)').bind(wallet, data, now()).run()
+    : await env.DB.prepare('UPDATE saves SET data = ?2, rev = rev + 1, updated_at = ?3 WHERE wallet = ?1 AND rev = ?4').bind(wallet, data, now(), rev).run();
+  if (!res.meta.changes) {
+    const cur = await env.DB.prepare('SELECT data, rev, updated_at FROM saves WHERE wallet = ?1').bind(wallet).first<any>();
+    return json({ error: 'stale', rev: cur?.rev ?? 0, data: cur?.data ?? null, updatedAt: cur?.updated_at ?? 0 }, 409);
+  }
+  return json({ rev: rev + 1 });
 }
 
 /** POST /v1/event { deviceId, name, props } — races, connects, returning devices, last exception. */

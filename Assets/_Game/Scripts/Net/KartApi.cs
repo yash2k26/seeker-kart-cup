@@ -117,6 +117,11 @@ namespace KartCup
         public static Awaitable<Board> Leaderboard(string track) => Get<Board>($"/v1/leaderboard?track={track}");
         public static Awaitable<KartCup.Weekly.Board> WeeklyBoard(string wallet) => Get<KartCup.Weekly.Board>("/v1/weekly" + (string.IsNullOrEmpty(wallet) ? "" : "?wallet=" + wallet));
         public static Awaitable<Profile> Me() => Get<Profile>("/v1/me");
+        /// The wallet's cloud save (CloudSave): rev 0 and no data = nothing saved yet. A put on a stale rev is a 409
+        /// ApiException whose Body is the newer save.
+        [Serializable] public class Save { public int rev; public string data; public long updatedAt; }
+        public static Awaitable<Save> SaveGet() => Get<Save>("/v1/save");
+        public static Awaitable<Save> SavePut(int rev, string data) => Post<Save>("/v1/save", new { rev, data });
         public static Awaitable<object> DeleteMe() => Send<object>("DELETE", "/v1/me", null);
         public static Awaitable<object> ConfirmTx(string signature, string raceId) => Post<object>("/v1/tx/confirm", new { signature, raceId });
         /// `pending` is the Worker's 202 (not landed at 'confirmed' yet): a 2xx, so it arrives as an answer, not an exception.
@@ -171,7 +176,8 @@ namespace KartCup
         public sealed class ApiException : Exception
         {
             public readonly long Status;
-            public ApiException(long status, string body) : base($"{status}: {body}") { Status = status; }
+            public readonly string Body;
+            public ApiException(long status, string body) : base($"{status}: {body}") { Status = status; Body = body; }
         }
     }
 

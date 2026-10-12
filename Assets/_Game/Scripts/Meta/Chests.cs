@@ -35,6 +35,7 @@ namespace KartCup
 
         const string Key = "kc.chests";
         static State state;
+        internal static void Reload() { state = null; Changed?.Invoke(); }   // CloudSave replaced it
         static State S
         {
             get

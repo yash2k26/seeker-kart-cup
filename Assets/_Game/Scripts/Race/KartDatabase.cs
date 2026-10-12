@@ -27,17 +27,27 @@ namespace KartCup
         public static bool Owned(KartDef k) => k != null && (k.IsFree || Unlocks.Has(k.sku));
 
         // ---- one free trial race per shop kart: drive it once, then decide ----
-        public static bool TrialUsed(string id) => PlayerPrefs.GetInt("kc.trial.used." + id, 0) == 1;
+        // spent trials as one list (kc.trials) so the cloud save carries them; kc.trial.used.<id> is the older per-kart form,
+        // still read so a trial spent before 12 Oct 2026 stays spent on that phone
+        public const string TrialsKey = "kc.trials";
+        static System.Collections.Generic.List<string> Spent => PlayerPrefs.GetString(TrialsKey, "").Split(',', System.StringSplitOptions.RemoveEmptyEntries).ToList();
+        public static bool TrialUsed(string id) => Spent.Contains(id) || PlayerPrefs.GetInt("kc.trial.used." + id, 0) == 1;
         public static void ArmTrial(string id) { PlayerPrefs.SetString(TrialArmed, id); PlayerPrefs.Save(); }
         public static string ArmedTrial => PlayerPrefs.GetString(TrialArmed, "");
 
         /// A chest's test drive: the kart's free trial handed back (the garage's TEST DRIVE arms it again).
-        public static void GrantTrial(string id) { PlayerPrefs.DeleteKey("kc.trial.used." + id); PlayerPrefs.Save(); }
+        public static void GrantTrial(string id)
+        {
+            PlayerPrefs.SetString(TrialsKey, string.Join(",", Spent.Where(x => x != id)));
+            PlayerPrefs.DeleteKey("kc.trial.used." + id); PlayerPrefs.Save();
+        }
 
         /// Called by the spawner when a trial kart actually rolls onto the grid: the trial is spent.
         public static void SpendTrial(string id)
         {
-            PlayerPrefs.SetInt("kc.trial.used." + id, 1);
+            var spent = Spent;
+            if (!spent.Contains(id)) spent.Add(id);
+            PlayerPrefs.SetString(TrialsKey, string.Join(",", spent));
             PlayerPrefs.DeleteKey(TrialArmed);
             PlayerPrefs.Save();
         }

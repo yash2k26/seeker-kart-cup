@@ -61,8 +61,8 @@ const cfg = (await get('/v1/config')).body;
 check('the local Worker is up on the fake RPC with real payment checks', cfg.treasuryOwner === TREASURY && Array.isArray(cfg.catalog), wlog.slice(-500));
 
 // ---------- wallets ----------
-async function signIn() {
-  const kp = Keypair.generate(), address = kp.publicKey.toBase58();
+async function signIn(kp = Keypair.generate()) {
+  const address = kp.publicKey.toBase58();
   const ch = await post('/v1/auth/challenge', {});
   const msg = new TextEncoder().encode(`${ch.body.domain} wants you to sign in with your Solana account:\n${address}\n\nSign in to Kartel\n\nNonce: ${ch.body.nonce}`);
   const sig = ed25519.sign(msg, kp.secretKey.slice(0, 32));
@@ -88,6 +88,37 @@ async function buy(w, sku, cur, amount, bad = {}, sigOverride = null, orderId = 
   if (!sigOverride || !txs.has(sig)) txs.set(sig, 'state' in bad ? bad.state : tx(w.address, cur, amount, `kc:buy:${sku}:${orderId}`, bad));
   return { sig, orderId, ...(await post('/v1/purchase/verify', { signature: sig, sku, orderId, currency: cur }, w.token)) };
 }
+
+// ================= 0. cloud save: progress kept per wallet (node scripts/stress.mjs --save runs only this) =================
+console.log('\n== 0. cloud save');
+{
+  check('no session: the save can be neither read nor written', (await get('/v1/save')).status === 401 && (await post('/v1/save', { rev: 0, data: '{}' })).status === 401);
+  const kp = Keypair.generate(), a = await signIn(kp), b = await signIn();
+  const g0 = await get('/v1/save', a.token);
+  check('a new wallet has nothing saved (rev 0)', g0.status === 200 && g0.body.rev === 0 && g0.body.data === null, g0.text);
+  const snap = JSON.stringify({ i: { 'kc.gems': 345, 'kc.item.rocket': 6 }, f: { 'kc.best2.beach': 61.25 }, s: { 'kc.tour': '{"best":[]}' } });
+  const p1 = await post('/v1/save', { rev: 0, data: snap }, a.token), g1 = await get('/v1/save', a.token);
+  check('the first save is kept as sent, rev 1', p1.status === 200 && p1.body.rev === 1 && g1.body.rev === 1 && g1.body.data === snap, p1.text + ' ' + g1.text);
+  const again = await post('/v1/save', { rev: 0, data: '{"i":{}}' }, a.token);
+  check('a second phone that thinks nothing is saved is refused (409) and handed the save', again.status === 409 && again.body.rev === 1 && again.body.data === snap, again.text);
+  const p2 = await post('/v1/save', { rev: 1, data: snap.replace('345', '400') }, a.token);
+  const stale = await post('/v1/save', { rev: 1, data: snap.replace('345', '1') }, a.token);
+  const g2 = await get('/v1/save', a.token);
+  check('a save on top of rev 1 makes rev 2; a phone still on rev 1 overwrites nothing', p2.body.rev === 2 && stale.status === 409 && g2.body.rev === 2 && g2.body.data.includes('400'), [p2.text, stale.text, g2.text].join(' | '));
+  const race = await Promise.all([1, 2, 3, 4].map(n => post('/v1/save', { rev: 2, data: snap.replace('345', String(n)) }, a.token)));
+  check('four phones saving on rev 2 at the same instant: exactly one wins', race.filter(r => r.status === 200).length === 1 && race.filter(r => r.status === 409).length === 3, race.map(r => r.status).join(','));
+  const junk = await Promise.all([{ rev: 3, data: { i: {} } }, { rev: 3, data: 'x'.repeat(70000) }, { rev: -1, data: '{}' }, { rev: 'x', data: '{}' }, {}, null, []]
+    .map(bd => post('/v1/save', bd, a.token)));
+  check('malformed saves (object, 70 KB, bad rev, empty, null, array) are 400, never 5xx', junk.every(r => r.status === 400), junk.map(r => r.status).join(','));
+  const gb = await get('/v1/save', b.token);
+  check("another wallet never sees this one's save", gb.body.rev === 0 && gb.body.data === null, gb.text);
+  const re = await signIn(kp), gr = await get('/v1/save', re.token);
+  check('signing in again (a reinstall) brings the same save back', gr.body.rev === 3 && gr.body.data === (await get('/v1/save', a.token)).body.data, gr.text);
+  const del = await call('DELETE', '/v1/me', undefined, re.token);
+  const after = await signIn(kp), ga = await get('/v1/save', after.token);
+  check('deleting the account deletes the save', del.status === 200 && ga.body.rev === 0 && ga.body.data === null, del.text + ' ' + ga.text);
+}
+if (process.argv.includes('--save')) { console.log(`\n${failures ? failures + ' FAILURE(S)' : 'ALL PASS'}`); stop(); process.exit(failures ? 1 : 0); }
 
 // ================= 1. every purchase, every currency =================
 console.log('\n== 1. the shop: every item, every currency, honest and not');

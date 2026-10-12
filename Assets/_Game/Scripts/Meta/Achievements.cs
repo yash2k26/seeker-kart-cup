@@ -51,6 +51,7 @@ namespace KartCup
         [Serializable] sealed class State { public int[] counts = new int[Enum.GetValues(typeof(Stat)).Length]; public List<string> done = new(), tracksWon = new(), claimed = new(); public int version; }
         const string Key = "kc.ach";
         static State s;
+        internal static void Reload() { s = null; Changed?.Invoke(); }   // CloudSave replaced it
         static State S
         {
             get

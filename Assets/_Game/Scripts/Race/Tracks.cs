@@ -35,7 +35,7 @@ namespace KartCup
         // ---- personal bests, per track, on this phone (the Worker keeps the signed-in ones) ----
         /// "kc.best2.": the circuits were relaid longer on 11 Oct 2026 (1.0-1.4 km to 1.8-2.3 km), so a best from before
         /// could never be beaten again; the old keys are left where they are.
-        static string BestKey(string id) => "kc.best2." + id;
+        internal static string BestKey(string id) => "kc.best2." + id;
         public static float Best(string id) => PlayerPrefs.GetFloat(BestKey(id), 0f);
 
         /// Returns true when `seconds` is a new best for the track.

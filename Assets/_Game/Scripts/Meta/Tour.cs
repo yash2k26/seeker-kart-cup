@@ -109,6 +109,7 @@ namespace KartCup
         [Serializable] sealed class State { public List<Entry> best = new(); }
         const string Key = "kc.tour";
         static State state;
+        internal static void Reload() => state = null;   // CloudSave replaced it
         static State S
         {
             get

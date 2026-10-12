@@ -51,6 +51,7 @@ namespace KartCup
                     SetProfile(await KartApi.Me());
                     Status(Profile.skrName ?? Short(Profile.wallet));   // label otherwise stays "Not connected" after a silent reconnect
                     KartApi.Event("wallet_reconnect");
+                    await CloudSave.Pull(Profile.wallet);   // a newer save from another phone, or this phone's changes up
                 }
             }
             catch (Exception e) { Debug.LogWarning("[wallet] silent reconnect skipped: " + e.Message); }
@@ -120,6 +121,7 @@ namespace KartCup
                 _ = SettlePurchases();   // payments this wallet made under a session that has since expired
                 KartApi.Event("wallet_login", new { seeker = Profile.isSeeker });
                 if (RaceSession.Instance != null) await RaceSession.Instance.ClaimAfterLogin();
+                await CloudSave.Pull(Profile.wallet);   // the wallet's progress comes back (a reinstall), or this phone's goes up
                 return true;
             }
             catch (OperationInFlightException) { Status("Your wallet is still open: finish there, or close it and try again."); return false; }
@@ -130,7 +132,7 @@ namespace KartCup
         public async void Logout()
         {
             try { await Web3.Instance.DisconnectWalletAdapter(); } catch { }
-            KartApi.SessionToken = ""; SetProfile(null); Status("Not connected");
+            KartApi.SessionToken = ""; CloudSave.SignedOut(); SetProfile(null); Status("Not connected");
         }
 
         /// Results screen, only when the server said isPersonalBest: one mainnet Memo the player signs.
