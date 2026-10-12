@@ -1522,6 +1522,8 @@ public static partial class MenuSetup
         Fill(so.FindProperty("pips"), images.Cast<Object>().ToArray());
         so.FindProperty("on").colorValue = Accent;
         so.FindProperty("off").colorValue = Design.Ink600;
+        so.FindProperty("label").objectReferenceValue = text;
+        so.FindProperty("title").stringValue = label;
         so.ApplyModifiedPropertiesWithoutUndo();
         return bar;
     }

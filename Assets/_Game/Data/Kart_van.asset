@@ -16,8 +16,8 @@ MonoBehaviour:
   displayName: Courier
   blurb: Delivers. Eventually.
   sku: kart.van
-  speed: 2
+  speed: 3
   turbo: 3
   grip: 2
   armor: 4
-  attack: 3
+  attack: 2

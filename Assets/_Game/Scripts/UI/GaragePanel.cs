@@ -166,7 +166,11 @@ namespace KartCup
             UiMotion.Beside(secondaryButton, tertiaryButton);
 
             for (int i = 0; i < powerBars.Length; i++)
-                if (powerBars[i] != null) powerBars[i].SetCount(i switch { 0 => def.speed, 1 => def.turbo, 2 => def.grip, 3 => def.armor, _ => def.attack });
+                if (powerBars[i] != null)
+                {
+                    powerBars[i].SetCount(i switch { 0 => def.speed, 1 => def.turbo, 2 => def.grip, 3 => def.armor, _ => def.attack });
+                    powerBars[i].Note(Edge(def, i));
+                }
 
             for (int i = 0; i < swatches.Length; i++)
             {
@@ -188,6 +192,16 @@ namespace KartCup
             foreach (var r in kart.GetComponentsInChildren<MeshRenderer>()) b.Encapsulate(r.bounds);
             float size = Mathf.Max(b.size.x, b.size.z);
             backdrop.Fit = Mathf.Clamp(size / 6.0f, 0.8f, 0.92f);   // 4.7 m karts to 5.6 m trucks (wheels and all): 8-20 % closer, the head still in frame
+        }
+
+        /// What a power does against a free kart's two pips, in the numbers KartDef.ApplyTo uses (13 Oct 2026, the user:
+        /// "I can't see any difference in the quality of karts"): top speed, boost, steering, spin-outs, item speed.
+        static string Edge(KartDef d, int power)
+        {
+            int p = (power switch { 0 => d.speed, 1 => d.turbo, 2 => d.grip, 3 => d.armor, _ => d.attack }) - 2;
+            if (p == 0) return "";
+            int pct = power switch { 0 => 6, 1 => 15, 2 => 6, 3 => 10, _ => 15 } * p;
+            return (pct > 0 ? "+" : "") + pct + "%" + (power == 4 && d.attack >= 4 ? " +1 SHOT" : "");
         }
 
         static void SetButton(TMP_Text label, Button button, string text, bool interactable)

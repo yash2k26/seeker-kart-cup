@@ -20,7 +20,18 @@ public static class ItemSetup
         // homing one keeps its brain and wears a blue nose. A bomb is the trap, bigger, black, dropped behind the
         // kart and hitting three spins hard. Both rockets are the film's (Rocketize).
         var rocket = Variant("HomingItem", "Rocket", p => { p.homingAccuracy = 0f; p.startSpeed = 48f; p.targetSpeed = 96f; p.accel = 46f; p.kartSpinCount = 2; Rocketize(p, Red); });
-        var homing = Variant("HomingItem", "Homing", p => { p.startSpeed = Mathf.Max(p.startSpeed, 26f); Rocketize(p, Blue); });
+        // 13 Oct 2026, the user: "rocket and homing is same; homing should find the nearest kart and hit it". It never
+        // homed: Powerslide's Item fills its kart list when the scene loads, before RaceSpawner has made a kart, so the
+        // missile had nobody to look for; and it looked 30 m ahead only, through no wall, for the kart most in front. Now
+        // it asks for the karts as it leaves the tubes, takes the nearest within 140 m anywhere ahead of a wide cone,
+        // through barriers, keeps looking until it has one, and turns hard onto it.
+        var homing = Variant("HomingItem", "Homing", p =>
+        {
+            p.startSpeed = Mathf.Max(p.startSpeed, 26f);
+            p.fetchKartsDuringSpawn = true; p.prioritizeKartsInFront = false; p.maxHomingDist = 140f; p.minHomingAngle = -0.35f;
+            p.useLineOfSight = false; p.findTargetWhileActive = true; p.homingAccuracy = Mathf.Max(p.homingAccuracy, 8f);
+            Rocketize(p, Blue);
+        });
         // 13 Oct 2026, the user: "bomb should look like a bomb" and the bouncer had no good look: a cartoon bomb (glossy
         // black ball, steel neck, rope fuse spitting sparks) and a beach ball, both from tools/blender/export_weapons.py,
         // at the sizes the old spheres were drawn (1.3 m and 1 m radius): the hit areas do not change

@@ -20,10 +20,10 @@ public static class AudioSetup
         var director = go.AddComponent<AudioDirector>();
         var so = new SerializedObject(director);
 
-        // The menu has its own unhurried loop. A race lists its circuit's track first and the rest of the pool after:
+        // The menu has its own theme (kartel_theme, 13 Oct 2026: the sun-bomb hook, tools/audio/game_music.py). A race lists its circuit's track first and the rest of the pool after:
         // the director starts each race on one the last race did not play.
         string own = Own.FirstOrDefault(o => o.map == map).track ?? Pool[0];
-        var list = (menu ? new[] { "garage" } : new[] { own }.Concat(Pool.Where(t => t != own))).Select(t => Clip(Music + t + ".ogg")).Where(c => c != null).ToArray();
+        var list = (menu ? new[] { "kartel_theme" } : new[] { own }.Concat(Pool.Where(t => t != own))).Select(t => Clip(Music + t + ".ogg")).Where(c => c != null).ToArray();
         var tracks = so.FindProperty("tracks");
         tracks.arraySize = list.Length;
         for (int i = 0; i < list.Length; i++) tracks.GetArrayElementAtIndex(i).objectReferenceValue = list[i];

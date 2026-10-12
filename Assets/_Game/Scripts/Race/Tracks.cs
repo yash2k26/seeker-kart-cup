@@ -36,13 +36,16 @@ namespace KartCup
         /// "kc.best2.": the circuits were relaid longer on 11 Oct 2026 (1.0-1.4 km to 1.8-2.3 km), so a best from before
         /// could never be beaten again; the old keys are left where they are.
         internal static string BestKey(string id) => "kc.best2." + id;
-        public static float Best(string id) => PlayerPrefs.GetFloat(BestKey(id), 0f);
+        public static float Best(string id) { float b = PlayerPrefs.GetFloat(BestKey(id), 0f); return b < Floor ? 0f : b; }
+        /// ponytail: no lap of a 1.8 km+ circuit is under 30 s; a time below it was a test's forced finish (seen: 1.55 s,
+        /// 11.97 s on Ranking), so it is never kept or shown. Lower it if a much shorter circuit is ever added.
+        const float Floor = 30f;
 
         /// Returns true when `seconds` is a new best for the track.
         public static bool RecordBest(string id, float seconds)
         {
             float prev = Best(id);
-            if (prev > 0f && seconds >= prev) return false;
+            if (seconds < Floor || prev > 0f && seconds >= prev) return false;
             PlayerPrefs.SetFloat(BestKey(id), seconds); PlayerPrefs.Save();
             return true;
         }

@@ -57,22 +57,39 @@ namespace KartCup
 
         /// A race is over (solo, or a free room; never a paid one): a podium place earns a chest and stars.
         /// Returns the chest's tier (null off the podium) and whether the stars just filled the meter.
+        /// 13 Oct 2026, the user: "the chest should not be easily collectible ... not too many, or there is no want and
+        /// nobody craves a kart or a character; but never so mean it feels like a scam". A race chest needs a WIN (second
+        /// and third fill the star meter), and race chests wait in SLOTS: four unopened at most, the next win's chest only
+        /// when one is free, and a full star meter keeps its stars until a slot is (nothing earned is ever lost). Gifts (the
+        /// Daily, an achievement, a boss, the wheel, the Weekly) always go in.
+        public const int Slots = 4;
+        public static bool SlotsFull => S.pending.Count >= Slots;
+        /// The last win found every slot taken: the card says so, and to open one.
+        public static bool LastFull { get; private set; }
+
         public static (Tier? tier, int stars, bool filled) Earn(int place)
         {
+            LastFull = false;
             if (place < 1 || place > 3) return LastEarn = (null, 0, false);
-            var odds = Odds[place - 1];
-            int roll = Random.Range(0, 100), acc = 0; var tier = Tier.Wood;
-            for (int i = 0; i < odds.Length; i++) { acc += odds[i]; if (roll < acc) { tier = (Tier)i; break; } }
-            if (S.sinceGold + 1 >= GoldPity && tier < Tier.Gold) tier = Tier.Gold;
-            S.sinceGold = tier >= Tier.Gold ? 0 : S.sinceGold + 1;
-            S.pending.Add(tier);
+            Tier? got = null;
+            if (place == 1 && SlotsFull) LastFull = true;
+            else if (place == 1)
+            {
+                var odds = Odds[0];
+                int roll = Random.Range(0, 100), acc = 0; var tier = Tier.Wood;
+                for (int i = 0; i < odds.Length; i++) { acc += odds[i]; if (roll < acc) { tier = (Tier)i; break; } }
+                if (S.sinceGold + 1 >= GoldPity && tier < Tier.Gold) tier = Tier.Gold;
+                S.sinceGold = tier >= Tier.Gold ? 0 : S.sinceGold + 1;
+                S.pending.Add(tier);
+                got = tier;
+            }
             int stars = StarsFor[place - 1];
             S.stars += stars;
             bool filled = false;
-            while (S.stars >= StarGoal) { S.stars -= StarGoal; S.fills++; S.pending.Add(Tier.Treasure); filled = true; }   // every fill pays
+            while (S.stars >= StarGoal && !SlotsFull) { S.stars -= StarGoal; S.fills++; S.pending.Add(Tier.Treasure); filled = true; }   // a full meter waits for a slot
             Save();
-            KartApi.Event("chest_earn", new { tier = tier.ToString(), place, filled });
-            return LastEarn = (tier, stars, filled);
+            KartApi.Event("chest_earn", new { tier = got?.ToString() ?? "none", place, filled, full = LastFull });
+            return LastEarn = (got, stars, filled);
         }
 
         /// A chest from outside a podium (a Tour boss, the Daily Challenge): waiting to be opened.

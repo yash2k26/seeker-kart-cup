@@ -29,7 +29,7 @@ namespace KartCup
             // A pip is 6% of top speed (9 Oct 2026; was 3.5%): a Hero kart's SPEED 5 is +18%, so a bought kart visibly
             // walks away from a free one, Beach Buggy's way. referee.ts V_SUSTAINED and referee-test.ts carry the same numbers.
             kart.maxSpeed *= 1f + s * 0.06f;
-            kart.acceleration *= 1f + s * 0.04f;
+            kart.acceleration *= 1f + s * 0.06f;   // 13 Oct 2026: 4% a pip was not felt off the line
             kart.boostSpeedAdd *= 1f + t * 0.15f;
             kart.driftBoostAdd *= 1f + t * 0.12f;
             kart.boostBurnRate *= 1f - t * 0.10f;
@@ -37,7 +37,7 @@ namespace KartCup
             kart.maxSteer *= 1f + g * 0.04f;
             kart.sidewaysFriction *= 1f + g * 0.045f;
             kart.spinDecel *= Mathf.Max(0.4f, 1f - a * 0.1f);   // ARMOR: a hit costs less speed (spinDecel slows a spinning kart)
-            if (kart.rb != null) kart.rb.mass *= 1f + a * 0.08f;
+            if (kart.rb != null) kart.rb.mass *= 1f + a * 0.04f;   // heavier to bump; at 8% a pip ARMOR made a kart slower (measured, 13 Oct 2026)
             var powers = KartPowers.On(kart.gameObject);
             powers.attack *= 1f + k * 0.15f;
             if (attack >= 4) powers.bonusAmmo += 1;

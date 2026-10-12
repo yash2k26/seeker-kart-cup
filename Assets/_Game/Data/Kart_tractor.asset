@@ -16,8 +16,8 @@ MonoBehaviour:
   displayName: Harvester
   blurb: Slow off the line, unstoppable after.
   sku: kart.tractor
-  speed: 2
+  speed: 4
   turbo: 5
   grip: 3
-  armor: 5
+  armor: 3
   attack: 3

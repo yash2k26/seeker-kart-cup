@@ -248,6 +248,7 @@ public static class MenuPreview
         Achievements.Preview();
         foreach (var d in Object.FindObjectsByType<DailyCard>(FindObjectsInactive.Include, FindObjectsSortMode.None)) d.ShowInEditor();
         foreach (var w in Object.FindObjectsByType<WeeklyCard>(FindObjectsInactive.Include, FindObjectsSortMode.None)) w.ShowInEditor();
+        foreach (var l in Object.FindObjectsByType<LeaderboardFeed>(FindObjectsInactive.Include, FindObjectsSortMode.None)) l.ShowInEditor();
         foreach (var c in Object.FindObjectsByType<ChestButton>(FindObjectsInactive.Include, FindObjectsSortMode.None)) c.ShowInEditor();
         foreach (var t in Object.FindObjectsByType<TitleToast>(FindObjectsInactive.Include, FindObjectsSortMode.None)) t.ShowInEditor("mert.skr beat your Palm Bay lap by 0.42 s", "RACE");
 

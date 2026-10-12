@@ -1,4 +1,5 @@
 using PrimeTween;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -11,6 +12,15 @@ namespace KartCup
         [SerializeField] Image[] pips = System.Array.Empty<Image>();
         [SerializeField] Color on = new(0.96f, 0.78f, 0.35f);
         [SerializeField] Color off = new(1f, 1f, 1f, 0.18f);
+        [SerializeField] TMP_Text label;      // the row's name: a kart's row adds what its pips do against a free kart
+        [SerializeField] string title;
+
+        /// "SPEED  +12%" in gold (or a cost in grey); empty for none.
+        public void Note(string note)
+        {
+            if (label == null) return;
+            label.text = string.IsNullOrEmpty(note) ? title : $"{title}  <color={(note.StartsWith("-") ? "#8F86B8" : "#FFB126")}>{note}</color>";
+        }
 
         int shown = -1;
 

@@ -67,8 +67,10 @@ namespace KartCup
                 if (rowObjects[i] != null) rowObjects[i].SetActive(i < n);
                 if (i >= n) continue;
                 var e = rows[i];
-                if (i < ranks.Length) ranks[i].text = e.rank.ToString();
-                if (i < names.Length) names[i].text = Fit(e.name) + (e.isSeeker ? "  <size=70%><color=#B4A7DE>SEEKER</color></size>" : "");
+                bool judge = e.rank == 0;
+                if (i < ranks.Length) ranks[i].text = judge ? "" : e.rank.ToString();
+                string tag = judge ? "JUDGE" : me != null && e.wallet == me ? "YOU" : e.isSeeker ? "SEEKER" : "";
+                if (i < names.Length) names[i].text = Fit(e.name) + (tag != "" ? $"  <size=70%><color={(tag == "YOU" ? "#FFB126" : "#B4A7DE")}>{tag}</color></size>" : "");
                 if (i < times.Length) times[i].text = RaceHud.Clock(e.bestMs / 1000f);
                 if (i < prizeLabels.Length) prizeLabels[i].text = e.prizePlace is { } p && Weekly.Prize(p) is { } amount ? amount : "";
                 if (i < rowBacks.Length) rowBacks[i].color = me != null && e.wallet == me ? rowMine : rowIdle;
@@ -80,6 +82,11 @@ namespace KartCup
         {
             if (b == null) return new List<Weekly.Row>();
             var all = b.entries;
+            // 13 Oct 2026, the user: "weekly isn't working". An empty board read as broken, so while it has room the
+            // judges' par times (the Ranking's) stand on it as pace to beat, unranked: they take no place and no prize.
+            if (all.Count < rowObjects.Length && LeaderboardFeed.SolidLap.TryGetValue(b.track, out float solid))
+                return all.Concat(LeaderboardFeed.Judges.Select(j => new Weekly.Row { rank = 0, name = j.name, bestMs = Mathf.RoundToInt(solid / j.pace * 1000f) }))
+                          .OrderBy(e => e.bestMs).Take(rowObjects.Length).ToList();
             if (all.Count <= rowObjects.Length || b.me == null || b.me.rank <= rowObjects.Length) return all.Take(rowObjects.Length).ToList();
             var around = all.Where(e => e.rank >= b.me.rank - 2 && e.rank <= b.me.rank + 2).ToList();
             if (!around.Any(e => e.wallet == b.me.wallet)) around.Add(b.me);   // past the top 50 the Worker sends your row alone

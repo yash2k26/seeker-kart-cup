@@ -43,12 +43,12 @@ export const CATALOG: Sku[] = [
 
   // SPEED, TURBO, GRIP, ARMOR, ATTACK — Street karts total 14, Hero karts 18 (the free five total 10)
   kart('taxi',             'Night Cab',       'Takes everyone for a ride.',            3, 3, 2, 3, 3),
-  kart('van',              'Courier',       'Delivers. Eventually.',                 2, 3, 2, 4, 3),
+  kart('van',              'Courier',       'Delivers. Eventually.',                 3, 3, 2, 4, 2),
   kart('hatchback-sports', 'Hot Hatch',     'Point it and it goes.',                 4, 3, 3, 2, 2),
   kart('police',           'Slasher',       'Enforces the racing line.',             3, 3, 3, 2, 3),
-  kart('firetruck',        'Fire Chief',        'A fire truck. In a kart race. Yes.',    3, 4, 3, 5, 3),
-  kart('garbage-truck',    'Big Haul', 'Hauls the whole field.',              2, 3, 3, 5, 5),
-  kart('tractor',          'Harvester',  'Slow off the line, unstoppable after.', 2, 5, 3, 5, 3),
+  kart('firetruck',        'Fire Chief',        'A fire truck. In a kart race. Yes.',    4, 4, 3, 4, 3),
+  kart('garbage-truck',    'Big Haul', 'Hauls the whole field.',              4, 3, 3, 4, 4),
+  kart('tractor',          'Harvester',  'Slow off the line, unstoppable after.', 4, 5, 3, 3, 3),
   kart('race-future',      'Photon',        'Low, wide, glued to the road.',         5, 4, 5, 2, 2),
 
   driver('mert',   'Mert',   'Knows every corner before he takes it. Or beat him in Cup 1.',             0.08),

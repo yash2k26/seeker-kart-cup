@@ -17,6 +17,9 @@ namespace KartCup
             if (!show) return;
             if (RaceMode.EventId == "daily")
             {
+                // the Daily keeps the standings and "You finished 1st" (a Tour event hides them), so its line goes up
+                // into the Weekly line's slot, which a Daily never uses, instead of sitting on top of that one
+                line.rectTransform.anchoredPosition = new Vector2(line.rectTransform.anchoredPosition.x, 300f);
                 line.text = Daily.LastPaid ? "DAILY CHALLENGE DONE  ·  + SILVER CHEST  ·  + 3 STARS"
                     : Daily.Done ? "Daily challenge already done today" : $"Daily goal: {Daily.Current.goal.ToLowerInvariant()}. Try again!";
                 return;

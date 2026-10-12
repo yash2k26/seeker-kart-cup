@@ -26,11 +26,11 @@ namespace KartCup
             bool show = !Weekly.Racing && !(RoomClient.Instance != null && RoomClient.Instance.Room != null && RoomClient.Instance.Room.IsPaid);
             if (content != null) content.SetActive(show);
             if (!show) return;
-            if (stars != null) stars.text = (tier == null ? $"STARS  {Chests.Stars}/{Chests.StarGoal}" : $"+{gained} STARS  ·  {Chests.Stars}/{Chests.StarGoal}")
+            if (stars != null) stars.text = (gained <= 0 ? $"STARS  {Mathf.Min(Chests.Stars, Chests.StarGoal)}/{Chests.StarGoal}" : $"+{gained} STARS  ·  {Mathf.Min(Chests.Stars, Chests.StarGoal)}/{Chests.StarGoal}")
                                             + (Gems.LastPodium > 0 && !TourCard ? $"  ·  +{Gems.LastPodium} GEMS" : "");
             if (openButton != null) openButton.SetActive(tier != null && Chests.Pending > 0 && ChestReveal.Instance != null && !ChestReveal.Instance.Showing);
             if (chest != null) chest.enabled = tier != null;
-            if (label != null) label.text = tier == null ? "Podium finishes earn chests" : filled ? "+ GOLDEN TREASURE CHEST!" : Chests.Names[(int)tier.Value];
+            if (label != null) label.text = Chests.LastFull ? "CHEST SLOTS FULL: OPEN ONE" : tier == null ? (filled ? "+ GOLDEN TREASURE CHEST!" : "WIN TO EARN A CHEST") : filled ? "+ GOLDEN TREASURE CHEST!" : Chests.Names[(int)tier.Value];
             if (tier == null || tier == shown) return;
             shown = tier;
             chest.sprite = closedSprites[(int)tier.Value];

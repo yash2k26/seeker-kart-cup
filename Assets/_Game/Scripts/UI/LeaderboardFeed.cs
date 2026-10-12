@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using PrimeTween;
 using TMPro;
 using UnityEngine;
@@ -22,6 +24,13 @@ namespace KartCup
 
         int asked;     // a newer tab press wins over a slower answer to an older one
 
+        // 13 Oct 2026, the user: "what is ranking for, when it shows nothing". With few players signed in a board was
+        // empty, so it always holds two more things: your own best lap here (lit), and the five judges' par times (the
+        // Tour bosses at their pace over a solid lap: the phone's autopilot at skill 1.08 on 11 Oct, plus 3%).
+        internal static readonly Dictionary<string, float> SolidLap = new() { ["beach"] = 58.5f, ["alpine"] = 58.1f, ["forest"] = 46.8f, ["speedway"] = 58.8f, ["volcano"] = 49.2f };
+        internal static readonly (string name, float pace)[] Judges = { ("Mert", 1.04f), ("Akshay", 1.07f), ("Chase", 1.10f), ("Toly", 1.13f), ("Beeman", 1.15f) };
+        sealed class Line { public string name, wallet; public float seconds; public bool judge, me, seeker; }
+
         void OnEnable() => Load();
 
         /// A track tab.
@@ -41,36 +50,60 @@ namespace KartCup
             ShowRows(0);
             rows.gameObject.SetActive(true);
             rows.text = "Loading the fastest laps…";
-            try
+            KartApi.Board board = null;
+            try { board = await KartApi.Leaderboard(track); }
+            catch (System.Exception e) { Debug.LogWarning("[board] " + e.Message); }   // offline: the judges and your best still show
+            if (me != asked || this == null) return;
+            string mine = WalletFlow.Instance != null && WalletFlow.Instance.Profile != null ? WalletFlow.Instance.Profile.wallet : null;
+            Fill(Merge(board, mine));
+        }
+
+        /// MenuPreview: the card as it is offline (the judges and this machine's best), since OnEnable never runs in edit mode.
+        public void ShowInEditor() { if (rows == null) return; MarkTabs(); Fill(Merge(null, null)); }
+
+        void Fill(List<(int rank, Line line)> lines)
+        {
+            int n = Mathf.Min(lines.Count, rowObjects.Length);
+            rows.gameObject.SetActive(n == 0); if (n == 0) rows.text = "No laps here yet.";
+            for (int i = 0; i < n; i++)
             {
-                var board = await KartApi.Leaderboard(track);
-                if (me != asked || this == null) return;
-                int n = board == null ? 0 : Mathf.Min(board.entries.Count, rowObjects.Length);
-                rows.gameObject.SetActive(n == 0);
-                rows.text = "No times on this track yet.\nSet the first one.";
-                string mine = WalletFlow.Instance != null && WalletFlow.Instance.Profile != null ? WalletFlow.Instance.Profile.wallet : null;
-                for (int i = 0; i < n; i++)
+                var (rank, l) = lines[i];
+                if (i < ranks.Length && ranks[i] != null) ranks[i].text = rank.ToString();
+                string tag = l.judge ? "JUDGE" : l.me ? (l.name == "You" ? "" : "YOU") : l.seeker ? "SEEKER" : "";
+                if (i < names.Length && names[i] != null) names[i].text = Fit(l.name) + (tag != "" ? $"  <size=70%><color={(l.me ? "#FFB126" : "#B4A7DE")}>{tag}</color></size>" : "");
+                if (i < times.Length && times[i] != null) times[i].text = RaceHud.Clock(l.seconds);
+                if (i < medals.Length && medals[i] != null)
                 {
-                    var e = board.entries[i];
-                    if (i < ranks.Length && ranks[i] != null) ranks[i].text = e.rank.ToString();
-                    if (i < names.Length && names[i] != null) names[i].text = Fit(e.name) + (e.isSeeker ? "  <size=70%><color=#B4A7DE>SEEKER</color></size>" : "");
-                    if (i < times.Length && times[i] != null) times[i].text = RaceHud.Clock(e.bestMs / 1000f);
-                    if (i < medals.Length && medals[i] != null)
-                    {
-                        medals[i].enabled = e.rank <= medalColours.Length;
-                        if (medals[i].enabled) medals[i].color = medalColours[e.rank - 1];
-                    }
-                    if (i < rowBacks.Length && rowBacks[i] != null) rowBacks[i].color = mine != null && e.wallet == mine ? rowMine : rowIdle;
+                    medals[i].enabled = rank <= medalColours.Length;
+                    if (medals[i].enabled) medals[i].color = medalColours[rank - 1];
                 }
-                ShowRows(n);
+                if (i < rowBacks.Length && rowBacks[i] != null) rowBacks[i].color = l.me ? rowMine : rowIdle;
             }
-            catch (System.Exception e)
-            {
-                if (me != asked || this == null) return;
-                Debug.LogWarning("[board] " + e.Message);
-                rows.gameObject.SetActive(true);
-                rows.text = "Can't reach the leaderboard.\nCheck your connection and try again.";
-            }
+            ShowRows(n);
+        }
+
+        /// The server's laps, the judges' par times and your own best, fastest first, each with its rank; your row stays
+        /// on the card even when it is below the last one shown (it takes the last place, with its real rank).
+        List<(int rank, Line line)> Merge(KartApi.Board board, string mine)
+        {
+            var all = new List<Line>();
+            bool meOnBoard = false;
+            if (board != null)
+                foreach (var e in board.entries)
+                {
+                    bool isMe = mine != null && e.wallet == mine; meOnBoard |= isMe;
+                    all.Add(new Line { name = e.name, wallet = e.wallet, seconds = e.bestMs / 1000f, me = isMe, seeker = e.isSeeker });
+                }
+            float best = Tracks.Best(track);
+            if (!meOnBoard && best > 0f) all.Add(new Line { name = WalletFlow.Instance?.Profile?.skrName ?? "You", seconds = best, me = true });
+            if (SolidLap.TryGetValue(track, out float solid))
+                foreach (var (name, pace) in Judges) all.Add(new Line { name = name, seconds = solid / pace, judge = true });
+            var ranked = all.OrderBy(l => l.seconds).Select((l, i) => (i + 1, l)).ToList();
+            int shown = rowObjects.Length;
+            int at = ranked.FindIndex(r => r.l.me);
+            var list = ranked.Take(shown).ToList();
+            if (at >= shown && shown > 0) list[shown - 1] = ranked[at];
+            return list;
         }
 
         void ShowRows(int n)

@@ -122,6 +122,7 @@ namespace PowerslideKartPhysics
 
         // Sets the target kart to the given kart
         public virtual void SetHomingTarget(Kart target) {
+            if (target != null && target != targetKart) Debug.Log($"[items] {name} locked on {target.name} {Vector3.Distance(tr != null ? tr.position : transform.position, target.transform.position):0} m away");   // Kartel
             targetKart = target;
         }
 
@@ -241,6 +242,7 @@ namespace PowerslideKartPhysics
                     if (curCol.otherCollider != casterCol || (lifeTime > casterIgnoreTime && canHitCaster && curCol.otherCollider == casterCol)) {
                         // Spin out kart upon collision
                         curCol.otherCollider.transform.GetTopmostParentComponent<Kart>().SpinOut(kartSpin, kartSpinCount);
+                        if (homingAccuracy > 0) Debug.Log($"[items] {name} hit {curCol.otherCollider.transform.GetTopmostParentComponent<Kart>().name}");   // Kartel
                         Destroy(gameObject);
                     }
                 }

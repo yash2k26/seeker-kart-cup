@@ -47,6 +47,7 @@ public static class Playtest
     static bool oobTest, smashTest, oobDone, smashDone, countShot;
     static double every, nextAuto = -1, until = 50;
     static bool toCard, cardShot;
+    static string prevKart;
     static double cardAt = -1;
     static int autoShot;
 
@@ -79,10 +80,19 @@ public static class Playtest
         // -mist turn those on for any race
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-event")
         {
+            if (args[i + 1] == "daily") { var d = KartCup.Daily.Current; KartCup.Daily.Arm(d); track = d.track + 1; continue; }   // today's Daily as the menu arms it
             var (c, e) = KartCup.Tour.Find(args[i + 1]);
             if (e != null) { KartCup.Tour.Arm(e, c); track = e.track + 1; } else Debug.LogError("[playtest] no event " + args[i + 1]);
         }
         if (args.Contains("-reverse")) KartCup.RaceMode.Reverse = true;
+        KartCup.RaceManager.PodiumEnds = !args.Contains("-fullrace");   // -fullrace: the player's lap always ends at the line
+        // -kart <id>: the player drives that kart (its free trial armed for the run; the pick is put back at the end)
+        prevKart = null;
+        for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-kart")
+        {
+            prevKart = KartCup.KartDatabase.SelectedId; string id = args[i + 1];
+            KartCup.KartDatabase.SelectedId = id; KartCup.KartDatabase.GrantTrial(id); KartCup.KartDatabase.ArmTrial(id);
+        }
         // bought items carried in (Carry), never the picker: -carry rocket:2,bomb:1 (nothing carried without it)
         KartCup.Carry.SkipPicker = true;
         KartCup.Carry.Chosen = new System.Collections.Generic.List<KartCup.Carry.Stack>();
@@ -285,6 +295,7 @@ public static class Playtest
         Debug.Log("[playtest] done");
         if (mobile) QualitySettings.SetQualityLevel(prevQuality, true);
         if (steer != null) KartCup.Settings.Steering = prevSteer;
+        if (prevKart != null) KartCup.KartDatabase.SelectedId = prevKart;
         EditorApplication.Exit(0);
     }
 

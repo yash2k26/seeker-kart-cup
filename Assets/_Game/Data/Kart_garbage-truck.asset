@@ -16,8 +16,8 @@ MonoBehaviour:
   displayName: Big Haul
   blurb: Hauls the whole field.
   sku: kart.garbage-truck
-  speed: 2
+  speed: 4
   turbo: 3
   grip: 3
-  armor: 5
-  attack: 5
+  armor: 4
+  attack: 4

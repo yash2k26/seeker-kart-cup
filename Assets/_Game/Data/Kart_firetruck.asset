@@ -16,8 +16,8 @@ MonoBehaviour:
   displayName: Fire Chief
   blurb: A fire truck. In a kart race. Yes.
   sku: kart.firetruck
-  speed: 3
+  speed: 4
   turbo: 4
   grip: 3
-  armor: 5
+  armor: 4
   attack: 3

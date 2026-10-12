@@ -242,7 +242,7 @@ public static class Design
     /// White glyph on clear, 128 px, made once into Gen/Icons. play, back, next, globe, trophy, kart, user, flag; the
     /// race items (rocket, homing, bomb, nitro, bouncer, sunbomb, trap); arc (the loading spinner).
     public static readonly string[] Drawn = { "play", "back", "next", "globe", "trophy", "kart", "user", "flag",
-                                              "rocket", "homing", "bomb", "nitro", "bouncer", "sunbomb", "trap", "arc", "download", "star", "swap", "lock", "fuel" };
+                                              "rocket", "homing", "bomb", "nitro", "bouncer", "sunbomb", "trap", "arc", "download", "star", "swap", "lock", "fuel", "gem" };
     /// The race items' glyphs by ItemManager name.
     public static string ItemGlyph(string item) => item switch
     {

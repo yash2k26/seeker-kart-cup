@@ -16,7 +16,10 @@ public static class KartSetup
                                               "taxi", "van", "hatchback-sports", "police", "firetruck", "garbage-truck", "tractor", "race-future" };
 
     // id, shown name, blurb, sku ("" = free), then the five powers (0..5): SPEED, TURBO, GRIP, ARMOR, ATTACK. The free
-    // five total 10, Street karts 14, Hero karts 18, and the total sets the price (KartPricing). worker/src/catalog.ts
+    // five total 10, Street karts 14, Hero karts 18, and the total sets the price (KartPricing). Every kart for sale has
+    // SPEED 3 or more, a Hero 4 or more (13 Oct 2026, the user: "all the karts have the same features, what's the point
+    // of paying"; measured on Palm Bay, the Courier at SPEED 2 lapped slower than a free kart).
+    // Public so a tool can rewrite just the garage's numbers: KartSetup.Powers. worker/src/catalog.ts
     // carries the same table and rule, so the Worker quotes what the card shows offline.
     static readonly (string id, string name, string blurb, string sku, int sp, int tb, int gr, int ar, int at)[] Garage =
     {
@@ -26,12 +29,12 @@ public static class KartSetup
         ("oopi", "Oopi", "Big tyres, big attitude.", "",                                  2, 2, 2, 3, 1),
         ("oozi", "Oozi", "All gas, some brakes.", "",                                     2, 3, 1, 2, 2),
         ("taxi", "Night Cab", "Takes everyone for a ride.", "kart.taxi",                    3, 3, 2, 3, 3),
-        ("van", "Courier", "Delivers. Eventually.", "kart.van",                           2, 3, 2, 4, 3),
+        ("van", "Courier", "Delivers. Eventually.", "kart.van",                           3, 3, 2, 4, 2),
         ("hatchback-sports", "Hot Hatch", "Point it and it goes.", "kart.hatchback-sports", 4, 3, 3, 2, 2),
         ("police", "Slasher", "Enforces the racing line.", "kart.police",                 3, 3, 3, 2, 3),
-        ("firetruck", "Fire Chief", "A fire truck. In a kart race. Yes.", "kart.firetruck",   3, 4, 3, 5, 3),
-        ("garbage-truck", "Big Haul", "Hauls the whole field.", "kart.garbage-truck", 2, 3, 3, 5, 5),
-        ("tractor", "Harvester", "Slow off the line, unstoppable after.", "kart.tractor", 2, 5, 3, 5, 3),
+        ("firetruck", "Fire Chief", "A fire truck. In a kart race. Yes.", "kart.firetruck",   4, 4, 3, 4, 3),
+        ("garbage-truck", "Big Haul", "Hauls the whole field.", "kart.garbage-truck", 4, 3, 3, 4, 4),
+        ("tractor", "Harvester", "Slow off the line, unstoppable after.", "kart.tractor", 4, 5, 3, 3, 3),
         ("race-future", "Photon", "Low, wide, glued to the road.", "kart.race-future",    5, 4, 5, 2, 2),
     };
 
@@ -210,6 +213,9 @@ public static class KartSetup
         "van" => ("Engine3", 0.45f, 1.20f), "firetruck" => ("Engine3", 0.40f, 1.10f), "garbage-truck" => ("Engine3", 0.38f, 1.00f),
         _ => ("Engine1", 0.55f, 1.45f),
     };
+
+    /// The garage's numbers only (Karts.asset and each Kart_<id>.asset), without rebuilding the kart prefabs.
+    public static void Powers() { Database(); AssetDatabase.SaveAssets(); if (Application.isBatchMode) EditorApplication.Exit(0); }
 
     /// Karts.asset: what the garage shows and the spawner reads. Rebuilt every run so a renamed kart never goes stale.
     static void Database()

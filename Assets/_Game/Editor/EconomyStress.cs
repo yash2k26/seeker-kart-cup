@@ -118,14 +118,30 @@ public static class EconomyStress
         var counts = new int[4]; int sinceGold = 0, worstDrought = 0;
         for (int i = 0; i < 6000; i++)
         {
-            var (tier, stars, _) = Chests.Earn(1 + i % 3);
-            if (tier == null) { Check("chests: a podium always earns a chest", false); break; }
-            counts[(int)tier.Value]++;
-            sinceGold = tier.Value >= Chests.Tier.Gold ? 0 : sinceGold + 1;
-            worstDrought = Mathf.Max(worstDrought, sinceGold);
+            int place = 1 + i % 3;
+            var (tier, stars, _) = Chests.Earn(place);
+            // 13 Oct 2026: a chest needs a win (and a free slot); second and third fill the meter
+            if (place == 1 && tier == null) { Check("chests: a win with a free slot always earns a chest", false); break; }
+            if (place > 1 && tier != null) { Check("chests: second and third earn stars, not a chest", false); break; }
+            if (tier != null)
+            {
+                counts[(int)tier.Value]++;
+                sinceGold = tier.Value >= Chests.Tier.Gold ? 0 : sinceGold + 1;
+                worstDrought = Mathf.Max(worstDrought, sinceGold);
+            }
+            while (Chests.Pending > 0) Chests.Open();             // the player opens what they win: the slots stay free
             if (Chests.Stars < 0 || Chests.Stars >= Chests.StarGoal) { Check($"chests: the meter reads {Chests.Stars}/{Chests.StarGoal}", false); break; }
         }
-        Check($"chests: never more than {Chests.GoldPity - 1} podiums without a gold (worst {worstDrought})", worstDrought <= Chests.GoldPity - 1);
+        Check($"chests: never more than {Chests.GoldPity - 1} won chests without a gold (worst {worstDrought})", worstDrought <= Chests.GoldPity - 1);
+        // the slots: four waiting, and a win earns no chest (but its stars); a full meter waits; gifts always go in
+        Chests.Preview(28, Chests.Tier.Wood, Chests.Tier.Wood, Chests.Tier.Wood, Chests.Tier.Wood);
+        var full = Chests.Earn(1);
+        Check("chests: with four waiting a win earns no chest, says so, and still pays its stars", full.tier == null && Chests.LastFull && Chests.Pending == 4 && full.stars == 3);
+        Check("chests: a full star meter waits for a slot instead of losing its stars", Chests.Stars >= Chests.StarGoal && Chests.Pending == 4, $"{Chests.Stars}/{Chests.StarGoal}, {Chests.Pending} waiting");
+        Chests.Open(); Chests.Earn(3);
+        Check("chests: the waiting meter pays the moment a slot is free", Chests.Pending == 4 && Chests.Stars < Chests.StarGoal, $"{Chests.Pending} waiting, {Chests.Stars}/{Chests.StarGoal}");
+        Chests.Give(Chests.Tier.Silver);
+        Check("chests: a gift goes in even with every slot taken", Chests.Pending == 5);
         Check("chests: off the podium earns nothing", Chests.Earn(4).tier == null && Chests.Earn(0).tier == null && Chests.Earn(-3).tier == null);
         Debug.Log($"[economy] 6000 podiums: wood {counts[0]} silver {counts[1]} gold {counts[2]} treasure {counts[3]}, {Chests.Pending} chests waiting");
         Chests.Preview(0);
@@ -301,6 +317,7 @@ public static class EconomyStress
             Gems.Earn(757, "test");
             Inventory.Add("rocket", 5); Carry.Remember(new() { new Carry.Stack { id = "rocket", n = 3 } });
             Tracks.RecordBest("beach", 61.25f); Tracks.RecordBest(RaceMode.BestKey("alpine", true, 2, RaceMode.Items.Nitro), 70.5f);
+            Check("a test's forced finish (11.97 s on a 2.3 km lap) is never a best", !Tracks.RecordBest("beach", 11.97f) && Mathf.Approximately(Tracks.Best("beach"), 61.25f));
             KartDatabase.SpendTrial("k_test"); Unlocks.Earn("driver.test");
             Chests.AddStars(4); Chests.Give(Chests.Tier.Gold);
             Tour.Record(Tour.Cups[0].events[0].id, 1, 50f);

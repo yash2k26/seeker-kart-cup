@@ -5034,12 +5034,12 @@ MonoBehaviour:
     wallTag: Walls
   casterIgnoreTime: 0.5
   canHitCaster: 0
-  fetchKartsDuringSpawn: 0
+  fetchKartsDuringSpawn: 1
   homingAccuracy: 10
-  prioritizeKartsInFront: 1
-  minHomingAngle: 0
-  maxHomingDist: 50
-  useLineOfSight: 1
+  prioritizeKartsInFront: 0
+  minHomingAngle: -0.35
+  maxHomingDist: 140
+  useLineOfSight: 0
   lineOfSightMask:
     serializedVersion: 2
     m_Bits: 1025

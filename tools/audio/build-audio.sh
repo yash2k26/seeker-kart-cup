@@ -1,7 +1,7 @@
 #!/bin/zsh
 # Composes the game's music and item sounds and writes them as OGG where AudioSetup.cs looks for them.
 #   ./tools/audio/build-audio.sh        (needs the teaser folder: its synth kit and its venvs)
-# Music: six original loops (tools/audio/game_music.py). Item sounds: tools/audio/game_sfx.py, plus the teaser's own
+# Music: seven original loops (tools/audio/game_music.py). Item sounds: tools/audio/game_sfx.py, plus the teaser's own
 # in-house effects (teaser/sunbomb/audio/sfx, all synthesised: no licence, no credit).
 set -e
 cd "$(dirname "$0")/../.."
@@ -11,7 +11,7 @@ TMP=$(mktemp -d)
 MUSIC=Assets/_Game/Audio/Music; SFX=Assets/_Game/Audio/SFX/items
 mkdir -p $MUSIC $SFX
 
-for t in coast_run blue_hour golden_mist floodlights afterburn garage; do
+for t in coast_run blue_hour golden_mist floodlights afterburn garage kartel_theme; do
   TEASER=$T $T/.venv-music/bin/python tools/audio/game_music.py $t $TMP/$t.wav | tail -1
   $OGG $TMP/$t.wav $MUSIC/$t.ogg
 done
