@@ -68,7 +68,8 @@ namespace KartCup
         {
             if (mat == null) return;
             var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            Destroy(go.GetComponent<Collider>());
+            DestroyImmediate(go.GetComponent<Collider>());   // now, not at the frame's end: parented under the kart's moving body first,
+                                                             // its concave mesh collider logged a physics error per lamp per kart (MenuMonkey, 12 Oct 2026)
             go.name = name;
             go.transform.SetParent(body, true);
             go.transform.SetPositionAndRotation(kart.TransformPoint(kartLocal), kart.rotation * kartRot);

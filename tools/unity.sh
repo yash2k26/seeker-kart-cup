@@ -13,7 +13,7 @@ fi
 export SDKMANAGER_OPTS="-Dsun.net.client.defaultReadTimeout=15000 -Dsun.net.client.defaultConnectTimeout=15000"
 start=$(date +%s)
 # Play-mode tools (Playtest, ContractTest) exit the editor themselves; -quit would kill them before play mode starts.
-QUIT=-quit; [[ "$M" == Playtest.* || "$M" == ContractTest.* || "$M" == RoomSmoke.* || "$M" == PurchaseCheck.* || "$M" == MenuPlay.* ]] && QUIT=""
+QUIT=-quit; [[ "$M" == Playtest.* || "$M" == ContractTest.* || "$M" == RoomSmoke.* || "$M" == PurchaseCheck.* || "$M" == MenuPlay.* || "$M" == MenuMonkey.* ]] && QUIT=""
 "$UNITY" -batchmode -projectPath . -executeMethod "$M" -logFile "$LOG" "$@" $QUIT && rc=0 || rc=$?
 echo "== $M exit $rc in $(( $(date +%s) - start ))s — $LOG"
 grep -E "error CS|Exception:|Error:|\[(track|menu|menuplay|race|items|budget|look|content|preview|playtest|cuptest|contract|purchasecheck|escrowcheck|roomsmoke|probe|road|karts|build|economy|monkey)\]" "$LOG" | grep -v "Warning" | head -60

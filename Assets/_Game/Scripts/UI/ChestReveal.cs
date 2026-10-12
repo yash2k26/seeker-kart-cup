@@ -209,8 +209,11 @@ namespace KartCup
             Tween.PunchLocalRotation(chest, new Vector3(0, 0, 7f + 7f * taps), 0.35f, frequency: 9 + 3 * taps, useUnscaledTime: true);
             Tween.PunchScale(chest, new Vector3(0.07f * taps, -0.06f * taps, 0f), 0.32f, frequency: 7, useUnscaledTime: true);
             if (taps < 3)
-                Tween.UIAnchoredPositionY(chest, 60f + 28f * taps, 0.11f, Ease.OutQuad, useUnscaledTime: true)
-                     .Chain(Tween.UIAnchoredPositionY(chest, 60f, 0.26f, Ease.OutBounce, useUnscaledTime: true));
+                // a sequence made unscaled itself: chaining two unscaled tweens made a scaled one and PrimeTween logged
+                // an error every tap (MenuMonkey, 12 Oct 2026)
+                Sequence.Create(useUnscaledTime: true)
+                    .Chain(Tween.UIAnchoredPositionY(chest, 60f + 28f * taps, 0.11f, Ease.OutQuad, useUnscaledTime: true))
+                    .Chain(Tween.UIAnchoredPositionY(chest, 60f, 0.26f, Ease.OutBounce, useUnscaledTime: true));
             glowImage.color = Fade(tierColors[tier], 0.15f + taps * 0.25f);
             Tween.Scale(glow, Vector3.one * (1f + taps * 0.14f), 0.25f, Ease.OutQuad, useUnscaledTime: true);
             Tween.PunchScale(glow, Vector3.one * 0.12f, 0.3f, frequency: 4, useUnscaledTime: true);
@@ -287,8 +290,9 @@ namespace KartCup
                 c.localScale = Vector3.one * Random.Range(0.6f, 1.15f);
                 float t = Random.Range(0.8f, 1.3f), x = Random.Range(-820f, 820f), peak = 140f + Random.Range(180f, 520f);
                 Tween.UIAnchoredPositionX(c, x, t, Ease.Linear, useUnscaledTime: true);                     // sideways at a steady speed...
-                Tween.UIAnchoredPositionY(c, peak, t * 0.42f, Ease.OutQuad, useUnscaledTime: true)           // ...up, slowing...
-                     .Chain(Tween.UIAnchoredPositionY(c, -420f, t * 0.58f, Ease.InQuad, useUnscaledTime: true));   // ...and down, gathering speed: gravity
+                Sequence.Create(useUnscaledTime: true)
+                    .Chain(Tween.UIAnchoredPositionY(c, peak, t * 0.42f, Ease.OutQuad, useUnscaledTime: true))      // ...up, slowing...
+                    .Chain(Tween.UIAnchoredPositionY(c, -420f, t * 0.58f, Ease.InQuad, useUnscaledTime: true));    // ...and down, gathering speed: gravity
                 Tween.LocalRotation(c, new Vector3(0, 0, Random.Range(-720f, 720f)), t, useUnscaledTime: true);
                 var img = c.GetComponent<Image>();
                 img.color = Color.white;

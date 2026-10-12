@@ -51,7 +51,7 @@ namespace KartCup
                     puff.name = "TyreSmoke"; puff.transform.localPosition = new Vector3(0f, -0.2f, -0.3f); puff.transform.localRotation = Quaternion.identity;
                     var main = puff.main; main.startSizeMultiplier *= 4.5f; main.startLifetimeMultiplier *= 2.2f; main.simulationSpace = ParticleSystemSimulationSpace.World;
                     main.startColor = new Color(0.86f, 0.86f, 0.92f, 0.85f);   // light grey: black exhaust vanishes against a night road
-                    var vel = puff.velocityOverLifetime; vel.enabled = true; vel.space = ParticleSystemSimulationSpace.World; vel.y = new ParticleSystem.MinMaxCurve(0.6f, 1.4f);   // and it rises
+                    var vel = puff.velocityOverLifetime; vel.enabled = true; vel.space = ParticleSystemSimulationSpace.World; vel.x = new ParticleSystem.MinMaxCurve(0f, 0f); vel.y = new ParticleSystem.MinMaxCurve(0.6f, 1.4f); vel.z = new ParticleSystem.MinMaxCurve(0f, 0f);   // and it rises (all three in one curve mode, or Unity logs an error every play)
                     puff.gameObject.SetActive(true); smoke.Add(puff);
                 }
             var exhaust = kart.GetComponentsInChildren<ParticleSystem>(true).Where(ps => ps.name.StartsWith("ExhaustParticles") || ps.name.StartsWith("BoostParticles")).ToArray();
