@@ -55,4 +55,24 @@ namespace KartCup
             });
         }
     }
+
+    /// The frame-rate sweep (13 Oct 2026): kartcup://r/perf/Race1L loads that race scene straight from any screen, on a
+    /// phone whose autopilot file is there (adb puts it), so every circuit and its long layout can be driven and measured
+    /// without taps. Anywhere else the link does nothing: it is not a way round the fuel.
+    static class PerfLink
+    {
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        static void Hook() { Application.deepLinkActivated -= Open; Application.deepLinkActivated += Open; }
+
+        static void Open(string url)
+        {
+            int at = url == null ? -1 : url.IndexOf("/perf/", System.StringComparison.OrdinalIgnoreCase);
+            if (at < 0 || !RaceSpawner.DeviceAutopilot) return;
+            var scene = url.Substring(at + 6).Trim('/').Split('?', '#')[0];
+            if (!scene.StartsWith("Race") || !Application.CanStreamedLevelBeLoaded(scene)) return;
+            Debug.Log("[perf] sweep: loading " + scene);
+            Cup.End(); RaceMode.Clear(); Weekly.Racing = false;
+            UnityEngine.SceneManagement.SceneManager.LoadScene(scene);
+        }
+    }
 }

@@ -117,7 +117,7 @@ namespace KartCup
         public static CharacterDatabase Roster => FindAnyObjectByType<RaceSpawner>()?.roster;
 
         static string AutopilotFile => System.IO.Path.Combine(Application.persistentDataPath, "autopilot");
-        static bool DeviceAutopilot => !Application.isEditor && !RoomClient.InRaceRoom && System.IO.File.Exists(AutopilotFile);
+        internal static bool DeviceAutopilot => !Application.isEditor && !RoomClient.InRaceRoom && System.IO.File.Exists(AutopilotFile);
 
         /// The autopilot's driver, from the file adb puts there: empty for the character's own AI; "skill=1.1" and
         /// "steady" (no unforced mistakes, takes the shortcuts) stand in for a stronger player, to play the Tour through.
