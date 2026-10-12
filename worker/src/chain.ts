@@ -1,6 +1,6 @@
 // Solana reads: RPC proxy, SGT check, .skr resolution, tx verification. Addresses from docs.solanamobile.com (re-verified 13 Sep 2026).
 import type { Env } from './index';
-import { json, bad, now } from './index';
+import { json, bad, now, body } from './index';
 import { priceOf, grantsOf, type Currency } from './catalog';
 import { rates } from './prices';
 import { verifyPayment } from './payout';
@@ -118,7 +118,7 @@ export const signedBy = (tx: any, wallet: string) => tx.transaction.message.acco
 /** POST /v1/tx/confirm { signature, raceId } — memo "kc:pb:<raceId>" signed by the session wallet → results.memo_sig */
 export async function txConfirm(req: Request, env: Env, _ctx: ExecutionContext, wallet: string | null) {
   if (!wallet) return bad('unauthorized', 401);
-  const { signature, raceId } = await req.json<any>().catch(() => ({}));
+  const { signature, raceId } = await body(req);
   if (typeof signature !== 'string' || typeof raceId !== 'string' || signature.length > 128 || raceId.length > 64) return bad('signature and raceId required');
   if (!isSignature(signature) && env.MOCK_CHAIN !== '1') return bad('not a transaction signature');
   if (await usedByOther(env, signature, wallet, 'memo_pb')) return bad('already processed', 409);   // before the RPC: a replay costs nothing upstream
@@ -137,7 +137,7 @@ export async function txConfirm(req: Request, env: Env, _ctx: ExecutionContext, 
  *  (SOL to the owner, SKR or ORE to its associated account) plus memo "kc:buy:<sku>:<orderId>". Prices live in catalog.ts (+ PRICES_JSON). */
 export async function purchaseVerify(req: Request, env: Env, _ctx: ExecutionContext, wallet: string | null) {
   if (!wallet) return bad('unauthorized', 401);
-  const { signature, sku, orderId, currency } = await req.json<any>().catch(() => ({}));
+  const { signature, sku, orderId, currency } = await body(req);
   const cur: Currency = currency === 'SOL' ? 'SOL' : currency === 'ORE' ? 'ORE' : 'SKR';
   const price = sku ? priceOf(String(sku), cur, await rates(env), env.PRICES_JSON) : null;
   if (typeof signature !== 'string' || signature.length > 128 || !sku || !orderId || price === null) return bad('bad request');

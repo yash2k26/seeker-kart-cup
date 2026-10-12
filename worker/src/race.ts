@@ -1,6 +1,6 @@
 // Race sessions, results, leaderboard, profile, events, deletion. Guest mode: a race never needs a wallet.
 import type { Env } from './index';
-import { json, bad, now } from './index';
+import { json, bad, now, body } from './index';
 import { signHmac, readHmac } from './auth';
 import { getProfile } from './chain';
 import { geoOf, referee, finishT, lapTimes, crossingsToFinish, type Sample } from './referee';
@@ -17,7 +17,7 @@ type RaceToken = { r: string; d: string; t: string; s: number };
 /** POST /v1/race/start { deviceId, trackId, mode? } → { raceId, raceToken } — no session needed (guest mode).
  *  mode "weekly": a Kartel Weekly time trial, only on this week's circuit (anything else is an ordinary race). */
 export async function raceStart(req: Request, env: Env) {
-  const { deviceId, trackId, mode } = await req.json<any>().catch(() => ({}));
+  const { deviceId, trackId, mode } = await body(req);
   if (!deviceOk(deviceId) || !knownTrack(trackId)) return bad('deviceId and known trackId required');
   const raceId = crypto.randomUUID();
   const startedMs = Date.now();
@@ -58,7 +58,7 @@ function validate(trackId: string, b: any, issuedAtMs: number): { why: string } 
 
 /** POST /v1/race/finish { raceToken, totalMs, lapMs[], checkpointMs[], position } → { accepted, isPersonalBest, raceId } */
 export async function raceFinish(req: Request, env: Env, _ctx: ExecutionContext, wallet: string | null) {
-  const b = await req.json<any>().catch(() => ({}));
+  const b = await body(req);
   const tok = await readHmac<RaceToken>(env, b.raceToken);
   if (!tok) return bad('bad race token', 401);
   const v = validate(tok.t, b, tok.s);
@@ -75,18 +75,20 @@ export async function raceFinish(req: Request, env: Env, _ctx: ExecutionContext,
     const prev = await env.DB.prepare('SELECT MIN(total_ms) AS best FROM results WHERE wallet = ?1 AND track_id = ?2').bind(owner, tok.t).first<any>();
     isPb = !prev?.best || v.totalMs < prev.best;
   }
-  await env.DB.batch([
-    env.DB.prepare('UPDATE race_sessions SET finished_at = ?2, wallet = COALESCE(wallet, ?3) WHERE race_id = ?1').bind(tok.r, now(), owner),
-    env.DB.prepare('INSERT INTO results (race_id, device_id, wallet, track_id, total_ms, best_lap_ms, laps_json, position, is_pb, created_at, mode, country) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)')
-      .bind(tok.r, tok.d, owner, tok.t, v.totalMs, bestLap, JSON.stringify(v.lapMs), Number.isInteger(b.position) ? b.position : null, isPb ? 1 : 0, now(), session.mode, session.country),
-  ]);
+  // The finish is claimed first, atomically: two copies of one finish arriving together (a retry over a slow link) both
+  // passed the finished_at read above, and the second hit results.race_id UNIQUE as a 500 (scripts/stress.mjs, 12 Oct 2026).
+  const claimed = await env.DB.prepare('UPDATE race_sessions SET finished_at = ?2, wallet = COALESCE(wallet, ?3) WHERE race_id = ?1 AND finished_at IS NULL')
+    .bind(tok.r, now(), owner).run();
+  if (!claimed.meta.changes) return bad('already finished', 409);
+  await env.DB.prepare('INSERT OR IGNORE INTO results (race_id, device_id, wallet, track_id, total_ms, best_lap_ms, laps_json, position, is_pb, created_at, mode, country) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)')
+    .bind(tok.r, tok.d, owner, tok.t, v.totalMs, bestLap, JSON.stringify(v.lapMs), Number.isInteger(b.position) ? b.position : null, isPb ? 1 : 0, now(), session.mode, session.country).run();
   return json({ accepted: true, isPersonalBest: isPb, raceId: tok.r, totalMs: v.totalMs, lapMs: v.lapMs, memo: isPb ? `kc:pb:${tok.r}` : null });
 }
 
 /** POST /v1/race/claim { raceToken } (session) — binds a guest result to the wallet after Sign-In. */
 export async function raceClaim(req: Request, env: Env, _ctx: ExecutionContext, wallet: string | null) {
   if (!wallet) return bad('unauthorized', 401);
-  const { raceToken } = await req.json<any>().catch(() => ({}));
+  const { raceToken } = await body(req);
   const tok = await readHmac<RaceToken>(env, raceToken);
   if (!tok) return bad('bad race token', 401);
   await env.DB.batch([
@@ -111,7 +113,7 @@ export async function demoUnlock(req: Request, env: Env, _ctx: ExecutionContext,
   for (const key of ['demo:' + wallet, 'demo-ip:' + ip]) {
     if (env.RL_STRICT && !(await env.RL_STRICT.limit({ key })).success) return bad('too many attempts, try again in a minute', 429);
   }
-  const { code } = await req.json<any>().catch(() => ({}));
+  const { code } = await body(req);
   if (!env.DEMO_CODE || typeof code !== 'string' || code.trim().toUpperCase() !== env.DEMO_CODE.toUpperCase()) return bad('bad code', 403);
   await env.DB.batch(['kart.seeker_edition', 'badge.seeker'].map(sku =>
     env.DB.prepare("INSERT OR IGNORE INTO unlocks (wallet, sku, source, created_at) VALUES (?1, ?2, 'demo', ?3)").bind(wallet, sku, now())));
@@ -160,7 +162,7 @@ export async function deleteMe(_req: Request, env: Env, _ctx: ExecutionContext, 
 
 /** POST /v1/event { deviceId, name, props } — races, connects, returning devices, last exception. */
 export async function event(req: Request, env: Env, _ctx: ExecutionContext, wallet: string | null) {
-  const { deviceId, name, props } = await req.json<any>().catch(() => ({}));
+  const { deviceId, name, props } = await body(req);
   if (!deviceOk(deviceId) || !name || String(name).length > 64) return bad('bad event');
   await env.DB.prepare('INSERT INTO events (device_id, wallet, name, props, created_at) VALUES (?1, ?2, ?3, ?4, ?5)')
     .bind(deviceId, wallet, String(name), props ? JSON.stringify(props).slice(0, 4000) : null, now()).run();

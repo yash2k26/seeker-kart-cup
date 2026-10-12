@@ -1,7 +1,7 @@
 // HTTP side of rooms: create (→ a code), inspect, the WebSocket hand-off to the Durable Object, the invite page,
 // and the client config (treasury, escrow program, stake tiers, catalog) so the APK carries no addresses of its own.
 import type { Env } from './index';
-import { json, bad, now } from './index';
+import { json, bad, now, body } from './index';
 import { knownTrack } from './race';
 import { CATALOG, STAKE_TIERS, MIN_PAID_PLAYERS, catalogQuoted, formatAmount, type Currency } from './catalog';
 import { rates } from './prices';
@@ -29,7 +29,7 @@ const REFEREE_RESERVE_LAMPORTS = 30_000_000;
  *  minStake '0' is a free room. A paid room takes each player's stake from minStake up to the currency's top tier,
  *  held by the escrow program until the race is settled. */
 export async function roomsCreate(req: Request, env: Env, _ctx: ExecutionContext, wallet: string | null) {
-  const b = await req.json<any>().catch(() => ({}));
+  const b = await body(req);
   const currency: Currency = b.currency === 'SKR' ? 'SKR' : 'SOL';
   // An app from before the escrow sends `fee`, and would pay its stake to the treasury where no room can see it.
   if (b.minStake === undefined && b.fee !== undefined && String(b.fee) !== '0') return bad('update the app to host paid races', 426);

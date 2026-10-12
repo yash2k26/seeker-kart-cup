@@ -139,4 +139,11 @@ export default {
 
 export const json = (data: unknown, status = 200) => Response.json(data, { status });
 export const bad = (msg: string, status = 400) => Response.json({ error: msg }, { status });
+/** A request's JSON body as an object to take fields from: {} for no body, broken JSON, or a body that is valid JSON but
+ *  not an object ("null", "[]", "12"). Destructuring the raw parse threw on "null" and four routes answered 500 (12 Oct
+ *  2026, scripts/stress.mjs). */
+export const body = async (req: Request): Promise<any> => {
+  const v = await req.json<any>().catch(() => null);
+  return v !== null && typeof v === 'object' && !Array.isArray(v) ? v : {};
+};
 export const now = () => Math.floor(Date.now() / 1000);
