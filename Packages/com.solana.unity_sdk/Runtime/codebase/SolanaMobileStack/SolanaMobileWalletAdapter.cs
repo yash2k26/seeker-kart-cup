@@ -137,6 +137,16 @@ namespace Solana.Unity.SDK
         private async Task<LocalAssociationScenario> CreateTargetedScenario()
         {
             var package = await ResolveWalletPackage();
+            // a remembered wallet that can no longer take the request (uninstalled, replaced): forget it and show the
+            // chooser. TryCacheWalletPackage never replaces a cached one, so a stale one stuck for good.
+            if (!string.IsNullOrEmpty(package) && !MwaWalletDiscovery.CanHandle(package))
+            {
+                Debug.LogWarning($"[MWA] Cached wallet '{package}' cannot take the request: cleared, showing the chooser");
+                try { await _walletSelectionCache.ClearSelectedWalletPackage(); } catch (Exception e) { Debug.LogWarning("[MWA] clearing the cache failed: " + e.Message); }
+                package = null;
+            }
+            if (string.IsNullOrEmpty(package) && !MwaWalletDiscovery.CanHandle(null))
+                throw new MwaNoWalletException();
             Debug.Log($"[MWA] Resolved target wallet package: " +
                       (string.IsNullOrEmpty(package) ? "<none>" : package));
             return new LocalAssociationScenario(package);

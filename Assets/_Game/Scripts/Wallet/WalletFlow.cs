@@ -33,7 +33,11 @@ namespace KartCup
         public bool SignedIn => Connected && KartApi.HasSession;
         public string LastStatus { get; private set; }
 
-        void Awake() => Instance = this;
+        void Awake()
+        {
+            Instance = this;
+            if (FindAnyObjectByType<Web3>() == null) Debug.LogError("[wallet] no Web3 in this scene: sign-in and payments cannot work");
+        }
 
         async void Start()
         {
@@ -62,11 +66,31 @@ namespace KartCup
         }
 
         /// Button: "Save to leaderboard" / "Sign in". One prompt: connect + Sign-In-With-Solana.
-        public void Login() { if (!Busy) _ = LoginAsync(); }
+        /// SIGN IN. A tap never goes unanswered (12 Oct 2026, the user: "i click on sign in, and the wallet isnt opening"):
+        /// while an attempt waits on the wallet it says so, and one stuck past the SDK's own 90 s wait gives way to a new one.
+        public void Login()
+        {
+            if (Busy && Time.unscaledTime - loginAt < 100f) { Status("Waiting for your wallet…"); return; }
+            if (Busy) Busy = false;
+            _ = LoginAsync();
+        }
+        float loginAt = -999f;
+
+        /// What a failed sign-in tells the player: what happened and what to do, never only "failed".
+        static string Why(Exception e)
+        {
+            var m = e.Message ?? "";
+            if (e.GetType().Name == "MwaNoWalletException") return "No Solana wallet on this phone. Install Phantom or Solflare, then sign in.";
+            if (m.Contains("returned to app before")) return "Sign-in cancelled. Tap SIGN IN to try again.";
+            if (m.Contains("Timeout or cancelled")) return "Your wallet didn't answer. Open it once, then tap SIGN IN.";
+            if (m.Contains("declined") || m.Contains("rejected") || m.Contains("NotAuthorized") || m.Contains("authorization request failed")) return "Sign-in declined in the wallet.";
+            if (e is KartApi.ApiException || m.Contains("Cannot resolve") || m.Contains("Cannot connect") || m.Contains("timed out")) return "Can't reach Kartel's server. Check your connection.";
+            return "Sign-in failed. Tap SIGN IN to try again.";
+        }
 
         public async Awaitable<bool> LoginAsync()
         {
-            bool outer = Busy; Busy = true;
+            bool outer = Busy; Busy = true; loginAt = Time.unscaledTime;
             try
             {
                 Status("Opening wallet…");
@@ -95,8 +119,8 @@ namespace KartCup
                 if (RaceSession.Instance != null) await RaceSession.Instance.ClaimAfterLogin();
                 return true;
             }
-            catch (OperationInFlightException) { return false; }   // debounced; should not happen
-            catch (Exception e) { Debug.LogWarning("[wallet] login failed: " + e); Status("Sign-in failed. Try again."); return false; }
+            catch (OperationInFlightException) { Status("Your wallet is still open: finish there, or close it and try again."); return false; }
+            catch (Exception e) { Debug.LogWarning("[wallet] login failed: " + e); Status(Why(e)); return false; }
             finally { Busy = outer; }
         }
 

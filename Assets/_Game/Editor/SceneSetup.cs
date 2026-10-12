@@ -122,13 +122,7 @@ public static class SceneSetup
 
         // ---- systems ----
         var boot = new GameObject("Boot"); boot.AddComponent<KartCup.GameBoot>(); boot.AddComponent<KartCup.HitStop>();
-        var web3 = new GameObject("Web3").AddComponent<Web3>();
-        web3.rpcCluster = RpcCluster.MainNet;
-        web3.customRpc = "https://kartcup.bharadwaj465.workers.dev/rpc";     // TODO: your Worker's /rpc once the domain exists
-        web3.solanaWalletAdapterOptions ??= new SolanaWalletAdapterOptions();
-        web3.solanaWalletAdapterOptions.solanaMobileWalletAdapterOptions ??= new SolanaMobileWalletAdapterOptions();
-        var mwa = web3.solanaWalletAdapterOptions.solanaMobileWalletAdapterOptions;
-        mwa.identityUri = "https://kartcup.bharadwaj465.workers.dev/"; mwa.iconUri = "/icon.png"; mwa.name = "Kartel"; mwa.keepConnectionAlive = true;
+        Web3Object();
         var wallet = new GameObject("WalletFlow").AddComponent<KartCup.WalletFlow>();
 
         // ---- UI (legacy uGUI Text; TMP resources come with the real HUD) ----
@@ -190,6 +184,20 @@ public static class SceneSetup
         m.RecalculateBounds();
         AssetDatabase.CreateAsset(m, Art + "Models/Props/RingRoad.asset");
         return m;
+    }
+
+    /// The Solana SDK's Web3 (mainnet, the Worker's RPC, the Mobile Wallet Adapter identity). Every scene with a WalletFlow
+    /// needs one: the menu had none until 12 Oct 2026, so Web3.Instance was null and SIGN IN failed before any wallet opened.
+    public static Web3 Web3Object()
+    {
+        var web3 = new GameObject("Web3").AddComponent<Web3>();
+        web3.rpcCluster = RpcCluster.MainNet;
+        web3.customRpc = "https://kartcup.bharadwaj465.workers.dev/rpc";     // TODO: your Worker's /rpc once the domain exists
+        web3.solanaWalletAdapterOptions ??= new SolanaWalletAdapterOptions();
+        web3.solanaWalletAdapterOptions.solanaMobileWalletAdapterOptions ??= new SolanaMobileWalletAdapterOptions();
+        var mwa = web3.solanaWalletAdapterOptions.solanaMobileWalletAdapterOptions;
+        mwa.identityUri = "https://kartcup.bharadwaj465.workers.dev/"; mwa.iconUri = "/icon.png"; mwa.name = "Kartel"; mwa.keepConnectionAlive = true;
+        return web3;
     }
 
     /// A SerializedObject edit is a no-op until Apply — without this the refs silently stayed null (NRE in FpsCounter, ChaseCam never followed).

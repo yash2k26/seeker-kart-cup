@@ -44,5 +44,39 @@ namespace Solana.Unity.SDK
             Debug.Log("[MWA][Discovery] No cached wallet package; intent will be untargeted (OS chooser).");
             return null;
         }
+
+        /// <summary>
+        /// Whether <paramref name="package"/> (or, with null, any app on the phone) takes a solana-wallet association
+        /// intent. A wallet cached from an earlier sign-in may since have been uninstalled: launching at it threw, the
+        /// chooser never showed, and the sign-in button looked dead (Kartel, 12 Oct 2026). Needs the solana-wallet
+        /// &lt;queries&gt; entry in the manifest (Android 11+ package visibility). Always true off Android.
+        /// </summary>
+        public static bool CanHandle(string package)
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                using var player = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
+                using var activity = player.GetStatic<AndroidJavaObject>("currentActivity");
+                using var pm = activity.Call<AndroidJavaObject>("getPackageManager");
+                using var intent = LocalAssociationIntentCreator.CreateAssociationIntent("probe", 1, package);
+                using var info = pm.Call<AndroidJavaObject>("resolveActivity", intent, 0);
+                return info != null;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[MWA][Discovery] could not ask the package manager ({e.Message}); assuming it can");
+                return true;
+            }
+#else
+            return true;
+#endif
+        }
+    }
+
+    /// <summary>No app on the phone takes a Mobile Wallet Adapter request: there is no Solana wallet to open.</summary>
+    public sealed class MwaNoWalletException : System.Exception
+    {
+        public MwaNoWalletException() : base("[MWA] No Solana wallet app on this phone") { }
     }
 }

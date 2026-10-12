@@ -404,7 +404,11 @@ public static partial class MenuSetup
             ("Awards", "star", "AWARDS", nameof(ScreenFlow.ShowAchievements)), ("Online", "globe", "ONLINE", nameof(ScreenFlow.ShowRooms)),
         };
         for (int i = 0; i < doors.Length; i++)
-            Wire(Tile(doors[i].name, actions, doors[i].icon, doors[i].caption, new Vector2(0, 0), new Vector2(64 + i * 262, 48), new Vector2(236, 212), glyph: 96f), doors[i].method);
+        {
+            var door = Tile(doors[i].name, actions, doors[i].icon, doors[i].caption, new Vector2(0, 0), new Vector2(64 + i * 262, 48), new Vector2(236, 212), glyph: 96f);
+            Wire(door, doors[i].method);
+            if (doors[i].name == "Awards") AwardsBadge(door.transform);   // how many wait to be claimed
+        }
         var play = Button("Play", actions, "PLAY", Accent, Paper, 76, new Vector2(1, 0), new Vector2(-64, 48), new Vector2(640, 212), icon: "play");
         Wire(play, nameof(ScreenFlow.ShowTitle));
         Shine(play);
@@ -489,7 +493,11 @@ public static partial class MenuSetup
             ("Quick", "play", "QUICK RACE", nameof(ScreenFlow.Play)),   // one track, or the cup in flight (the label says CONTINUE CUP then)
         };
         for (int i = 0; i < doors.Length; i++)
-            Wire(Tile(doors[i].name, actions, doors[i].icon, doors[i].caption, new Vector2(0, 0), new Vector2(64 + i * 262, 48), new Vector2(236, 212), glyph: 96f), doors[i].method);
+        {
+            var door = Tile(doors[i].name, actions, doors[i].icon, doors[i].caption, new Vector2(0, 0), new Vector2(64 + i * 262, 48), new Vector2(236, 212), glyph: 96f);
+            Wire(door, doors[i].method);
+            if (doors[i].name == "Awards") AwardsBadge(door.transform);   // how many wait to be claimed
+        }
         // the DRIVER and KART doors wear what is chosen, a swap badge in the corner (Beach Buggy's Switch Driver / Switch Car)
         Image Picture(string door)
         {
@@ -528,6 +536,7 @@ public static partial class MenuSetup
 
         // Top right: who you are (sign in), the gems, the two counters (ranking, awards) and the settings.
         var corner = Rect("Corner", screen.transform, new Vector2(1, 1), new Vector2(1, 1), Vector2.zero, Vector2.zero);
+        SceneSetup.Web3Object();   // without it SIGN IN, the shop and paid rooms all hit a null Web3.Instance
         var wallet = new GameObject("WalletFlow").AddComponent<WalletFlow>();
         var chipBtn = Button("Profile", corner, "SIGN IN", new Color(Slate.r, Slate.g, Slate.b, 0.92f), Paper, 34,
                              new Vector2(1, 1), new Vector2(-196, -32), new Vector2(380, 104), icon: "user");
@@ -551,6 +560,7 @@ public static partial class MenuSetup
         Wire(boardBtn, nameof(ScreenFlow.ShowLeaderboard));
         var awardsBtn = IconButton("Awards", corner, "star", new Vector2(1, 1), new Vector2(-1000, -32), new Vector2(104, 104));
         Wire(awardsBtn, nameof(ScreenFlow.ShowAchievements));
+        AwardsBadge(awardsBtn.transform);
 
         // NEW VERSION, right of the hero: hidden until the download host has a newer build (AppUpdate)
         var update = Button("Update", screen.transform, "NEW VERSION", Slate, Paper, 32,
