@@ -33,7 +33,7 @@ namespace KartCup
             {
                 if (Count >= Max) return 0;
                 long at = At();
-                return (int)Math.Max(0, RefillSeconds - (Clock() - at));
+                return (int)Math.Clamp(RefillSeconds - (Clock() - at), 0, RefillSeconds);   // a clock set back never shows more than a full wait
             }
         }
 
@@ -77,6 +77,7 @@ namespace KartCup
             int c = PlayerPrefs.GetInt(CountKey, Max);
             if (c >= Max) return;
             long now = Clock(), at = At();
+            if (now < at) { SetAt(now); PlayerPrefs.Save(); return; }   // the clock went back: the wait restarts now, never freezes
             long gained = (now - at) / RefillSeconds;
             if (gained <= 0) return;
             int next = (int)Math.Min(Max, c + gained);

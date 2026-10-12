@@ -19,12 +19,12 @@ namespace KartCup
         public static void Earn(int n, string why)
         {
             if (n <= 0) return;
-            Set(Balance + n);
+            Set((int)System.Math.Min((long)Balance + n, int.MaxValue));   // never wraps negative
             KartApi.Event("gems", new { n, why, balance = Balance });
         }
         public static bool Spend(int n, string on)
         {
-            if (n > Balance) return false;
+            if (n < 0 || n > Balance) return false;      // a negative price would be a gift
             Set(Balance - n);
             KartApi.Event("gems_spent", new { n, on, balance = Balance });
             return true;

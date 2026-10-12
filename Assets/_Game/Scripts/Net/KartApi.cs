@@ -125,6 +125,9 @@ namespace KartCup
 
         public static void Event(string name, object props = null)
         {
+            // never from edit mode: an editor tool or test (EconomyStress spends gems 30,000 times) is not a player, and the
+            // events went to the live Worker
+            if (!Application.isPlaying) return;
             _ = Post<object>("/v1/event", new { deviceId = DeviceId, name, props });   // fire and forget
         }
 

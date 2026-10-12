@@ -23,7 +23,7 @@ namespace KartCup
         public static Def BySku(string sku) { foreach (var p in Packs) if (p.sku == sku) return p; return null; }
 
         public static int Count(string id) => string.IsNullOrEmpty(id) ? 0 : PlayerPrefs.GetInt("kc.item." + id, 0);
-        public static void Add(string id, int n) { PlayerPrefs.SetInt("kc.item." + id, Count(id) + n); PlayerPrefs.Save(); }
+        public static void Add(string id, int n) { if (string.IsNullOrEmpty(id) || n <= 0) return; PlayerPrefs.SetInt("kc.item." + id, (int)System.Math.Min((long)Count(id) + n, 9999)); PlayerPrefs.Save(); }
 
         /// One out of the pack, if there is one.
         public static bool Take(string id)

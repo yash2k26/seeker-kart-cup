@@ -68,7 +68,7 @@ namespace KartCup
             int stars = StarsFor[place - 1];
             S.stars += stars;
             bool filled = false;
-            if (S.stars >= StarGoal) { S.stars -= StarGoal; S.fills++; S.pending.Add(Tier.Treasure); filled = true; }
+            while (S.stars >= StarGoal) { S.stars -= StarGoal; S.fills++; S.pending.Add(Tier.Treasure); filled = true; }   // every fill pays
             Save();
             KartApi.Event("chest_earn", new { tier = tier.ToString(), place, filled });
             return LastEarn = (tier, stars, filled);
@@ -80,8 +80,9 @@ namespace KartCup
         /// Stars from outside a podium (the Daily Challenge): into the meter, a golden chest if it fills.
         public static void AddStars(int n)
         {
+            if (n <= 0) return;
             S.stars += n;
-            if (S.stars >= StarGoal) { S.stars -= StarGoal; S.fills++; S.pending.Add(Tier.Treasure); }
+            while (S.stars >= StarGoal) { S.stars -= StarGoal; S.fills++; S.pending.Add(Tier.Treasure); }   // a big gain fills it more than once
             Save();
         }
 
