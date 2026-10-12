@@ -350,6 +350,7 @@ namespace KartCup
         /// Thrown before the wallet opens when no Solana node gave a blockhash: there is nothing the wallet could sign.
         sealed class NoBlockhashException : Exception { public NoBlockhashException() : base("no recent blockhash") { } }
         const string SolanaBusy = "Solana is busy right now. Nothing was charged: try again in a moment.";
+        ulong contextSlot;   // the slot the blockhash was read at: sign_and_send's min_context_slot
 
         async Awaitable<Transaction> BuildTx()
         {
@@ -360,7 +361,13 @@ namespace KartCup
             for (int i = 0; i < 4 && string.IsNullOrEmpty(hash); i++)
             {
                 if (i > 0) await Awaitable.WaitForSecondsAsync(0.6f * i);
-                try { hash = await Web3.Wallet.GetBlockHash(Commitment.Confirmed, useCache: false); }
+                try
+                {
+                    var r = await Web3.Rpc.GetLatestBlockHashAsync(Commitment.Confirmed);
+                    hash = r?.Result?.Value?.Blockhash;
+                    if (!string.IsNullOrEmpty(hash)) contextSlot = r.Result.Context.Slot;
+                    else Debug.LogWarning("[wallet] blockhash: " + r?.Reason);
+                }
                 catch (Exception e) { Debug.LogWarning("[wallet] blockhash: " + e.Message); }
             }
             if (string.IsNullOrEmpty(hash)) throw new NoBlockhashException();
@@ -379,7 +386,11 @@ namespace KartCup
             var adapter = Web3.Wallet as SolanaWalletAdapter;
             if (adapter != null)
             {
-                switch (await adapter.SignAndSendTransactions(new[] { tx }))
+                // 12 Oct 2026: Phantom's sign_and_send handler requires min_context_slot (its log: "params.minContextSlot
+                // Required"); sent without it, Phantom threw inside, never showed the approval and the session hung until
+                // the player left. The slot the blockhash was read at, as the MWA reference clients send.
+                var options = new SignAndSendTransactionsOptions { MinContextSlot = contextSlot, Commitment = "confirmed" };
+                switch (await adapter.SignAndSendTransactions(new[] { tx }, options))
                 {
                     case SignAndSendTxResult.Success s: return Encoders.Base58.EncodeData(s.Signatures[0]);
                     case SignAndSendTxResult.UserDeclined: Status("Cancelled"); return null;
