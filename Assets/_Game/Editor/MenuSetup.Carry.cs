@@ -67,6 +67,7 @@ public static partial class MenuSetup
             Fill(s.FindProperty("owned"), owned.Cast<Object>().ToArray());
             s.FindProperty("hint").objectReferenceValue = hint;
             s.FindProperty("goLabel").objectReferenceValue = goBtn.GetComponentInChildren<TMP_Text>(true);
+            s.FindProperty("noneButton").objectReferenceValue = none.gameObject;
             s.FindProperty("idle").colorValue = new Color(0.16f, 0.12f, 0.36f);
             s.FindProperty("picked").colorValue = Accent;
             s.FindProperty("muted").colorValue = Muted;

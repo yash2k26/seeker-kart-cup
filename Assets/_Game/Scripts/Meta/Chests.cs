@@ -117,29 +117,31 @@ namespace KartCup
         /// Items by weight: nitro, rockets, bouncers common; homing and bombs less so; sun bombs rare.
         static readonly (string id, int weight)[] ItemWeights = { ("nitro", 6), ("rocket", 6), ("bouncer", 5), ("homing", 3), ("bomb", 3), ("sunbomb", 1) };
 
-        /// wood: 2 items · silver: 4 items, a test drive 1 in 4 · gold: 6 items with a sun bomb, a test drive, a paint
-        /// 3 in 10 · golden: 10 items, 2 test drives, a paint you don't have (2 more test drives once you have them all).
+        /// 13 Oct 2026, the user: "you are giving a lot of good things in the chest, make it less rewarding". About a
+        /// quarter of what they held, so the shop's packs are worth buying again; fuel cans (never sold, refill over time)
+        /// fill the space. wood: one item 4 in 10, else a can · silver: an item and a can, a test drive 1 in 10 · gold: two
+        /// items and a can, a test drive half the time, a paint 1 in 10 · golden: three items and a sun bomb, two cans, a
+        /// test drive, a paint 1 in 3.
         static List<Reward> Roll(Tier t)
         {
             var list = new List<Reward>();
             switch (t)
             {
-                case Tier.Wood: Items(list, 2, t); break;
-                case Tier.Silver: Items(list, 4, t); if (Random.value < 0.25f) Add(list, TestDrive(t)); break;
+                case Tier.Wood: if (Random.value < 0.4f) Items(list, 1, t); else list.Add(FuelCan(1, t)); break;
+                case Tier.Silver: Items(list, 1, t); list.Add(FuelCan(1, t)); if (Random.value < 0.1f) Add(list, TestDrive(t)); break;
                 case Tier.Gold:
-                    Items(list, 5, t); list.Add(Item("sunbomb", 1, t));
-                    Add(list, TestDrive(t));
-                    if (Random.value < 0.3f) Add(list, Paint(t));
+                    Items(list, 2, t); list.Add(FuelCan(1, t));
+                    if (Random.value < 0.5f) Add(list, TestDrive(t));
+                    if (Random.value < 0.1f) Add(list, Paint(t));
                     break;
                 default:
-                    Items(list, 10, t);
-                    Add(list, TestDrive(t)); Add(list, TestDrive(t));
-                    var paint = Paint(t);
-                    if (paint != null) list.Add(paint); else { Add(list, TestDrive(t)); Add(list, TestDrive(t)); }
+                    Items(list, 3, t); list.Add(Item("sunbomb", 1, t)); list.Add(FuelCan(2, t));
+                    Add(list, TestDrive(t));
+                    if (Random.value < 0.33f) Add(list, Paint(t));
                     break;
             }
-            // gems in every chest (9 Oct 2026): the currency that recruits the judges
-            var (lo, hi) = t switch { Tier.Wood => (5, 10), Tier.Silver => (15, 25), Tier.Gold => (40, 60), _ => (80, 120) };
+            // gems in every chest (9 Oct 2026), a pinch of them now: the currency that recruits the judges
+            var (lo, hi) = t switch { Tier.Wood => (2, 5), Tier.Silver => (5, 10), Tier.Gold => (12, 20), _ => (30, 45) };
             int gems = Random.Range(lo, hi + 1);
             list.Add(new Reward { kind = "gems", id = "gems", qty = gems, rarity = t, label = $"+{gems} GEMS" });
             // the same thing twice reads as one bigger pile; the best is revealed last
@@ -158,6 +160,8 @@ namespace KartCup
                 foreach (var (id, weight) in ItemWeights) { acc += weight; if (roll < acc) { list.Add(Item(id, 1, t)); break; } }
             }
         }
+
+        static Reward FuelCan(int n, Tier t) => new() { kind = "fuel", id = "fuel", qty = n, rarity = t, label = $"FUEL  ×{n}" };
 
         static Reward Item(string id, int qty, Tier t) { var r = new Reward { kind = "item", id = id, qty = qty, rarity = t }; r.label = Label(r); return r; }
 
@@ -180,7 +184,7 @@ namespace KartCup
             return new Reward { kind = "paint", id = p.id, qty = 1, rarity = t, label = $"{p.name.ToUpperInvariant()} PAINT" };
         }
 
-        static string Label(Reward r) => r.kind == "item" ? $"{Inventory.Find(r.id)?.item.ToUpperInvariant() ?? r.id.ToUpperInvariant()}  ×{r.qty}" : r.label;
+        static string Label(Reward r) => r.kind == "fuel" ? $"FUEL  ×{r.qty}" : r.kind == "item" ? $"{Inventory.Find(r.id)?.item.ToUpperInvariant() ?? r.id.ToUpperInvariant()}  ×{r.qty}" : r.label;
 
         static void Apply(Reward r)
         {
@@ -190,6 +194,7 @@ namespace KartCup
                 case "gems": Gems.Earn(r.qty, "chest"); break;
                 case "trial": KartDatabase.GrantTrial(r.id); break;
                 case "paint": if (Paints.Find(r.id) is { } p) Unlocks.Earn(p.sku); break;
+                case "fuel": Fuel.Gift(r.qty); break;
             }
         }
 

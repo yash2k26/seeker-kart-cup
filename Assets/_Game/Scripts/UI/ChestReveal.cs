@@ -30,7 +30,10 @@ namespace KartCup
         [SerializeField] Color[] tierColors = System.Array.Empty<Color>();
         [SerializeField] string[] itemIds = System.Array.Empty<string>();
         [SerializeField] Sprite[] itemIcons = System.Array.Empty<Sprite>();
-        [SerializeField] Sprite kartIcon, paintIcon;
+        [SerializeField] Sprite kartIcon, paintIcon, fuelIcon;
+        // 13 Oct 2026, the user: "two options while chest opening, next chest and done, equal and parallel": DONE beside
+        // the collect button, the same size; alone in the middle when no chest is left to open
+        [SerializeField] GameObject doneButton;
         [SerializeField] KartDatabase karts;
         [SerializeField] RectTransform rays;                 // the beams behind an opened chest, turning slowly
         [SerializeField] Image raysImage;
@@ -106,7 +109,7 @@ namespace KartCup
             }
             info.text = rows + $"\n<align=center><size=80%><color=#B4A7DE>No gold in {Chests.GoldPity - 1} chests? The next one is gold.  ·  Earned, never sold, no cash value.</color></size>";
             Rates(false);
-            collectButton.SetActive(true); collectLabel.text = "GOT IT";
+            Single("GOT IT");
         }
 
         /// The info page's DROP RATES / BACK.
@@ -126,7 +129,7 @@ namespace KartCup
                 busy = true; opened = false; taps = 0;
                 infoRoot.SetActive(false);
                 SetCards(0);
-                collectButton.SetActive(false);
+                collectButton.SetActive(false); if (doneButton != null) doneButton.SetActive(false);
                 chestImage.sprite = closedSprites[(int)tier];
                 tierLabel.text = Chests.Names[(int)tier];
                 tierLabel.color = tierColors[(int)tier];
@@ -177,8 +180,9 @@ namespace KartCup
                     else { Haptics.Play(Haptics.Kind.Pickup); AudioDirector.Instance?.PositionUp(); }
                     yield return new WaitForSecondsRealtime(last ? 0.2f : 0.05f);
                 }
-                collectButton.SetActive(true);
-                collectLabel.text = Chests.Pending > 0 ? $"NEXT CHEST  ({Chests.Pending})" : "COLLECT";
+                bool more = Chests.Pending > 0;
+                collectLabel.text = $"NEXT CHEST  ({Chests.Pending})";
+                Pair(more);
                 busy = false;
                 bool next = false;
                 void Go() => next = true;
@@ -190,6 +194,33 @@ namespace KartCup
         }
 
         System.Action onCollect;
+
+        void Single(string text)
+        {
+            collectButton.SetActive(true); collectLabel.text = text;
+            var rt = (RectTransform)collectButton.transform; rt.anchoredPosition = new Vector2(0f, rt.anchoredPosition.y);
+            if (doneButton != null) doneButton.SetActive(false);
+        }
+
+        /// NEXT CHEST and DONE side by side, the same size; DONE alone in the middle when none is left.
+        void Pair(bool next)
+        {
+            collectButton.SetActive(next);
+            if (doneButton == null) { collectButton.SetActive(true); if (!next) collectLabel.text = "COLLECT"; return; }
+            doneButton.SetActive(true);
+            float half = ((RectTransform)collectButton.transform).sizeDelta.x * 0.5f + 16f;
+            Set(collectButton, next ? half : 0f); Set(doneButton, next ? -half : 0f);
+            static void Set(GameObject b, float x) { var rt = (RectTransform)b.transform; rt.anchoredPosition = new Vector2(x, rt.anchoredPosition.y); }
+        }
+
+        /// DONE: the chests left wait for later.
+        public void Done()
+        {
+            if (busy) return;
+            StopAllCoroutines(); onCollect = null;
+            if (doneButton != null) doneButton.SetActive(false);
+            Hide();
+        }
 
         /// The collect / got-it button.
         public void Collect()
@@ -318,6 +349,7 @@ namespace KartCup
             {
                 case "item": int k = System.Array.IndexOf(itemIds, r.id); icon.sprite = k >= 0 && k < itemIcons.Length ? itemIcons[k] : kartIcon; break;
                 case "trial": icon.sprite = kartIcon; break;
+                case "fuel": icon.sprite = fuelIcon != null ? fuelIcon : kartIcon; break;
                 case "gems": icon.sprite = paintIcon; icon.color = new Color(1f, 0.69f, 0.15f); break;   // the gold swatch stands for gems
                 default: icon.sprite = paintIcon; icon.color = Paints.Find(r.id)?.color ?? Color.white; break;
             }
@@ -336,7 +368,7 @@ namespace KartCup
             glow.gameObject.SetActive(true); glowImage.color = Fade(tierColors[(int)tier], 0.9f); glow.localScale = Vector3.one * 1.2f;
             tierLabel.text = Chests.Names[(int)tier]; tierLabel.color = tierColors[(int)tier]; hint.text = "";
             for (int i = 0; i < cards.Length; i++) { cards[i].SetActive(i < rewards.Count); if (i < rewards.Count) { Card(i, rewards[i]); Place(i, rewards.Count); } }
-            collectButton.SetActive(true); collectLabel.text = "COLLECT";
+            collectLabel.text = "NEXT CHEST  (2)"; Pair(true);   // as the phone shows it with more waiting
             Effects(true, (int)tier);
             var rnd = new System.Random(3);
             for (int i = 0; i < coins.Length; i++)                 // the shower, caught mid-air

@@ -84,6 +84,7 @@ namespace KartCup
                     + (newBest ? "  NEW BEST" : "") + (Fuel.LastRefund ? "  ·  FUEL BACK FOR THE WIN" : "");
 
             if (table != null) table.text = single ? TimesText(order) : StandingsText();
+            AlignHeadline();
             if (final) Cup.MarkFinished();   // so a kill-and-relaunch offers a new cup, not this one's last race again
 
             if (primaryLabel != null) primaryLabel.text = single ? "RACE AGAIN" : final ? "NEW CUP" : "NEXT RACE";
@@ -347,9 +348,25 @@ namespace KartCup
         /// Single race: the finishing order with total times. A racer still on track when the player's card came up
         /// has no time yet, and inventing one would be a lie the leaderboard could never match.
         string TimesText(List<KartProgress> order) => string.Join("\n", order.Select((r, i) =>
-            Row(i, r.remote || r.isPlayer && online ? r.racerName : Name(r.characterIndex), r.finished && r.finishTime < float.MaxValue ? RaceHud.Clock(r.finishTime) : "—", r.isPlayer)));
+            Row(i, r.remote || r.isPlayer && online ? r.racerName : Name(r.characterIndex), TimeOf(r), r.isPlayer)));
 
         string Name(int character) => roster != null && character >= 0 ? roster.At(character).displayName : "?";
+
+        /// The headline over the column it heads (13 Oct 2026, the user: "the text is not aligned at this finish screen"): the
+        /// table keeps left of the chest sticker, so FINISH centred on the whole card sat 130 px off the rows under it. A
+        /// Tour card (EventResult) heads its own boxes from the card's centre.
+        void AlignHeadline()
+        {
+            if (headline == null) return;
+            bool tour = RaceMode.InEvent && RaceMode.EventId != "daily" && !Weekly.Racing;
+            float x = !tour && table != null ? table.rectTransform.anchoredPosition.x : 0f;
+            headline.rectTransform.anchoredPosition = new Vector2(x, headline.rectTransform.anchoredPosition.y);
+        }
+
+        /// A time on the card: a clock for a finish, OUT for a knocked-out kart, "—" for one still driving when it ended
+        /// (a finish time of 9e5 printed as a clock read 15000:00.00, the phone, 13 Oct 2026).
+        static string TimeOf(KartProgress r) =>
+            !r.finished || r.finishTime >= float.MaxValue ? "—" : r.finishTime >= 9.5e5f ? "OUT" : r.finishTime >= 1e5f ? "—" : RaceHud.Clock(r.finishTime);
 
         static string Row(int i, string name, string value, bool me)
         {

@@ -21,6 +21,7 @@ namespace KartCup
         [SerializeField] Image[] backs = System.Array.Empty<Image>(), icons = System.Array.Empty<Image>();
         [SerializeField] TMP_Text[] counts = System.Array.Empty<TMP_Text>(), owned = System.Array.Empty<TMP_Text>();
         [SerializeField] TMP_Text hint, goLabel;
+        [SerializeField] GameObject noneButton;   // hidden while nothing is picked: GO already says RACE WITHOUT ITEMS
         [SerializeField] Color idle = new(0.16f, 0.12f, 0.36f), picked = new(1f, 0.694f, 0.149f), muted = new(0.706f, 0.655f, 0.871f);
 
         int[] take;
@@ -100,6 +101,7 @@ namespace KartCup
             }
             int total = order.Sum(i => take[i]);
             if (goLabel != null) goLabel.text = total > 0 ? $"RACE WITH {total} ITEM{(total == 1 ? "" : "S")}" : "RACE WITHOUT ITEMS";
+            if (noneButton != null) noneButton.SetActive(total > 0);
         }
 
         /// MenuPreview: the picker as it opens with a choice made.

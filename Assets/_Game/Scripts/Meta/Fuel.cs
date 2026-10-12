@@ -52,6 +52,13 @@ namespace KartCup
             return true;
         }
 
+        /// Cans out of a chest, up to a full tank.
+        public static void Gift(int n)
+        {
+            int c = Count, after = Mathf.Min(Max, c + Mathf.Max(0, n));
+            if (after != c) Set(c, after);
+        }
+
         /// A won race hands its can back.
         public static void Refund()
         {

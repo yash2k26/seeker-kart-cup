@@ -1149,6 +1149,7 @@ public static partial class TrackSetup
         // left of the chest sticker, which hangs 310 down the card's right: across the full width its OPEN pill sat on
         // second place's time (the phone, 12 Oct 2026). 100-860 of the card's 1220, the times at 72% of it.
         var table = Text("Table", card, body, "", 44, paper, TextAlignmentOptions.TopLeft, new Vector2(0.5f, 1), new Vector2(-130, -196), new Vector2(760, 420));
+        table.enableAutoSizing = true; table.fontSizeMin = 30; table.fontSizeMax = 60;   // a duel's two rows fill the space six would
         var status = Text("Status", card, body, "", 36, Design.Muted, TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 228), new Vector2(900, 60));
 
         var again = TextButton("Again", card, "NEXT RACE", Design.Accent, paper, 46, display, new Vector2(0.5f, 0), new Vector2(276, 80), new Vector2(500, 124));

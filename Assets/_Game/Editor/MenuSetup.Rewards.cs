@@ -524,6 +524,10 @@ public static partial class MenuSetup
         var collect = Button("Collect", go.transform, "COLLECT", Accent, Paper, 46, new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(520, 124));
         UnityEditor.Events.UnityEventTools.AddPersistentListener(collect.onClick, reveal.Collect);
         collect.gameObject.SetActive(false);
+        // DONE, the same size beside NEXT CHEST (ChestReveal.Pair lays the two out)
+        var done = Button("Done", go.transform, "DONE", Slate, Paper, 46, new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(520, 124));
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(done.onClick, reveal.Done);
+        done.gameObject.SetActive(false);
 
         new SerializedObject(reveal).Do(s =>
         {
@@ -555,6 +559,8 @@ public static partial class MenuSetup
             Fill(s.FindProperty("itemIcons"), Inventory.Packs.Select(p => (Object)Design.Icon(Design.ItemGlyph(p.item))).ToArray());
             s.FindProperty("kartIcon").objectReferenceValue = IconSprite("kart");
             s.FindProperty("paintIcon").objectReferenceValue = Design.Pill;
+            s.FindProperty("fuelIcon").objectReferenceValue = Design.Icon("fuel");
+            s.FindProperty("doneButton").objectReferenceValue = done.gameObject;
             s.FindProperty("karts").objectReferenceValue = AssetDatabase.LoadAssetAtPath<KartDatabase>("Assets/_Game/Data/Karts.asset");
             s.FindProperty("rays").objectReferenceValue = rays;
             s.FindProperty("raysImage").objectReferenceValue = raysImg;

@@ -136,7 +136,7 @@ public static class EconomyStress
         Check("chests: negative stars change nothing", Chests.Stars < Chests.StarGoal && Chests.Stars >= 0);
         // open a big pile of every tier and check what comes out against each tier's promise
         Chests.Preview(0, Enumerable.Range(0, 400).Select(i => (Chests.Tier)(i % 4)).ToArray());
-        var gemRange = new[] { (5, 10), (15, 25), (40, 60), (80, 120) };
+        var gemRange = new[] { (2, 5), (5, 10), (12, 20), (30, 45) };   // 13 Oct 2026: chests a quarter of what they were
         var itemsBefore = Inventory.Packs.ToDictionary(p => p.id, p => Inventory.Count(p.id));
         int gemsBefore = Gems.Balance, gemsSeen = 0, opened = 0; var itemsSeen = new Dictionary<string, int>();
         while (Chests.Pending > 0)
@@ -146,10 +146,17 @@ public static class EconomyStress
             var gem = rewards.Where(r => r.kind == "gems").ToList();
             if (gem.Count != 1 || gem[0].qty < gemRange[(int)t].Item1 || gem[0].qty > gemRange[(int)t].Item2) { Check($"chests: a {t} chest gave gems {string.Join(",", gem.Select(g => g.qty))}", false); break; }
             gemsSeen += gem[0].qty;
-            int items = rewards.Where(r => r.kind == "item").Sum(r => r.qty), want = t switch { Chests.Tier.Wood => 2, Chests.Tier.Silver => 4, Chests.Tier.Gold => 6, _ => 10 };
-            if (items != want) { Check($"chests: a {t} chest gave {items} items, not {want}", false); break; }
+            int items = rewards.Where(r => r.kind == "item").Sum(r => r.qty), fuel = rewards.Where(r => r.kind == "fuel").Sum(r => r.qty);
+            bool fair = t switch
+            {
+                Chests.Tier.Wood => items + fuel == 1,                     // an item or a can
+                Chests.Tier.Silver => items == 1 && fuel == 1,
+                Chests.Tier.Gold => items == 2 && fuel == 1,
+                _ => items == 4 && fuel == 2,
+            };
+            if (!fair) { Check($"chests: a {t} chest gave {items} items and {fuel} cans", false); break; }
             foreach (var r in rewards.Where(r => r.kind == "item")) itemsSeen[r.id] = itemsSeen.GetValueOrDefault(r.id) + r.qty;
-            if (t == Chests.Tier.Gold && !rewards.Any(r => r.kind == "item" && r.id == "sunbomb")) { Check("chests: a gold chest always has a sun bomb", false); break; }
+            if (t == Chests.Tier.Treasure && !rewards.Any(r => r.kind == "item" && r.id == "sunbomb")) { Check("chests: a golden treasure chest always has a sun bomb", false); break; }
             if (rewards.Any(r => r.kind == "paint" && Paints.Find(r.id) is { } p && p.skrOnly)) { Check("chests: never an SKR-only paint", false); break; }
         }
         Check($"chests: {opened} chests opened, each with its tier's items and gems", opened == 400 && Chests.Pending == 0);

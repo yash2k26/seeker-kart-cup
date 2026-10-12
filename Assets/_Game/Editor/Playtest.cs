@@ -46,7 +46,8 @@ public static class Playtest
     // on the player's line at 12 s. Frames of both, and of the countdown with its start-boost line.
     static bool oobTest, smashTest, oobDone, smashDone, countShot;
     static double every, nextAuto = -1, until = 50;
-    static bool toCard;
+    static bool toCard, cardShot;
+    static double cardAt = -1;
     static int autoShot;
 
     [MenuItem("Build/Playtest 30s")]
@@ -93,7 +94,7 @@ public static class Playtest
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-item") item = args[i + 1];
         // -worker URL: submit to that Worker (a local wrangler dev) instead of the live one, so test races leave no rows on mainnet
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-worker") KartCup.KartApi.BaseUrl = args[i + 1];
-        autopilot = args.Contains("-autopilot"); toCard = args.Contains("-tocard"); gatewalk = args.Contains("-gatewalk"); walkGate = 0; nextWalk = 0; autoSet = false; autoShot = 0; nextAuto = -1; every = 0; until = 50;
+        autopilot = args.Contains("-autopilot"); toCard = args.Contains("-tocard"); cardShot = false; cardAt = -1; gatewalk = args.Contains("-gatewalk"); walkGate = 0; nextWalk = 0; autoSet = false; autoShot = 0; nextAuto = -1; every = 0; until = 50;
         moments.Clear(); lastAmmo = 0; pickups = 0; hits = 0; wasSpinning = false; wasFinished = false;
         oobTest = args.Contains("-oob"); smashTest = args.Contains("-smash"); oobDone = smashDone = countShot = false;
         Smashable.Smashed -= OnSmashed; Smashable.Smashed += OnSmashed;
@@ -270,7 +271,12 @@ public static class Playtest
         if (toCard && KartCup.RaceManager.Instance?.Player != null && KartCup.RaceManager.Instance.Player.finished)
         {
             var dim = Object.FindFirstObjectByType<ResultsPanel>()?.transform.Find("Dim");
-            if (dim != null && dim.gameObject.activeInHierarchy) until = System.Math.Min(until, t + 1.5);
+            if (dim != null && dim.gameObject.activeInHierarchy)
+            {
+                if (cardAt < 0) cardAt = t;
+                if (!cardShot && t > cardAt + 1.0) { cardShot = true; Capture($"card{track}"); }   // the card, settled, checked by the overflow scan
+                until = System.Math.Min(until, cardAt + 1.5);
+            }
         }
         if (t < until) return;
 
