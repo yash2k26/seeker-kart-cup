@@ -22,7 +22,8 @@ ORE_MINT = "oreoU2P8bN6jkk3jbaiVxYnG1dCXcYxwhwyK9jSybcp"   # ORE (Regolith Labs)
 # not a var, so no wallet address sits in this file. Unset, the payout key's own address is used.
 PRICES_JSON = "{}"                        # per-sku overrides of catalog.ts, e.g. {"paint.sunset":{"SKR":"1000000"}}
 HOUSE_CUT_BPS = "1000"                    # 10% of every prize pool
-PAID_ROOMS = "1"                          # "0" = free rooms only (kill switch; no redeploy of the APK needed)
+PAID_ROOMS = "0"                          # "0" = free rooms only (kill switch; no redeploy of the APK needed). Off since 12 Oct 2026:
+                                          # the escrow program is not on mainnet yet (escrow/README.md runbook); "1" once it is
 # Paid entry is refused from these places (research/20): India's Online Gaming Act 2025 bans paid skill games outright;
 # Belgium/Japan/Korea treat paid competitions with chance elements as gambling; the US states mirror Skillz's exclusions.
 PAID_BLOCK = "IN,BE,JP,KR,US-AR,US-CT,US-DE,US-LA,US-SD"
