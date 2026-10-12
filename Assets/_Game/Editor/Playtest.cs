@@ -23,7 +23,7 @@ public static class Playtest
     static Vector3 itemFrom, itemAt;   // a second camera for the item frames: beside the road, on where it lands
     static int prevQuality;
     static readonly double[] shotTimes = { 5, 12, 22, 34, 46 };   // the last: the results card, after the podium
-    static readonly double[] introTimes = { 2.2, 3.4, 4.6, 7.2 };   // the drone's lap before the flag, and a turbo pad from above
+    static readonly double[] introTimes = { 0.9, 2.4, 3.8, 5.2, 6.6, 7.6 };   // the b-roll before the flag: about a frame per cut
     static int introShot;
     // -autopilot: the AI drives the player's kart, so the camera, the HUD and everything that happens to a kart are seen
     // in motion. -every S: a frame every S seconds from the green light (auto<track>-NN.png). -seconds N: run that long.

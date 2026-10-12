@@ -4,8 +4,8 @@ using UnityEngine;
 
 namespace KartCup
 {
-    /// The two shots round a race. Before it: a drone's lap of the circuit (the race camera, flown along the
-    /// waypoints, landing behind the grid) with the words over it: what the race is for, the prize pool counting up and
+    /// The two shots round a race. Before it: a few b-roll cuts of the circuit (the race camera off its rig: its
+    /// critters, tunnel, landmark, a ramp, the shortcut; then a crane down behind the grid) with the words over it: what the race is for, the prize pool counting up and
     /// what each place takes. After it: the ceremony stage, the top three standing on their blocks holding their
     /// trophies (gold, biggest, to the winner, who is too excited to stand still), under confetti. A scene with no
     /// waypoints shows the trophies on the stage before the race instead, as it used to.
@@ -68,7 +68,7 @@ namespace KartCup
 
         public bool Active { get; private set; }
         public const float PrizeSeconds = 4.5f;       // the pre-race shot on the stage (online it runs until 3-2-1)
-        /// How long the pre-race shot wants: the drone's lap and a beat behind the grid, or the stage's reveal.
+        /// How long the pre-race shot wants: the b-roll and a beat behind the grid, or the stage's reveal.
         public float IntroSeconds => flying ? flySeconds + 0.7f : PrizeSeconds;
         public const float CeremonySeconds = 9f;      // the podium before the results card comes up: the reveal, then a few seconds of it
 
@@ -420,52 +420,279 @@ namespace KartCup
 
         static float Ease(float x) => 1f - (1f - x) * (1f - x) * (1f - x);
 
-        // ---------- the drone ----------
+        // ---------- the b-roll ----------
+        // 13 Oct 2026, the user: "instead of showing the whole track shot, just show some broll shots of the tracks, like
+        // underpass, the chickens, and for each track we should get different shots". So no lap: a few low cuts of what
+        // this circuit has (its critters, the tunnel, its landmark, a ramp or a turbo pad, the shortcut's mouth), picked
+        // afresh each race, then a crane down onto the grid that hands over to the chase camera.
 
-        /// The lap to fly: the circuit's waypoints (TrackSetup lays ~48 round it, the first on the start line).
+        struct Shot { public string name; public float seconds; public System.Func<float, (Vector3 pos, Vector3 look)> pose; }
+        readonly List<Shot> shots = new();
+        const float ShotSeconds = 1.4f, GridSeconds = 1.6f;
+        const int MaxBroll = 4;
+        int cutLogged = -1;
+
+        /// The shots for this circuit; false when the scene has no waypoints (the stage shot then plays instead).
         bool FlightPath()
         {
             var root = GameObject.Find("Waypoints");
             if (root == null || root.transform.childCount < 8 || Camera.main == null || Camera.main == cam) return false;
-            // Beach Buggy hints at its shortcuts in the intro: the drone takes the circuit's (ShortcutPath) instead of the corner
-            var cut = ShortcutPath.Instance;
-            var points = new System.Collections.Generic.List<Vector3>();
-            for (int i = 0; i < root.transform.childCount; i++)
-            {
-                var w = root.transform.GetChild(i);
-                points.Add(w.position);
-                if (cut == null || cut.from == null || w != cut.from.transform) continue;
-                foreach (var p in cut.path) points.Add(p.transform.position + Vector3.up * 1.5f);
-                while (i + 1 < root.transform.childCount && root.transform.GetChild(i + 1) != cut.to.transform) i++;
-            }
-            path = points.ToArray();
-            int n = path.Length;
-            float lap = 0f;
-            for (int i = 0; i < n; i++) lap += Vector3.Distance(path[i], path[(i + 1) % n]);
-            flySeconds = Mathf.Clamp(lap / 190f, 5f, 7.5f);        // quick: about 190 m/s on average
+            path = new Vector3[root.transform.childCount];
+            for (int i = 0; i < path.Length; i++) path[i] = root.transform.GetChild(i).position;
+            var rng = new System.Random(System.Environment.TickCount);
+            shots.Clear(); cutLogged = -1;
+            var picks = new List<Shot>();
+            void Add(Shot? s) { if (s is Shot v) picks.Add(v); }
+            Add(CritterShot(rng));
+            Add(TunnelShot());
+            foreach (var s in LandmarkShots(rng)) Add(s);
+            var hazards = new List<Shot>();
+            if (RampOrPad("Ramps", rng, ramp: true) is Shot r) hazards.Add(r);
+            if (RampOrPad("TurboPads", rng, ramp: false) is Shot t) hazards.Add(t);
+            if (hazards.Count > 0) picks.Add(hazards[rng.Next(hazards.Count)]);
+            Add(ShortcutShot());
+            for (int i = 0; i < picks.Count && shots.Count < MaxBroll; i++) shots.Add(picks[i]);
+            if (shots.Count > 0) { var first = shots[0]; first.seconds += 0.6f; shots[0] = first; }   // the scene is still settling under the first cut
+            shots.Add(GridShot());
+            flySeconds = 0f; foreach (var s in shots) flySeconds += s.seconds;
+            Debug.Log($"[intro] b-roll on {Cup.TrackId}: {string.Join(", ", shots.ConvertAll(s => s.name))} ({flySeconds:0.0} s)");
             return true;
         }
 
-        /// A point `s` waypoints round the lap (Catmull-Rom through them, wrapping).
-        Vector3 Along(float s)
-        {
-            int n = path.Length, i = Mathf.FloorToInt(s); float u = s - i;
-            Vector3 P(int k) => path[((k % n) + n) % n];
-            Vector3 a = P(i - 1), b = P(i), c = P(i + 1), d = P(i + 2);
-            return 0.5f * (2f * b + (c - a) * u + (2f * a - 5f * b + 4f * c - d) * u * u + (3f * b - a - 3f * c + d) * u * u * u);
-        }
-
-        /// The race camera `t` seconds into the lap: seven metres up (under the tunnel's crown and the start gantry),
-        /// looking down the road, leaning into the turns. Away fast, slowing as it comes round to land behind the grid.
+        /// The race camera `t` seconds into the intro: the shot running at t, eased along its move.
         void Fly(float t)
         {
-            if (raceCam == null) return;
-            float x = Mathf.Clamp01(t / flySeconds), k = x * (1.5f - 0.5f * x);
-            float s = Mathf.Lerp(1.5f, path.Length - 2.5f, k);
-            var pos = Along(s) + Vector3.up * 7f;
-            var rot = Quaternion.LookRotation(Along(s + 2.4f) + Vector3.up * 2f - pos, Vector3.up);
-            float turn = Vector3.SignedAngle(Along(s + 0.5f) - Along(s), Along(s + 3f) - Along(s + 2.5f), Vector3.up);
-            raceCam.transform.SetPositionAndRotation(pos, rot * Quaternion.Euler(0f, 0f, Mathf.Clamp(-turn * 0.3f, -15f, 15f)));
+            if (raceCam == null || shots.Count == 0) return;
+            int i = 0; float from = 0f;
+            while (i < shots.Count - 1 && t >= from + shots[i].seconds) { from += shots[i].seconds; i++; }
+            if (i != cutLogged) { cutLogged = i; Debug.Log($"[intro] cut {i}: {shots[i].name} at {t:0.0} s (scene {Time.timeSinceLevelLoad:0.0} s)"); }
+            float u = Mathf.Clamp01((t - from) / shots[i].seconds);
+            u = u * u * (3f - 2f * u);
+            var (pos, look) = shots[i].pose(u);
+            raceCam.transform.SetPositionAndRotation(pos, Quaternion.LookRotation(look - pos, Vector3.up));
+        }
+
+        int Nearest(Vector3 p)
+        {
+            int best = 0; float d = float.MaxValue;
+            for (int i = 0; i < path.Length; i++) { float e = (path[i] - p).sqrMagnitude; if (e < d) { d = e; best = i; } }
+            return best;
+        }
+
+        /// The way the race runs at waypoint i, flat.
+        Vector3 Road(int i) { var d = path[(i + 1) % path.Length] - path[i]; d.y = 0f; return d.sqrMagnitude > 0.01f ? d.normalized : Vector3.forward; }
+
+        /// A shot is only kept when its camera is in the open and nothing stands close in front of it (a hill, a rock,
+        /// a wall); what is out by the subject (its own collider, the ground it stands on, the cone's slope) is the shot.
+        static string Blocked(Vector3 eye, Vector3 at, Transform subject)
+        {
+            var inside = Physics.OverlapSphere(eye, 0.4f, ~0, QueryTriggerInteraction.Ignore);
+            if (inside.Length > 0) return "inside " + inside[0].name;
+            if (!Physics.Linecast(eye, at, out var hit, ~0, QueryTriggerInteraction.Ignore)) return null;
+            if (subject != null && hit.transform.IsChildOf(subject) || hit.distance >= 0.6f * Vector3.Distance(eye, at)) return null;
+            return $"{hit.collider.name} at {hit.distance:0} m";
+        }
+
+        /// An item box's bubble near the camera fills the frame: such a spot is no good.
+        static bool Bubble(Vector3 from, Vector3 to, Vector3 at)
+        {
+            foreach (var c in Physics.OverlapCapsule(from, to, 3.5f, ~0, QueryTriggerInteraction.Collide))
+                if (c.GetComponentInParent<PowerslideKartPhysics.ItemGiver>() != null) return true;
+            foreach (var c in Physics.OverlapCapsule(to, to + (at - to).normalized * 12f, 2.5f, ~0, QueryTriggerInteraction.Collide))
+                if (c.GetComponentInParent<PowerslideKartPhysics.ItemGiver>() != null) return true;
+            return false;
+        }
+
+        static Shot? Make(string name, Vector3 from, Vector3 to, System.Func<Vector3> look, Transform subject, bool quiet = false, float seconds = ShotSeconds)
+        {
+            var a = look();
+            var why = Blocked(from, a, subject) ?? Blocked(to, a, subject) ?? (Bubble(from, to, a) ? "an item bubble" : null);
+            if (why != null) { if (!quiet) Debug.Log($"[intro] {name}: blocked ({why}), skipped"); return null; }
+            return new Shot { name = name, seconds = seconds, pose = u => (Vector3.Lerp(from, to, u), look()) };
+        }
+
+        /// One of the critters, from down at its height on the road, the camera panning with it as it crosses.
+        Shot? CritterShot(System.Random rng)
+        {
+            var live = Critter.All.FindAll(c => c != null && c.isActiveAndEnabled);
+            if (live.Count == 0) return null;
+            // ponytail: the camera rides with the animal at its height, pushing in, facing it (penguins and ducks are dark
+            // from behind); which way it faces is taken when the cut starts, so a turn at the kerb does not swing the camera.
+            // Checked from where it stands now (it walks ~2 m in the shot); from the road's line when the front is blocked.
+            for (int k = 0; k < live.Count; k++)
+            {
+                var c = live[(k + rng.Next(live.Count)) % live.Count];
+                var t = c.transform; var road = Road(Nearest(t.position));
+                foreach (bool front in new[] { true, false })
+                {
+                    Vector3 Axis() { var f = front ? Face(t) : -road; f.y = 0f; return f.sqrMagnitude > 0.01f ? f.normalized : -road; }
+                    Vector3 Eye(float u, Vector3 f) => t.position + f * Mathf.Lerp(5.4f, 4.0f, u) + Vector3.Cross(Vector3.up, f) * 1.3f + Vector3.up * 0.7f;
+                    var now = Axis();
+                    if (Make("critter", Eye(0f, now), Eye(1f, now), () => t.position + Vector3.up * 0.4f, t, quiet: true) is not Shot) continue;
+                    Vector3 axis = Vector3.zero;
+                    return new Shot { name = "critter", seconds = ShotSeconds, pose = u =>
+                    {
+                        if (axis == Vector3.zero || u <= 0f) axis = Axis();
+                        return (Eye(u, axis), t.position + Vector3.up * 0.4f);
+                    } };
+                }
+            }
+            Debug.Log("[intro] critter: no clear view, skipped");
+            return null;
+        }
+
+        /// Which way an animal's face looks: toward its eyes (ChickenSetup's boxes), whichever way its root is turned.
+        static Vector3 Face(Transform t)
+        {
+            var eyes = Vector3.zero; int n = 0;
+            foreach (var c in t.GetComponentsInChildren<Transform>()) if (c.name.StartsWith("Eye")) { eyes += c.position; n++; }
+            if (n == 0) return t.forward;
+            var f = eyes / n - t.position; f.y = 0f;
+            return f.sqrMagnitude > 0.0001f ? f.normalized : t.forward;
+        }
+
+        /// Palm Bay's tunnel: down the tube at kart height, under its strip lights.
+        Shot? TunnelShot()
+        {
+            var a = GameObject.Find("TunnelLight0"); var b = GameObject.Find("TunnelLight7");
+            if (a == null || b == null) return null;
+            Vector3 p0 = a.transform.position, p1 = b.transform.position;   // 6 m and 90 m into the tube, at its crown
+            if (Vector3.Dot(p1 - p0, Road(Nearest((p0 + p1) * 0.5f))) < 0f) (p0, p1) = (p1, p0);   // the way the race runs
+            var down = Vector3.up * -6.8f;                                // the crown is ~9 m over the road: kart height plus a bit
+            foreach (float k in new[] { 0.02f, 0.25f, 0.45f })            // the first stretch of the tube clear of item bubbles
+                if (Make("tunnel", Vector3.Lerp(p0, p1, k) + down, Vector3.Lerp(p0, p1, k + 0.28f) + down, () => p1 + down + Vector3.up * 0.6f, null, quiet: true) is Shot shot) return shot;
+            Debug.Log("[intro] tunnel: no clear stretch, skipped");
+            return null;
+        }
+
+        /// Each circuit's own sight, filmed from the road side.
+        IEnumerable<Shot?> LandmarkShots(System.Random rng)
+        {
+            switch (Cup.TrackId)
+            {
+                case "beach":
+                {
+                    var lh = GameObject.Find("Dressing/Lighthouse");
+                    if (lh == null) break;
+                    var p = lh.transform.position; Shot? shot = null;
+                    foreach (float turn in new[] { 0f, 35f, -35f, 70f, -70f })   // round from the circuit's side until the rocks are out of the way
+                        foreach (float far in new[] { 64f, 90f })
+                        {
+                            if (shot != null) break;
+                            var back = Quaternion.AngleAxis(turn, Vector3.up) * -new Vector3(p.x, 0f, p.z).normalized;
+                            var side = Vector3.Cross(Vector3.up, back);
+                            shot = Make("lighthouse", p + back * far + side * 14f + Vector3.up * 6f, p + back * (far - 8f) - side * 10f + Vector3.up * 8f, () => p + Vector3.up * 17f, lh.transform, quiet: true);
+                        }
+                    if (shot == null) Debug.Log("[intro] lighthouse: no clear view, skipped");
+                    yield return shot;
+                    break;
+                }
+                case "alpine": yield return Beside(All("train-locomotive", rng), 11f, 2.0f, 1.6f); break;
+                case "forest": yield return Beside(All("campfire_logs", rng), 7.5f, 1.2f, 0.6f); break;
+                case "speedway":
+                {
+                    var cars = new List<Transform>();                       // the paddock's race cars (the stands show their backs to the road)
+                    foreach (var c in new[] { "raceCarRed", "raceCarGreen", "raceCarOrange", "raceCarWhite" }) cars.AddRange(All(c, rng));
+                    yield return Beside(cars, 7f, 1.1f, 0.6f);
+                    foreach (var arch in All("overheadRound", rng)) if (Toward(arch, "arch") is Shot through) { yield return through; break; }
+                    break;
+                }
+                case "volcano":
+                {
+                    yield return Beside(All("statue_head", rng), 15f, 1.0f, 5f);
+                    // the cone itself: from the road, looking up at the crater's rim
+                    int w = rng.Next(path.Length); var at = new Vector3(0f, 58f, 0f);
+                    var eye = path[w] + Vector3.up * 6f; var towards = (at - eye); towards.y = 0f;
+                    yield return Make("crater", eye, eye + towards.normalized * 16f + Vector3.up * 3f, () => at + Vector3.up * -6f, null);
+                    break;
+                }
+            }
+        }
+
+        /// The dressing's props by name (they repeat: the kit's names), in a random order.
+        static List<Transform> All(string name, System.Random rng)
+        {
+            var found = new List<Transform>();
+            var dressing = GameObject.Find("Dressing");
+            if (dressing != null) foreach (var t in dressing.GetComponentsInChildren<Transform>()) if (t.name == name) found.Add(t);
+            for (int i = found.Count - 1; i > 0; i--) { int j = rng.Next(i + 1); (found[i], found[j]) = (found[j], found[i]); }
+            return found;
+        }
+
+
+        /// A prop off the road, the camera sliding past it: the first of them, and the first spot (road side, nearer,
+        /// or the far side) with nothing in the way.
+        Shot? Beside(List<Transform> subjects, float away, float height, float lookUp)
+        {
+            foreach (var subject in subjects)
+            {
+                var p = subject.position; int w = Nearest(p); var dir = Road(w);
+                var toRoad = path[w] - p; toRoad.y = 0f; toRoad = toRoad.normalized;
+                foreach (float out_ in new[] { away, away * 0.6f, -away * 0.8f })
+                {
+                    var eye = p + toRoad * out_; eye.y = Mathf.Max(p.y, path[w].y - 0.5f) + height;
+                    if (Make(subject.name, eye - dir * 4f, eye + dir * 4f, () => p + Vector3.up * lookUp, subject, quiet: true) is Shot shot) return shot;
+                }
+            }
+            if (subjects.Count > 0) Debug.Log($"[intro] {subjects[0].name}: no clear view, skipped");
+            return null;
+        }
+
+        /// A tall prop beside the road (a grandstand) from the far side of the tarmac, rolling past it, aimed at its middle.
+        Shot? FromRoad(List<Transform> subjects, float height)
+        {
+            foreach (var subject in subjects)
+            {
+                var b = new Bounds(subject.position, Vector3.zero);
+                foreach (var r in subject.GetComponentsInChildren<Renderer>()) b.Encapsulate(r.bounds);
+                int w = Nearest(b.center); var dir = Road(w);
+                var across = path[w] - b.center; across.y = 0f; across = across.normalized;
+                var eye = path[w] + across * 6f + Vector3.up * (height - 0.5f);
+                var at = b.center;
+                if (Make(subject.name, eye - dir * 8f, eye + dir * 4f, () => at, subject, quiet: true) is Shot shot) return shot;
+            }
+            if (subjects.Count > 0) Debug.Log($"[intro] {subjects[0].name}: no clear view, skipped");
+            return null;
+        }
+
+        /// Up the road through something it passes under (the Speedway's arches).
+        Shot? Toward(Transform subject, string name)
+        {
+            if (subject == null) return null;
+            var p = subject.position; int w = Nearest(p); var dir = Road(w);
+            var road = path[w].y - 0.5f;
+            var at = new Vector3(p.x, road + 4f, p.z);
+            return Make(name, at - dir * 46f + Vector3.up * -3f, at - dir * 30f + Vector3.up * -2.8f, () => at + dir * 30f, subject, quiet: true);
+        }
+
+        /// A ramp from the run-up, or a turbo pad skimmed at kart height.
+        Shot? RampOrPad(string rootName, System.Random rng, bool ramp)
+        {
+            var root = GameObject.Find(rootName);
+            if (root == null || root.transform.childCount == 0) return null;
+            var t = root.transform.GetChild(rng.Next(root.transform.childCount));
+            var p = t.position; var dir = Road(Nearest(p));
+            return ramp
+                ? Make("ramp", p - dir * 17f + Vector3.up * 0.9f, p - dir * 8f + Vector3.up * 1.3f, () => p + dir * 3f + Vector3.up * 0.8f, t)
+                : Make("turbo", p - dir * 10f + Vector3.up * 0.7f, p + dir * 2f + Vector3.up * 0.7f, () => p + dir * 14f + Vector3.up * 0.5f, t);
+        }
+
+        /// Beach Buggy hints at its shortcuts in the intro: the camera at the cut's mouth, looking in.
+        Shot? ShortcutShot()
+        {
+            var cut = ShortcutPath.Instance;
+            if (cut == null || cut.path == null || cut.path.Length < 3) return null;
+            var a = cut.path[0].transform.position; var b = cut.path[2].transform.position;
+            var dir = b - a; dir.y = 0f; dir = dir.normalized;
+            return Make("shortcut", a - dir * 14f + Vector3.up * 1.8f, a - dir * 5f + Vector3.up * 1.6f, () => b + Vector3.up * 1f, cut.transform);
+        }
+
+        /// The finale: a crane down behind the grid, ending where the chase camera takes over.
+        Shot GridShot()
+        {
+            var line = path[0]; var dir = Road(0);
+            var from = line - dir * 62f + Vector3.up * 11f; var to = line - dir * 38f + Vector3.up * 5f;
+            return new Shot { name = "grid", seconds = GridSeconds, pose = u => (Vector3.Lerp(from, to, u), line + Vector3.up * 1.2f) };
         }
 
         /// Takes the race camera off its rig for the lap, puts the stage away and hangs the words on that camera.
