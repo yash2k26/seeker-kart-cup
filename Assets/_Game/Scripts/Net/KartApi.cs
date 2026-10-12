@@ -135,26 +135,37 @@ namespace KartCup
         static Awaitable<T> Post<T>(string path, object body) => Send<T>("POST", path, body);
         static Awaitable<T> Get<T>(string path) => Send<T>("GET", path, null);
 
+        /// Calls the server may safely get twice: reads, sign-in (a nonce is only spent when the request arrives) and the
+        /// purchase checks (keyed by the transaction signature).
+        static bool Repeatable(string method, string path) =>
+            method == "GET" || path.StartsWith("/v1/auth/") || path == "/v1/purchase/verify" || path == "/v1/tx/confirm";
+
         static async Awaitable<T> Send<T>(string method, string path, object body)
         {
-            using var req = new UnityWebRequest(BaseUrl + path, method);
-            if (body != null)
+            // 12 Oct 2026: the first request after coming back from the wallet hung for the whole timeout and never reached
+            // the Worker (its sign-in nonce was still unspent), so sign-in failed after the player had approved it. A call
+            // that can be repeated gets a short first try and one more on a fresh connection when no answer came at all.
+            bool again = Repeatable(method, path);
+            for (int attempt = 0; ; attempt++)
             {
-                req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(body)));
-                req.SetRequestHeader("content-type", "application/json");
-            }
-            req.downloadHandler = new DownloadHandlerBuffer();
-            if (HasSession) req.SetRequestHeader("authorization", "Bearer " + SessionToken);
-            req.timeout = 15;
-            await req.SendWebRequest();
-            var text = req.downloadHandler.text;
-            if (req.result != UnityWebRequest.Result.Success && req.responseCode != 202)
-            {
-                Debug.LogWarning($"[api] {method} {path} -> {req.responseCode} {text}");
+                using var req = new UnityWebRequest(BaseUrl + path, method);
+                if (body != null)
+                {
+                    req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(body)));
+                    req.SetRequestHeader("content-type", "application/json");
+                }
+                req.downloadHandler = new DownloadHandlerBuffer();
+                if (HasSession) req.SetRequestHeader("authorization", "Bearer " + SessionToken);
+                req.timeout = again && attempt == 0 ? 8 : 15;
+                await req.SendWebRequest();
+                var text = req.downloadHandler.text;
+                if (req.result == UnityWebRequest.Result.Success || req.responseCode == 202)
+                    return string.IsNullOrEmpty(text) ? default : JsonConvert.DeserializeObject<T>(text);
+                Debug.LogWarning($"[api] {method} {path} -> {req.responseCode} {req.error} {text}");
+                if (req.responseCode == 0 && again && attempt == 0) continue;
                 if (req.responseCode == 401 && path != "/v1/auth/verify") SessionToken = "";   // expired session: silent re-login next time
                 throw new ApiException(req.responseCode, text);
             }
-            return string.IsNullOrEmpty(text) ? default : JsonConvert.DeserializeObject<T>(text);
         }
 
         public sealed class ApiException : Exception

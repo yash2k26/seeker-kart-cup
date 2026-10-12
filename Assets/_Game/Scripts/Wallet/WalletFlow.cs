@@ -70,20 +70,22 @@ namespace KartCup
         /// while an attempt waits on the wallet it says so, and one stuck past the SDK's own 90 s wait gives way to a new one.
         public void Login()
         {
-            if (Busy && Time.unscaledTime - loginAt < 100f) { Status("Waiting for your wallet…"); return; }
+            if (Busy && Time.unscaledTime - loginAt < 100f) { Status(busyNote); return; }
             if (Busy) Busy = false;
             _ = LoginAsync();
         }
         float loginAt = -999f;
+        string busyNote = "Waiting for your wallet…";
 
         /// What a failed sign-in tells the player: what happened and what to do, never only "failed".
         static string Why(Exception e)
         {
             var m = e.Message ?? "";
             if (e.GetType().Name == "MwaNoWalletException") return "No Solana wallet on this phone. Install Phantom or Solflare, then sign in.";
-            if (m.Contains("returned to app before")) return "Sign-in cancelled. Tap SIGN IN to try again.";
+            if (m.Contains("returned to app before") || m.Contains("WS closed unexpectedly")) return "Sign-in cancelled. Tap SIGN IN to try again.";
             if (m.Contains("Timeout or cancelled")) return "Your wallet didn't answer. Open it once, then tap SIGN IN.";
             if (m.Contains("declined") || m.Contains("rejected") || m.Contains("NotAuthorized") || m.Contains("authorization request failed")) return "Sign-in declined in the wallet.";
+            if (e is KartApi.ApiException a && a.Status != 0) return "Kartel's server didn't accept the sign-in. Tap SIGN IN to try again.";
             if (e is KartApi.ApiException || m.Contains("Cannot resolve") || m.Contains("Cannot connect") || m.Contains("timed out")) return "Can't reach Kartel's server. Check your connection.";
             return "Sign-in failed. Tap SIGN IN to try again.";
         }
@@ -93,7 +95,7 @@ namespace KartCup
             bool outer = Busy; Busy = true; loginAt = Time.unscaledTime;
             try
             {
-                Status("Opening wallet…");
+                Status("Opening wallet…"); busyNote = "Waiting for your wallet…";
                 var c = await KartApi.Challenge();
                 var (account, siws) = await Web3.Instance.LoginWalletAdapter(new SignInPayload
                 {
@@ -101,6 +103,7 @@ namespace KartCup
                     IssuedAt = c.issuedAt, ExpirationTime = c.expirationTime, Version = c.version, ChainId = c.chainId,
                 });
                 if (account == null) { Status("Cancelled"); return false; }
+                Status("Signing you in…"); busyNote = "Still signing you in…";   // the wallet is done; the server check can take a moment
 
                 KartApi.Profile profile;
                 if (siws != null && !string.IsNullOrEmpty(siws.Signature))
@@ -113,7 +116,7 @@ namespace KartCup
                     profile = await KartApi.VerifySignedMessage(c.nonce, account.PublicKey.Key, payload);
                 }
                 SetProfile(profile);
-                Status(Profile.skrName ?? Short(Profile.wallet));
+                Status("Signed in as " + (Profile.skrName ?? Short(Profile.wallet)));
                 _ = SettlePurchases();   // payments this wallet made under a session that has since expired
                 KartApi.Event("wallet_login", new { seeker = Profile.isSeeker });
                 if (RaceSession.Instance != null) await RaceSession.Instance.ClaimAfterLogin();
