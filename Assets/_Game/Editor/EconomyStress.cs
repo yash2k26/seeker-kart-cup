@@ -21,8 +21,8 @@ public static class EconomyStress
     }
 
     // what the player has saved, by type (PlayerPrefs.GetString on an int key reads as missing)
-    static readonly string[] IntKeys = { "kc.gems", "kc.fuel", "kc.spin.day", "kc.item.rocket", "kc.item.homing", "kc.item.bomb", "kc.item.nitro", "kc.item.bouncer", "kc.item.sunbomb" };
-    static readonly string[] StringKeys = { "kc.fuel.at", "kc.chests", "kc.unlocks", "kc.earned", "kc.loadout", "kc.tour", "kc.purchases" };
+    static readonly string[] IntKeys = { "kc.gems", "kc.fuel", "kc.spin.day", "kc.daily.done", "kc.item.rocket", "kc.item.homing", "kc.item.bomb", "kc.item.nitro", "kc.item.bouncer", "kc.item.sunbomb" };
+    static readonly string[] StringKeys = { "kc.fuel.at", "kc.chests", "kc.unlocks", "kc.earned", "kc.loadout", "kc.tour", "kc.purchases", "kc.ach" };
 
     public static void Run()
     {
@@ -41,6 +41,8 @@ public static class EconomyStress
             SpinUnderStress();
             RecruitsUnderStress();
             TourUnderStress(rng);
+            DailyUnderStress();
+            AchievementsUnderStress();
         }
         catch (System.Exception e) { failures++; Debug.Log("[economy] FAIL  threw: " + e); }
         finally
@@ -226,6 +228,56 @@ public static class EconomyStress
         Check("tour: 5000 random results keep each event's best, never lower it", ids.All(i => Tour.Stars(i) == best[i]));
         Check($"tour: the total never passes {Tour.MaxStars}", Tour.Total <= Tour.MaxStars && Tour.Total == best.Values.Sum());
         Check("tour: an unknown event records nothing", Tour.Record("nope", 1) == null);
+    }
+
+    // ---------- the Daily Challenge: every circuit and mode in turn, paid once a day, judged by the day it started ----------
+    static void DailyUnderStress()
+    {
+        int day0 = Daily.Today;
+        var seen = new int[Tracks.Count]; var modes = new HashSet<RaceMode.Kind>();
+        for (int d = day0; d < day0 + 400; d++) { var c = Daily.For(d); seen[c.track]++; modes.Add(c.mode); }
+        Check($"daily: 400 days visit every circuit evenly ({string.Join(" ", seen)}) and all three modes", seen.All(n => n >= 70) && modes.Count == 3);
+        for (int d = day0; d < day0 + 3; d++)
+        {
+            var c = Daily.For(d);
+            PlayerPrefs.DeleteKey("kc.daily.done"); Chests.Preview(0); PlayerPrefs.SetInt("kc.gems", 0); ResetCache(typeof(Gems));
+            Daily.Arm(c);
+            int miss = c.mode == RaceMode.Kind.Duel ? 2 : 4, hit = c.mode == RaceMode.Kind.Duel ? 1 : 3;
+            Check($"daily {c.mode}: place {miss} does not meet '{c.goal}'", !Daily.Record(miss));
+            Check($"daily {c.mode}: place {hit} meets it and pays a silver chest, 15 gems and 3 stars", Daily.Record(hit) && Chests.Pending == 1 && Gems.Balance == 15 && Chests.Stars == 3);
+            Check($"daily {c.mode}: paid once that day", !Daily.Record(hit) && Chests.Pending == 1 && Gems.Balance == 15);
+        }
+        // the race started yesterday and finished after midnight: yesterday's challenge, yesterday marked
+        PlayerPrefs.DeleteKey("kc.daily.done");
+        var yesterday = Daily.For(day0 - 1); Daily.Arm(yesterday);
+        Daily.Record(yesterday.mode == RaceMode.Kind.Duel ? 1 : 1);
+        Check("daily: a race from before midnight is yesterday's, and today's is still to do", PlayerPrefs.GetInt("kc.daily.done") == day0 - 1 && !Daily.Done);
+        int me = CharacterDatabase.SelectedIndex, clashes = 0;
+        for (int d = day0; d < day0 + 200; d++) { var c = Daily.For(d); if (c.mode != RaceMode.Kind.Duel) continue; Daily.Arm(c); if (RaceMode.Rival == me) clashes++; }
+        Check("daily: a duel is never against your own driver", clashes == 0);
+        RaceMode.Clear();
+    }
+
+    // ---------- achievements: done waits for a claim, a claim pays once, an old save's done ones count as claimed ----------
+    static void AchievementsUnderStress()
+    {
+        PlayerPrefs.DeleteKey("kc.ach"); ResetCache(typeof(Achievements), "s");
+        Chests.Preview(0);
+        Achievements.Add(Achievements.Stat.Races, 50);
+        var all = Achievements.All.Where(d => d.stat == Achievements.Stat.Races).ToList();
+        Check("achievements: 50 races finish the three race ones", all.All(Achievements.IsDone) && Achievements.ClaimableCount == 3);
+        Check("achievements: done is not paid until claimed", Chests.Pending == 0 && Chests.Stars == 0);
+        int stars = all.Sum(d => d.stars);
+        Check("achievements: a claim pays its chest and stars, once", Achievements.Claim(all[0]) && !Achievements.Claim(all[0]) && Chests.Pending == 1);
+        foreach (var d in all) Achievements.Claim(d);
+        Check("achievements: claiming the rest pays the rest", Achievements.ClaimableCount == 0 && Chests.Pending == 3, $"{Chests.Pending} chests");
+        Check("achievements: a not-done one cannot be claimed", !Achievements.Claim(Achievements.All.First(d => d.id == "wins-25")));
+        // a save from before claims (no version): what it had done was paid then, so it is claimed
+        PlayerPrefs.SetString("kc.ach", "{\"counts\":[3,1,1,0,0,0,0,0,0,0,0,0,0,0,0],\"done\":[\"races-1\",\"wins-1\"],\"tracksWon\":[]}");
+        ResetCache(typeof(Achievements), "s");
+        var w1 = Achievements.All.First(d => d.id == "wins-1");
+        Check("achievements: an old save's done ones are claimed already, nothing paid twice", Achievements.IsClaimed(w1) && !Achievements.CanClaim(w1) && Achievements.ClaimableCount == 0);
+        Check("achievements: five circuits and five bosses (Mount Ember, Beeman)", Achievements.All.First(d => d.id == "tracks-4").goal == 5 && Achievements.All.First(d => d.id == "bosses-4").goal == 5);
     }
 
     /// The static caches some of these keep (Gems' balance, Tour's state): cleared so the next read is from PlayerPrefs.

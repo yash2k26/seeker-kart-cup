@@ -183,6 +183,15 @@ const starts = [];
 }
 const startedAt = Date.now();
 
+// the Weekly: twelve signed-in wallets race this week's circuit at different speeds, one on the wrong circuit, and a
+// guest whose run is claimed after it finishes
+const wk = (await get('/v1/weekly')).body, wTrack = wk.track, other = TRACKS.find(t => t !== wTrack);
+const weeklyRacers = await Promise.all(Array.from({ length: 12 }, signIn));
+const weeklyRuns = await Promise.all(weeklyRacers.map(async (w, i) => ({ w, v: 36 + i * 0.7, r: await post('/v1/race/start', { deviceId: 'weekly' + i, trackId: wTrack, mode: 'weekly' }, w.token) })));
+const offTrack = { w: weeklyRacers[0], r: await post('/v1/race/start', { deviceId: 'weeklyX', trackId: other, mode: 'weekly' }, weeklyRacers[0].token) };
+const guestRun = await post('/v1/race/start', { deviceId: 'weeklyG', trackId: wTrack, mode: 'weekly' });
+check(`the Weekly is on a known circuit (${wTrack}) and its races start`, TRACKS.includes(wTrack) && weeklyRuns.every(x => x.r.status === 200) && offTrack.r.status === 200 && guestRun.status === 200);
+
 // ================= 3. reads under load, while the races run =================
 console.log('\n== 3. reads under load');
 {
@@ -289,6 +298,24 @@ console.log('\n== 2b. 150 finishes at once');
   check(`${badtok.length} finishes with a tampered race token are refused`, badtok.every(o => o.r.status === 401), badtok.map(o => o.r.status).join(','));
   const board = await get('/v1/leaderboard?track=beach');
   check('signed-in finishes reach the leaderboard', board.status === 200 && board.body.entries.length >= 1, board.text.slice(0, 200));
+
+  // the Weekly's board: fastest first, your row with its rank and gap, nothing from another circuit or an unclaimed guest
+  const fin = (r, d, tok) => post('/v1/race/finish', { raceToken: r.body.raceToken, totalMs: d.ms, lapMs: d.soloLaps, checkpointMs: d.cps, path: d.path(), position: 1 }, tok);
+  const wf = await Promise.all(weeklyRuns.map(x => fin(x.r, drive(wTrack, x.v), x.w.token)));
+  const xf = await fin(offTrack.r, drive(other, 40), offTrack.w.token);
+  const gd = drive(wTrack, 50), gf = await fin(guestRun, gd);
+  check('12 Weekly runs, the wrong-circuit one and a guest run are all accepted as races', wf.every(r => r.status === 200) && xf.status === 200 && gf.status === 200, wf.map(r => r.status).join(',') + ' ' + xf.status + ' ' + gf.status);
+  const slowest = weeklyRacers[0], fastest = weeklyRacers[11];
+  const wb = (await get('/v1/weekly?wallet=' + slowest.address)).body;
+  const order = wb.entries.map(e => e.wallet);
+  check(`the Weekly board lists the 12, fastest first (${wb.entries.length} entries)`, wb.entries.length === 12 && order[0] === fastest.address && order[11] === slowest.address
+        && wb.entries.every((e, i) => i === 0 || e.bestMs >= wb.entries[i - 1].bestMs), JSON.stringify(wb.entries.map(e => e.bestMs)));
+  check('your row: rank 12 of 12, with the gap to the one above', wb.me?.rank === 12 && wb.me.entrants === 12 && wb.me.gapMs > 0, JSON.stringify(wb.me));
+  check('no pot set: no prize promised to anyone', wb.pot === null && wb.entries.every(e => e.prize === null));
+  const g = await signIn();
+  const claimed = await post('/v1/race/claim', { raceToken: guestRun.body.raceToken }, g.token);
+  const wb2 = (await get('/v1/weekly?wallet=' + g.address)).body;
+  check("a guest's Weekly run joins the board once claimed by a wallet, at its time", claimed.status === 200 && wb2.entries.length === 13 && wb2.me?.rank === 1, JSON.stringify(wb2.me));
 }
 
 console.log(`\n${failures ? failures + ' FAILURE(S)' : 'ALL PASS'}`);

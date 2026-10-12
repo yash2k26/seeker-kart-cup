@@ -89,7 +89,7 @@ namespace KartCup
             abilityWasReady = ready;
         }
 
-        void Award(Achievements.Def d) => Banner($"<color=#FFB126>ACHIEVEMENT</color>   {d.title.ToUpperInvariant()}   ·   + {Chests.Names[(int)d.reward]}");
+        void Award(Achievements.Def d) => Banner($"<color=#FFB126>ACHIEVEMENT</color>   {d.title.ToUpperInvariant()}   ·   CLAIM YOUR {Chests.Names[(int)d.reward]} IN AWARDS");
 
         /// A line on the award plate for a few seconds (an achievement, a gold paint earned).
         public void Banner(string text, float seconds = 3.2f)

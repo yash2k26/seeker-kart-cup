@@ -46,6 +46,7 @@ public static class Playtest
     // on the player's line at 12 s. Frames of both, and of the countdown with its start-boost line.
     static bool oobTest, smashTest, oobDone, smashDone, countShot;
     static double every, nextAuto = -1, until = 50;
+    static bool toCard;
     static int autoShot;
 
     [MenuItem("Build/Playtest 30s")]
@@ -86,7 +87,9 @@ public static class Playtest
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-look") look = args[i + 1];   // what the vista frames look at
         item = null; itemShot = 0; thrownAt = -1; goAt = -1; armed = false; heldShot = false;
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-item") item = args[i + 1];
-        autopilot = args.Contains("-autopilot"); gatewalk = args.Contains("-gatewalk"); walkGate = 0; nextWalk = 0; autoSet = false; autoShot = 0; nextAuto = -1; every = 0; until = 50;
+        // -worker URL: submit to that Worker (a local wrangler dev) instead of the live one, so test races leave no rows on mainnet
+        for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-worker") KartCup.KartApi.BaseUrl = args[i + 1];
+        autopilot = args.Contains("-autopilot"); toCard = args.Contains("-tocard"); gatewalk = args.Contains("-gatewalk"); walkGate = 0; nextWalk = 0; autoSet = false; autoShot = 0; nextAuto = -1; every = 0; until = 50;
         moments.Clear(); lastAmmo = 0; pickups = 0; hits = 0; wasSpinning = false; wasFinished = false;
         oobTest = args.Contains("-oob"); smashTest = args.Contains("-smash"); oobDone = smashDone = countShot = false;
         Smashable.Smashed -= OnSmashed; Smashable.Smashed += OnSmashed;
@@ -257,6 +260,13 @@ public static class Playtest
             if (shot == 2 && pause != null) pause.Resume();
             captureAt = -1;
             shot++;
+        }
+        // -tocard: done 1.5 s after the results card is up. On a loaded machine the race runs slow in wall time, so -seconds
+        // has to be generous, and most of it goes unused.
+        if (toCard && KartCup.RaceManager.Instance?.Player != null && KartCup.RaceManager.Instance.Player.finished)
+        {
+            var dim = Object.FindFirstObjectByType<ResultsPanel>()?.transform.Find("Dim");
+            if (dim != null && dim.gameObject.activeInHierarchy) until = System.Math.Min(until, t + 1.5);
         }
         if (t < until) return;
 

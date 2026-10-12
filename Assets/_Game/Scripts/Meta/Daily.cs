@@ -37,10 +37,18 @@ namespace KartCup
         public static bool LastPaid;
         public static bool Done => PlayerPrefs.GetInt(Key, -1) == Today;
 
+        /// The day of the challenge armed: a race started before UTC midnight and finished after it is still that day's
+        /// (judged by the next day's rules, a duel read as a podium race and the wrong day was marked done).
+        static int armedDay = -1;
+
         public static void Arm(Challenge c)
         {
             RaceMode.Clear();   // nothing of the last event carries over
-            RaceMode.Current = c.mode; RaceMode.Rival = c.mode == RaceMode.Kind.Duel ? c.rival : -1;
+            armedDay = c.day;
+            // never a duel against your own driver: the rival is one of ten, and one day in ten it was you
+            int rival = c.rival, roster = RaceSpawner.Roster != null ? RaceSpawner.Roster.characters.Length : 10;
+            if (rival == CharacterDatabase.SelectedIndex) rival = (rival + 1) % Mathf.Max(2, roster);   // (Arm runs before Cup.Begin sets the cup's player)
+            RaceMode.Current = c.mode; RaceMode.Rival = c.mode == RaceMode.Kind.Duel ? rival : -1;
             RaceMode.Reverse = c.reverse; RaceMode.Mist = c.mist;
             RaceMode.Difficulty = c.mode == RaceMode.Kind.Duel ? 1.02f : 1.0f; RaceMode.EventId = "daily";
         }
@@ -48,10 +56,11 @@ namespace KartCup
         /// The race is over: the goal met for the first time today pays out. Returns whether it did.
         public static bool Record(int place)
         {
-            var c = Current;
+            int day = armedDay >= 0 ? armedDay : Today;
+            var c = For(day, RaceSpawner.Roster != null ? RaceSpawner.Roster.characters.Length : 10);
             bool met = c.mode == RaceMode.Kind.Duel ? place == 1 : place >= 1 && place <= 3;
-            if (!met || Done) return LastPaid = false;
-            PlayerPrefs.SetInt(Key, Today); PlayerPrefs.Save();
+            if (!met || PlayerPrefs.GetInt(Key, -1) == day) return LastPaid = false;
+            PlayerPrefs.SetInt(Key, day); PlayerPrefs.Save();
             Chests.Give(Chests.Tier.Silver);
             Gems.Earn(15, "daily");
             Chests.AddStars(3);

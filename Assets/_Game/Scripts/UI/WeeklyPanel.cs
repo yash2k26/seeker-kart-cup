@@ -50,7 +50,7 @@ namespace KartCup
             ShowClock();
             if (prizes != null)
                 prizes.text = b == null ? ""
-                    : b.pot == null ? "Top 3 Seekers win SKR prizes"
+                    : b.pot == null ? "Free time trial  ·  no prize pot this week: the fastest lap takes #1"   // never a prize the Worker has not set
                     : $"1ST  {Weekly.Prize(1)}   ·   2ND  {Weekly.Prize(2)}   ·   3RD  {Weekly.Prize(3)}"
                       + (b.seekers < b.minSeekers ? $"\n<size=80%><color=#B4A7DE>Paid when {b.minSeekers} Seekers have driven it ({b.seekers} so far)</color></size>" : "");
             if (mine != null)
