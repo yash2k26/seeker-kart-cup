@@ -36,6 +36,16 @@ public static class RpcCheck
         var direct = ClientFactory.GetClient("https://solana-rpc.publicnode.com");
         var sim = await direct.SimulateTransactionAsync(forWallet, sigVerify: false, commitment: Commitment.Confirmed, replaceRecentBlockhash: true);
         Debug.Log($"[rpc] simulate: ok={sim.WasSuccessful} err={(sim.Result?.Value?.Error == null ? "none" : sim.Result.Value.Error.Type.ToString())} reason={sim.Reason} logs={string.Join(" | ", sim.Result?.Value?.Logs ?? new string[0])}");
+        // the in-session blockhash refresh's request, off the main thread as the wallet session runs it
+        var off = await System.Threading.Tasks.Task.Run(async () =>
+        {
+            using var http = new System.Net.Http.HttpClient { Timeout = System.TimeSpan.FromSeconds(6) };
+            var reply = await http.PostAsync("https://kartcup.bharadwaj465.workers.dev/rpc", new System.Net.Http.StringContent(
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getLatestBlockhash\",\"params\":[{\"commitment\":\"confirmed\"}]}", System.Text.Encoding.UTF8, "application/json"));
+            var j = Newtonsoft.Json.Linq.JObject.Parse(await reply.Content.ReadAsStringAsync());
+            return $"{(string)j.SelectToken("result.value.blockhash")} @ {(ulong?)j.SelectToken("result.context.slot")} main thread: {UnityEditorInternal.InternalEditorUtility.CurrentThreadIsMainThread()}";
+        });
+        Debug.Log("[rpc] off-thread blockhash: " + off);
         if (Application.isBatchMode) EditorApplication.Exit(0);
     }
 }

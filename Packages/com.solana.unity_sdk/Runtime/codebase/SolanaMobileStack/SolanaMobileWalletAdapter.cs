@@ -445,15 +445,24 @@ namespace Solana.Unity.SDK
         private async Task RefreshBlockhash(Transaction[] transactions, SignAndSendTransactionsOptions options)
         {
             if (transactions.Any(t => t.Signatures != null && t.Signatures.Any(p => p.Signature != null && p.Signature.Any(b => b != 0)))) return;
+            // A plain HTTP call: the SDK's RPC client goes through Unity's main thread, which Android pauses while the
+            // wallet is in front, so awaiting it here hung the session until the player came back (build 170).
             try
             {
-                var r = await ActiveRpcClient.GetLatestBlockHashAsync(Commitment.Confirmed);
-                var hash = r?.Result?.Value?.Blockhash;
-                if (string.IsNullOrEmpty(hash)) { Debug.LogWarning("[MWA] fresh blockhash unavailable: " + r?.Reason); return; }
+                using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(6) };
+                var body = new System.Net.Http.StringContent(
+                    "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getLatestBlockhash\",\"params\":[{\"commitment\":\"confirmed\"}]}",
+                    System.Text.Encoding.UTF8, "application/json");
+                var reply = await http.PostAsync(ActiveRpcClient.NodeAddress, body).ConfigureAwait(false);
+                var json = JObject.Parse(await reply.Content.ReadAsStringAsync().ConfigureAwait(false));
+                var hash = (string)json.SelectToken("result.value.blockhash");
+                var slot = (ulong?)json.SelectToken("result.context.slot");
+                if (string.IsNullOrEmpty(hash)) { Debug.LogWarning("[MWA] fresh blockhash unavailable: " + json); return; }
                 foreach (var t in transactions) t.RecentBlockHash = hash;
-                if (options != null) options.MinContextSlot = r.Result.Context.Slot;
+                if (options != null && slot != null) options.MinContextSlot = slot;
+                Debug.Log($"[MWA] fresh blockhash {hash[..8]}… at slot {slot}");
             }
-            catch (Exception e) { Debug.LogWarning("[MWA] fresh blockhash failed: " + e.Message); }
+            catch (Exception e) { Debug.LogWarning("[MWA] fresh blockhash failed, keeping the one built with: " + e.Message); }
         }
 
         private static byte[] ForWallet(Transaction t)
