@@ -42,9 +42,11 @@ public static class ContractTest
         start = EditorApplication.timeSinceStartup;
         driving = false;
         introAt = countdownAt = podiumAt = cardAt = introFrame = podiumFrame = -1; podiumRacers = 0; tunnelFrame = false; surveyAt = -1; surveyN = 0;
-        // arm a starting item the way the shop does: one rocket in the pack, picked as the loadout
+        // carry two bought rockets in, as the pre-race picker would (Carry): on the kart at the grid, not spent until fired
         startItem = "<not checked>";
-        KartCup.Inventory.Add("rocket", 1); KartCup.Inventory.Loadout = "rocket";
+        KartCup.Inventory.Add("rocket", 2);
+        KartCup.Carry.Chosen = new() { new KartCup.Carry.Stack { id = "rocket", n = 2 } }; KartCup.Carry.SkipPicker = true;
+        RaceManager.PodiumEnds = false;   // the contract driver must reach the line whoever is home first
         packBefore = KartCup.Inventory.Count("rocket");
         EditorApplication.update += Tick;
         EditorApplication.EnterPlaymode();
@@ -113,6 +115,7 @@ public static class ContractTest
     static bool tunnelFrame;
     static double surveyAt = -1; static int surveyN;   // -survey: a frame every 2 s of the drive, to look round the whole lap
     static string startItem = "<not checked>";
+    static int startAmmo, packAtGrid;
     static int packBefore;
     static int podiumRacers;
 
@@ -136,6 +139,7 @@ public static class ContractTest
             countdownAt = t; Debug.Log($"[contract] flow: 3-2-1 at {t:F1}s, prize shot still up: {active}");
             var held = race.Player.GetComponent<ItemCaster>();
             startItem = held != null && held.item != null && held.ammo > 0 ? held.item.itemName : "<none>";
+            startAmmo = held != null ? held.ammo : 0; packAtGrid = KartCup.Inventory.Count("rocket");
         }
         if (race.Player.finished && podiumAt < 0 && active)
         {
@@ -169,8 +173,8 @@ public static class ContractTest
     static void Report(RaceManager race, bool finished, double t)
     {
         Check("the prize shot plays before the race", introAt > 0 && countdownAt > introAt + 3.0, $"shot {introAt:F1}s, 3-2-1 {countdownAt:F1}s");
-        Check("the shop's starting item is on the kart at the grid, and out of the pack", startItem == "Rocket" && KartCup.Inventory.Count("rocket") == packBefore - 1, $"held {startItem}, pack {packBefore} -> {KartCup.Inventory.Count("rocket")}");
-        KartCup.Inventory.Loadout = "";
+        Check("the carried rockets are on the kart at the grid (x2), and nothing is spent until fired", startItem == "Rocket" && startAmmo == 2 && packAtGrid == packBefore, $"held {startItem} x{startAmmo}, pack {packBefore} -> {packAtGrid} at the grid");
+        KartCup.Carry.Chosen = new(); KartCup.Carry.SkipPicker = false; RaceManager.PodiumEnds = true;
         Check("the podium plays after the finish, with three racers", podiumAt > 0 && podiumRacers == 3, $"podium {podiumAt:F1}s, racers {podiumRacers}");
         Check("the results card follows the podium", cardAt > podiumAt + 3.0, $"podium {podiumAt:F1}s, card {cardAt:F1}s");
         var session = Object.FindFirstObjectByType<RaceSession>();

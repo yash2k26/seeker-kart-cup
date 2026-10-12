@@ -82,6 +82,10 @@ public static class Playtest
             if (e != null) { KartCup.Tour.Arm(e, c); track = e.track + 1; } else Debug.LogError("[playtest] no event " + args[i + 1]);
         }
         if (args.Contains("-reverse")) KartCup.RaceMode.Reverse = true;
+        // bought items carried in (Carry), never the picker: -carry rocket:2,bomb:1 (nothing carried without it)
+        KartCup.Carry.SkipPicker = true;
+        KartCup.Carry.Chosen = new System.Collections.Generic.List<KartCup.Carry.Stack>();
+        for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-carry") KartCup.Carry.Chosen = KartCup.Carry.Parse(args[i + 1]);
         if (args.Contains("-mist")) KartCup.RaceMode.Mist = true;
         look = "Lighthouse";
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-look") look = args[i + 1];   // what the vista frames look at

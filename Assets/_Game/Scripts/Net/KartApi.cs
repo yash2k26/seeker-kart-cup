@@ -228,7 +228,6 @@ namespace KartCup
                 if (Inventory.BySku(e.sku) is { } pack)
                 {
                     Inventory.Add(pack.id, pack.qty);
-                    if (string.IsNullOrEmpty(Inventory.Loadout)) Inventory.Loadout = pack.id;
                 }
                 else if (e.sku.StartsWith("gems.") && int.TryParse(e.sku.Substring(5), out var gems)) Gems.Earn(gems, "bought");
             }

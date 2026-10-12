@@ -38,10 +38,38 @@ namespace KartCup
             // across the grass past a gate's end, a respawn): they count as passed. Strict order used to drop them, and
             // then refuse every gate after: the lap never completed and the race never ended (10 Oct 2026).
             int ahead = GatesAhead(cp.index, checkpointIndex, count);
-            if (ahead == 0 || ahead > Window(count)) return;
+            if (cp.index != 0 && lap > 0) touched.Add(cp.index);
+            if (ahead == 0) return;
+            if (ahead > Window(count))
+            {
+                // Out of step: more gates missed than a cut corner explains (a dash, an odd respawn, a gate the trigger
+                // never saw). 13 Oct 2026: the Daily on Sunset Speedway reversed sat at LAP 1/1 for minutes after the line,
+                // every gate refused for good. Two things put it back: the line itself, when most of this lap's gates were
+                // touched (any order), and two gates in a row, which say where the kart really is.
+                if (cp.index == 0 && lap > 0 && touched.Count >= Needed(count))
+                {
+                    Debug.Log($"[race] {racerName} back in step at the line ({touched.Count} of {count - 1} gates this lap)");
+                    checkpointIndex = count - 1; Advance(0, race);
+                }
+                else if (lastRefused >= 0 && GatesAhead(cp.index, lastRefused, count) == 1 && cp.index != 0)
+                {
+                    if (isPlayer) Debug.Log($"[race] {racerName} back in step at gate {cp.index}");
+                    checkpointIndex = cp.index;
+                }
+                lastRefused = cp.index;
+                return;
+            }
+            lastRefused = -1;
             if (ahead > 1 && isPlayer) Debug.Log($"[race] {racerName} skipped {ahead - 1} gate(s) before gate {cp.index}");
+            // the line completes a lap only when most of the lap was driven: a shortcut across the infield is not a lap
+            if (cp.index == 0 && lap > 0 && touched.Count < Needed(count)) { if (isPlayer) Debug.Log($"[race] {racerName} at the line with {touched.Count} of {count - 1} gates: not a lap"); return; }
             for (int k = 1; k <= ahead && !finished; k++) Advance((checkpointIndex + 1) % count, race);
         }
+
+        readonly System.Collections.Generic.HashSet<int> touched = new();   // this lap's gates, any order
+        int lastRefused = -1;
+        /// Gates a lap must have touched for the line to count it: seven in ten of the ones between.
+        public static int Needed(int count) => Mathf.CeilToInt((count - 1) * 0.7f);
 
         /// Gates from `last` forward to `gate` (1 = the next one; 0 = the same gate or one behind it). Before the start
         /// line has been crossed (`last` -1) only the line itself counts.
@@ -56,6 +84,7 @@ namespace KartCup
             // The Worker counts the intermediate gates per lap; the start line is reported through OnLap instead.
             if (gate != 0) { if (isPlayer) RaceSession.Instance?.OnCheckpoint(); return; }
 
+            touched.Clear();
             if (lap > 0) lapTimes.Add(race.Now - lapStart);         // crossing the line completes a lap
             if (lap > 0 && isPlayer) RaceSession.Instance?.OnLap();
             lapStart = race.Now;

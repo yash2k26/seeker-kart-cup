@@ -22,7 +22,7 @@ public static class EconomyStress
 
     // what the player has saved, by type (PlayerPrefs.GetString on an int key reads as missing)
     static readonly string[] IntKeys = { "kc.gems", "kc.fuel", "kc.spin.day", "kc.daily.done", "kc.item.rocket", "kc.item.homing", "kc.item.bomb", "kc.item.nitro", "kc.item.bouncer", "kc.item.sunbomb" };
-    static readonly string[] StringKeys = { "kc.fuel.at", "kc.chests", "kc.unlocks", "kc.earned", "kc.loadout", "kc.tour", "kc.purchases", "kc.ach" };
+    static readonly string[] StringKeys = { "kc.fuel.at", "kc.chests", "kc.unlocks", "kc.earned", "kc.loadout", "kc.tour", "kc.purchases", "kc.ach", "kc.carry", "kc.trials" };
 
     public static void Run()
     {
@@ -44,6 +44,7 @@ public static class EconomyStress
             DailyUnderStress();
             AchievementsUnderStress();
             CloudSaveRoundTrip();
+            CarryRules();
         }
         catch (System.Exception e) { failures++; Debug.Log("[economy] FAIL  threw: " + e); }
         finally
@@ -259,6 +260,28 @@ public static class EconomyStress
         RaceMode.Clear();
     }
 
+    // ---------- carrying bought items into a race: two kinds, three of each, never more than held ----------
+    static void CarryRules()
+    {
+        void Hold(string id, int n) { PlayerPrefs.SetInt("kc.item." + id, n); }
+        foreach (var p in Inventory.Packs) Hold(p.id, 0);
+        Hold("rocket", 7); Hold("bomb", 1); Hold("homing", 2);
+        Carry.Stack S(string id, int n) => new() { id = id, n = n };
+        var got = Carry.Clamp(new[] { S("rocket", 5), S("bomb", 3), S("homing", 2) });
+        Check("carry: two kinds at most, three of each at most, never more than held", Carry.Format(got) == "rocket:3,bomb:1", Carry.Format(got));
+        got = Carry.Clamp(new[] { S("nitro", 2), S("ghost", 3), S("homing", 3), S("homing", 1), S("rocket", 0), S("sunbomb", 1) });
+        Check("carry: none held, unknown, repeated and zero are dropped", Carry.Format(got) == "homing:2", Carry.Format(got));
+        Check("carry: more than one held asks before the race", Carry.NeedsPicker && Carry.Auto().Count == 0);
+        foreach (var p in Inventory.Packs) Hold(p.id, 0);
+        Hold("sunbomb", 1);
+        Check("carry: exactly one held goes in by itself, no question", !Carry.NeedsPicker && Carry.Format(Carry.Auto()) == "sunbomb:1", Carry.Format(Carry.Auto()));
+        Hold("sunbomb", 0);
+        Check("carry: nothing held, nothing carried, no question", !Carry.NeedsPicker && Carry.Auto().Count == 0);
+        Hold("bomb", 2); Carry.Remember(new() { S("bomb", 3), S("rocket", 2) });
+        Check("carry: the last choice comes back checked against what is held now", Carry.Format(Carry.Last) == "bomb:2", Carry.Format(Carry.Last));
+        Check("carry: a choice reads back as written", Carry.Format(Carry.Parse("rocket:3,bomb:1")) == "rocket:3,bomb:1" && Carry.Parse("junk,::,x:y").Count == 0);
+    }
+
     // ---------- cloud save: everything a player has made survives a wipe (a reinstall) and comes back exactly ----------
     static void CloudSaveRoundTrip()
     {
@@ -269,7 +292,7 @@ public static class EconomyStress
             Check("cloud save: a wiped phone reads the defaults (20 gems, no items, no best, no trial spent)",
                   Gems.Balance == 20 && Inventory.Count("rocket") == 0 && Tracks.Best("beach") == 0f && !KartDatabase.TrialUsed("k_test"));
             Gems.Earn(757, "test");
-            Inventory.Add("rocket", 5); Inventory.Loadout = "rocket";
+            Inventory.Add("rocket", 5); Carry.Remember(new() { new Carry.Stack { id = "rocket", n = 3 } });
             Tracks.RecordBest("beach", 61.25f); Tracks.RecordBest(RaceMode.BestKey("alpine", true, 2, RaceMode.Items.Nitro), 70.5f);
             KartDatabase.SpendTrial("k_test"); Unlocks.Earn("driver.test");
             Chests.AddStars(4); Chests.Give(Chests.Tier.Gold);
@@ -281,7 +304,7 @@ public static class EconomyStress
             Check("cloud save: a wipe drops what the game had in memory too", Gems.Balance == 20 && Tour.Stars(Tour.Cups[0].events[0].id) == 0);
             CloudSave.Apply(made);
             Check("cloud save: the save brings back gems, items, loadout, bests, trials, recruits, Tour",
-                  Gems.Balance == 777 && Inventory.Count("rocket") == 5 && Inventory.Loadout == "rocket" && Mathf.Approximately(Tracks.Best("beach"), 61.25f)
+                  Gems.Balance == 777 && Inventory.Count("rocket") == 5 && Carry.Format(Carry.Last) == "rocket:3" && Mathf.Approximately(Tracks.Best("beach"), 61.25f)
                   && Mathf.Approximately(Tracks.Best(RaceMode.BestKey("alpine", true, 2, RaceMode.Items.Nitro)), 70.5f)
                   && KartDatabase.TrialUsed("k_test") && Unlocks.Has("driver.test") && stars > 0 && Tour.Stars(Tour.Cups[0].events[0].id) == stars,
                   $"gems {Gems.Balance} rocket {Inventory.Count("rocket")} best {Tracks.Best("beach")} tour {Tour.Stars(Tour.Cups[0].events[0].id)}/{stars}");

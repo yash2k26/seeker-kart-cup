@@ -147,6 +147,31 @@ namespace KartCup
             }
             if (p.isPlayer) { state = State.Finished; playerDoneAt = Time.timeAsDouble; }
             onFinish.Invoke(p);
+            if (!p.isPlayer) PodiumFull();
+        }
+
+        /// 13 Oct 2026, the user: "if someone has achieved 1st place, or 1st, 2nd, 3rd, then the game should end even though
+        /// I didn't complete the race". Solo: once the other karts have taken every place the player could still win (the
+        /// top three; the duel's one), the race is over for the player. Everyone still driving is ranked in the order they
+        /// are running (the player among them, behind the finishers) with no time. Elimination and Smash-Up have their own ends.
+        /// Off for ContractTest, whose driver must reach the line however slow it is (the referee checks the whole lap).
+        public static bool PodiumEnds = true;
+
+        void PodiumFull()
+        {
+            if (!PodiumEnds) return;
+            var player = Player;
+            if (player == null || player.finished || state == State.Finished || RoomClient.InRaceRoom || Weekly.Racing || RaceMode.Alone
+                || RaceMode.Current == RaceMode.Kind.Elimination) return;
+            int places = Mathf.Min(3, racers.Count - 1), done = racers.Count(r => r != player && r.finished);
+            if (done < places) return;
+            Debug.Log($"[race] the podium is full ({done} home): the race ends for {player.racerName}");
+            RaceHud.Instance?.Callout(RaceMode.Current == RaceMode.Kind.Duel ? "DUEL LOST" : "PODIUM FULL", 1.6f);
+            int i = 0;
+            foreach (var r in racers.Where(r => !r.finished).OrderByDescending(r => r.score).ToList()) { r.finished = true; r.finishTime = 9e5f + i++; }
+            Guard(() => FinishLap.Cruise(player));
+            state = State.Finished; playerDoneAt = Time.timeAsDouble;
+            onFinish.Invoke(player);
         }
 
         static void Guard(System.Action a) { try { a(); } catch (System.Exception e) { Debug.LogException(e); } }

@@ -76,7 +76,13 @@ namespace KartCup
             // the time trial, a Smash-Up and a Clean Race: no items
             bool noItems = Weekly.Racing || RaceMode.Alone || RaceMode.Rule == RaceMode.Items.Clean;
             if (noItems) { var boxes = FindAnyObjectByType<ItemBag>(); if (boxes != null) boxes.gameObject.SetActive(false); }
-            else Loadout(race);
+            else
+            {
+                // bought items (Carry): more than one held, the player picks what to take while the grid waits; one, it goes in
+                if (!Carry.SkipPicker && Carry.NeedsPicker) { race.Hold(); yield return CarryPicker.Ask(); }
+                else if (!Carry.SkipPicker) Carry.Chosen = Carry.Auto();
+                CarriedItems.Begin(race.Player != null ? race.Player.GetComponent<Kart>() : null, Carry.Clamp(Carry.Chosen));
+            }
             if (show == null) { race.BeginCountdown(); yield break; }
             race.Hold();
             if (Weekly.Racing) show.Prizes("KARTEL WEEKLY · TIME TRIAL", Tracks.At(Cup.TrackIndex).name.ToUpperInvariant(), System.Array.Empty<string>());
@@ -93,19 +99,6 @@ namespace KartCup
             while (Time.time < until && !(Time.time > skippable && PodiumShow.Tapped())) yield return null;
             show.End();
             race.BeginCountdown();
-        }
-
-        /// The consumable the shop armed for this race: one out of its pack, handed to the player's kart on the grid.
-        static void Loadout(RaceManager race)
-        {
-            var player = race.Player; var pack = Inventory.Find(Inventory.Loadout);
-            var items = FindAnyObjectByType<ItemManager>();
-            if (player == null || pack == null || items == null) return;
-            var caster = player.GetComponent<ItemCaster>();
-            var item = items.GetItem(pack.item);
-            if (caster == null || item == null || !Inventory.Take(pack.id)) return;
-            caster.GiveItem(item, 1, true);
-            KartApi.Event("loadout", new { item = pack.id });
         }
 
         /// The driver prefab a character races as (the podium stands them up).

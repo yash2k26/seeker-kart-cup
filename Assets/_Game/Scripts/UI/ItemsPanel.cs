@@ -105,17 +105,6 @@ namespace KartCup
             Show();
         }
 
-        /// The starting item cycles through nothing and whatever you hold.
-        public void CycleLoadout()
-        {
-            var order = new System.Collections.Generic.List<string> { "" };
-            order.AddRange(Inventory.Packs.Where(p => Inventory.Count(p.id) > 0).Select(p => p.id));
-            int at = Mathf.Max(0, order.IndexOf(Inventory.Loadout));
-            Inventory.Loadout = order[(at + 1) % order.Count];
-            Haptics.Play(Haptics.Kind.Tick); AudioDirector.Instance?.Click();
-            Show();
-        }
-
         public void Primary() { if (!busy) _ = Buy("SKR"); }
         public void Secondary() { if (!busy) _ = Buy("SOL"); }
         public void Tertiary() { if (!busy) _ = Buy("ORE"); }
@@ -162,9 +151,7 @@ namespace KartCup
             if (blurbLabel != null)
                 blurbLabel.text = message ?? (fi != null ? $"{f.blurb}   ·   {Skr(fi)}  or  {Sol(fi)}"
                                             : KartApi.Cfg == null ? $"{f.blurb}   ·   {f.sol:0.###} SOL" : f.blurb);
-            var l = Inventory.Find(Inventory.Loadout);
-            if (loadoutLabel != null)
-                loadoutLabel.text = l == null || Inventory.Count(l.id) <= 0 ? "START WITH:  NOTHING" : $"START WITH:  {l.item.ToUpperInvariant()}   ({Inventory.Count(l.id)} LEFT)";
+            if (loadoutLabel != null) loadoutLabel.text = $"TAKE UP TO {Carry.Kinds} KINDS, {Carry.PerKind} OF EACH, INTO A RACE";
             Set(primaryLabel, primaryButton, fi != null ? $"UNLOCK  ·  {Skr(fi)}" : KartApi.Cfg == null ? "CONNECT TO BUY" : "…", fi != null && !busy);
             Set(secondaryLabel, secondaryButton, fi != null && !string.IsNullOrEmpty(fi.price.GetValueOrDefault("SOL")) ? $"PAY {Sol(fi)}" : "", fi != null && !busy);
             Set(tertiaryLabel, tertiaryButton, Ore(fi) != "" ? $"PAY {Ore(fi)}" : "", fi != null && !busy);

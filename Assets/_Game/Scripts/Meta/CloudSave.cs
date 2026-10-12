@@ -24,7 +24,7 @@ namespace KartCup
         const string RevKey = "kc.save.rev", WalletKey = "kc.save.wallet";   // this phone's bookkeeping, never in the save
 
         static readonly string[] Ints = { "kc.gems", "kc.fuel", "kc.daily.done", "kc.spin.day", "kc.character", "kc.welcomed", "kc.starter.gems" };
-        static readonly string[] Strings = { "kc.ach", "kc.chests", "kc.tour", "kc.earned", "kc.kart", "kc.paint", "kc.loadout", "kc.fuel.at", KartDatabase.TrialsKey };
+        static readonly string[] Strings = { "kc.ach", "kc.chests", "kc.tour", "kc.earned", "kc.kart", "kc.paint", "kc.carry", "kc.fuel.at", KartDatabase.TrialsKey };
         static IEnumerable<string> IntKeys => Ints.Concat(Inventory.Packs.Select(p => "kc.item." + p.id));
         static IEnumerable<string> FloatKeys =>                                     // a best per circuit, direction, laps and item rule
             from t in Tracks.All from rev in new[] { false, true } from laps in new[] { 1, 2, 3, 4 }

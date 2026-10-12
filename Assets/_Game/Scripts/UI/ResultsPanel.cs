@@ -123,7 +123,7 @@ namespace KartCup
             {
                 name = r.remote || r.isPlayer && online ? r.racerName : Name(r.characterIndex),
                 face = Name(r.characterIndex),
-                time = !r.finished || r.finishTime >= float.MaxValue ? "RACING" : r.finishTime >= 1e5f ? "OUT" : RaceHud.Clock(r.finishTime),
+                time = !r.finished || r.finishTime >= float.MaxValue ? "RACING" : r.finishTime >= 9.5e5f ? "OUT" : r.finishTime >= 1e5f ? "—" : RaceHud.Clock(r.finishTime),   // knocked out / still driving when it ended
                 prize = !single && i < Cup.PointsFor.Length ? "+" + Cup.PointsFor[i] + " PTS" : "",
                 me = r.isPlayer,
             }).ToList();

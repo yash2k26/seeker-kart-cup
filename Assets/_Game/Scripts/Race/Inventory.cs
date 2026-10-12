@@ -2,8 +2,8 @@ using UnityEngine;
 
 namespace KartCup
 {
-    /// What you carry into a race: packs of consumables bought in the shop's items tab, counted on the phone, one
-    /// spent per solo race as the starting item. A pack is credited when the Worker verifies its purchase.
+    /// What you own to take into races: packs of consumables bought in the shop's items tab, counted on the phone. A pack
+    /// is credited when the Worker verifies its purchase; what goes into a race, and when it is spent, is Carry's.
     /// `item` is the ItemManager name the race hands to the kart; the packs mirror worker/src/catalog.ts.
     public static class Inventory
     {
@@ -34,11 +34,5 @@ namespace KartCup
             return true;
         }
 
-        /// The pack the next race starts with ("" = nothing): picked in the shop, spent on the grid.
-        public static string Loadout
-        {
-            get => PlayerPrefs.GetString("kc.loadout", "");
-            set { PlayerPrefs.SetString("kc.loadout", value ?? ""); PlayerPrefs.Save(); }
-        }
     }
 }

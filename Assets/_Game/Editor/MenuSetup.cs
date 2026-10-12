@@ -107,6 +107,7 @@ public static partial class MenuSetup
         Curtain();
         ChestOverlay();
         PurchaseOverlay();
+        CarryPickerPrefab();   // a prefab the race scenes load, made here with the menu's kit
         new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
         var boot = new GameObject("Boot");
         boot.AddComponent<GameBoot>();
@@ -1321,8 +1322,9 @@ public static partial class MenuSetup
         var owned = Label("Owned", card, strong, "", 30, Accent, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(48, -160), new Vector2(608, 40));
         var blurb = Label("Blurb", card, body, "", 26, Muted, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(48, -206), new Vector2(608, 70));
         blurb.textWrappingMode = TextWrappingModes.Normal; blurb.enableAutoSizing = true; blurb.fontSizeMin = 20; blurb.fontSizeMax = 26;
-        var loadout = Chip("Loadout", card, "START WITH:  NOTHING", new Vector2(0, -288), out var loadoutLabel);
-        UnityEditor.Events.UnityEventTools.AddPersistentListener(loadout.onClick, panel.CycleLoadout);
+        // the rule, where the START WITH chip was: before each race the player picks what to take (CarryPicker)
+        var loadoutLabel = Label("Rule", card, strong, "", 24, Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -300), new Vector2(600, 64));
+        loadoutLabel.textWrappingMode = TextWrappingModes.Normal; loadoutLabel.enableAutoSizing = true; loadoutLabel.fontSizeMin = 18; loadoutLabel.fontSizeMax = 24;
 
         var packs = Inventory.Packs;
         var rows = new Button[packs.Length]; var rowLabels = new TMP_Text[packs.Length]; var rowPrices = new TMP_Text[0];

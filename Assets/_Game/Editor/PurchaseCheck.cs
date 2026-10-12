@@ -62,7 +62,7 @@ public static class PurchaseCheck
             Check("nothing credited while pending", Inventory.Count("rocket") == 0);
             Check("the payment stays written down", PendingPurchases.Any);
             Check("the next ask grants it", await PendingPurchases.Verify(slow) == PendingPurchases.Outcome.Granted);
-            Check("the pack is credited", Inventory.Count("rocket") == 3 && Inventory.Loadout == "rocket");
+            Check("the pack is credited", Inventory.Count("rocket") == 3);
             Check("a repeat grant credits nothing more", await PendingPurchases.Verify(slow) == PendingPurchases.Outcome.Granted && Inventory.Count("rocket") == 3);
 
             var bad = Entry("sig-bad", "WalletA");

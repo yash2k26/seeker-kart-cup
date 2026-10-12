@@ -74,6 +74,7 @@ public static class MenuPlay
             // the series, its first event's card, PLAY: the card's fuel chip goes 6 -> 5 (a "-1" pops off it) before the race loads
             (23.95, () => flow.ShowTour()), (24.6, () => Object.FindFirstObjectByType<TourPanel>()?.Pick(0)), (25.2, () => Object.FindFirstObjectByType<TourPanel>()?.Play(0)),
             (26.0, () => Object.FindFirstObjectByType<TourPanel>()?.Race()), (26.3, () => Shot("fuel-spent", ui: true)), (26.9, () => Shot("curtain", ui: true)),
+            (32.0, () => Shot("carry-picker", ui: true)), (32.2, () => { Debug.Log($"[menuplay] picker up: {CarryPicker.Instance != null}"); CarryPicker.Instance?.Go(); }),
             (34.7, () => { Debug.Log($"[menuplay] race scene: {UnityEngine.SceneManagement.SceneManager.GetActiveScene().name}, curtain alpha {LoadingCurtain.Instance?.GetComponent<CanvasGroup>()?.alpha}"); Shot("race", ui: true); }),
             // a win: the podium, then the card with the chest it earned, OPEN, three taps, what was inside
             (50.7, () => { var race = Object.FindFirstObjectByType<RaceManager>(); if (race != null && race.Player != null) race.Finish(race.Player); }),

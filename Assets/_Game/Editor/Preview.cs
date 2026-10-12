@@ -338,6 +338,17 @@ public static class MenuPreview
             reveal.GetComponent<CanvasGroup>().alpha = 0f;
         }
 
+        // The pre-race picker (a Resources prefab the race scenes load), rockets x3 and bombs x2 picked
+        var pickerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Resources/CarryPicker.prefab");
+        if (pickerPrefab != null)
+        {
+            var pk = (GameObject)PrefabUtility.InstantiatePrefab(pickerPrefab);
+            var pc = pk.GetComponent<Canvas>(); pc.renderMode = RenderMode.ScreenSpaceCamera; pc.worldCamera = cam; pc.planeDistance = 0.45f;
+            pk.GetComponent<CarryPicker>().PreviewInEditor((0, 3), (2, 2));
+            Canvas.ForceUpdateCanvases(); Shot(cam, "carry-picker");
+            Object.DestroyImmediate(pk);
+        }
+
         // The purchase sheet over the garage: a kart on its way through the wallet, stamped, refused, still confirming;
         // a gem pack and a recruited judge stamped
         var sheet = Object.FindObjectsByType<PurchaseSheet>(FindObjectsInactive.Include, FindObjectsSortMode.None).FirstOrDefault();
