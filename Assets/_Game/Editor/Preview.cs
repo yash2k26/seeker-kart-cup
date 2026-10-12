@@ -294,6 +294,10 @@ public static class MenuPreview
                 Canvas.ForceUpdateCanvases(); Shot(cam, "menu7-gold");
                 foreach (var garage in Object.FindObjectsByType<GaragePanel>(FindObjectsSortMode.None)) garage.ShowInEditor(2, Paints.IndexOf("gold") + 1);
                 Canvas.ForceUpdateCanvases(); Shot(cam, "menu7-gold-locked");
+                foreach (var garage in Object.FindObjectsByType<GaragePanel>(FindObjectsSortMode.None)) garage.ShowInEditor(1, 0);   // the PAINT view as it opens
+                Canvas.ForceUpdateCanvases(); Shot(cam, "menu7-paint");
+                foreach (var garage in Object.FindObjectsByType<GaragePanel>(FindObjectsSortMode.None)) garage.ShowInEditor(1, Paints.IndexOf("bossmert") + 1);   // a Tour prize tried on
+                Canvas.ForceUpdateCanvases(); Shot(cam, "menu7-paint-prize");
             }
             if (i == 0)   // the fuel panel, a can down
             {

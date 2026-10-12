@@ -1242,30 +1242,49 @@ public static partial class MenuSetup
                           new Vector2(0, 1), new Vector2(48, -128), new Vector2(608, 72));
         blurb.textWrappingMode = TextWrappingModes.Normal;
 
-        // the five powers; their total is the price (KartPricing), and a locked kart shows what it would cost
-        var powerBars = new StatBar[5];
-        var powerNames = new[] { "SPEED", "TURBO", "GRIP", "ARMOR", "ATTACK" };
-        for (int i = 0; i < 5; i++) powerBars[i] = StatRow(card, powerNames[i], -214 - i * 42, size: 24);
-        var price = Label("Price", card, strong, "", 28, Paper, TextAlignmentOptions.Left,
-                          new Vector2(0, 1), new Vector2(48, -428), new Vector2(624, 36));
-
-        // paint swatches: the driver's own colour, the four for sale, then the Tour bosses' prizes
-        var swatchCap = Label("PaintCap", card, body, "PAINT", 24, Muted, TextAlignmentOptions.Left,
-                              new Vector2(0, 1), new Vector2(48, -484), new Vector2(200, 36));
-        swatchCap.characterSpacing = 6f;
-        var swatches = new Image[1 + Paints.All.Length];
-        for (int i = 0; i < swatches.Length; i++)
+        // STATS | PAINT (13 Oct 2026, the user: "choosing colors of kart is looking really shitty"): eleven 42 px dots in
+        // one row ran off the card, the dark ones vanished on it and nothing said which was worn or locked. Paint is
+        // now its own view of the card.
+        var (modeBacks, modeLabels, modeButtons) = Segmented("Mode", card, new[] { "STATS", "PAINT" }, new Vector2(0, 1), new Vector2(48, -212), new Vector2(584, 72), 28);
+        for (int i = 0; i < 2; i++)
         {
-            var rt = Rect("Swatch" + i, card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(176 + i * 45, -480), new Vector2(42, 42));   // eleven fit the card (five bosses, the gold)
-            rt.pivot = new Vector2(0, 1);
-            swatches[i] = Design.AsPill(rt, Color.white);
-            var b = rt.gameObject.AddComponent<Button>();
-            rt.gameObject.AddComponent<PressFeel>();
-            UnityEditor.Events.UnityEventTools.AddIntPersistentListener(b.onClick, garage.Swatch, i);
+            UnityEditor.Events.UnityEventTools.AddIntPersistentListener(modeButtons[i].onClick, garage.Mode, i);
+            modeBacks[i].color = i == 0 ? Design.Ink600 : new Color(0, 0, 0, 0); modeLabels[i].color = i == 0 ? Paper : Muted;
         }
 
+        // the five powers; their total is the price (KartPricing), and a locked kart shows what it would cost
+        var statsGroup = Rect("Stats", card, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        var powerBars = new StatBar[5];
+        var powerNames = new[] { "SPEED", "TURBO", "GRIP", "ARMOR", "ATTACK" };
+        for (int i = 0; i < 5; i++) powerBars[i] = StatRow(statsGroup, powerNames[i], -304 - i * 42, size: 24);
+
+        // the paints: the driver's own colour, the four for sale, the Tour bosses' prizes, the gold; six to a row, big
+        // enough to tap, each on a hairline ring (so midnight shows on the card) that turns gold on the one worn and
+        // cream on the one being tried; a padlock on the ones not yet yours
+        var paintGroup = Rect("Paints", card, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        var swatches = new Image[1 + Paints.All.Length]; var rings = new Image[swatches.Length]; var locks = new GameObject[swatches.Length];
+        for (int i = 0; i < swatches.Length; i++)
+        {
+            var ring = Rect("Swatch" + i, paintGroup, new Vector2(0, 1), new Vector2(0, 1), new Vector2(90 + i % 6 * 100, -348 - i / 6 * 104), new Vector2(96, 96));
+            rings[i] = Design.AsPill(ring, new Color(Paper.r, Paper.g, Paper.b, 0.14f));
+            var b = ring.gameObject.AddComponent<Button>();
+            ring.gameObject.AddComponent<PressFeel>();
+            UnityEditor.Events.UnityEventTools.AddIntPersistentListener(b.onClick, garage.Swatch, i);
+            var chip = Rect("Chip", ring, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(76, 76));
+            swatches[i] = Design.AsPill(chip, Color.white); swatches[i].raycastTarget = false;
+            var badge = Rect("Lock", ring, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-14, 14), new Vector2(38, 38));
+            Design.AsPill(badge, Design.Ink900).raycastTarget = false;
+            var pl = Rect("Icon", badge, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(24, 24)).gameObject.AddComponent<Image>();
+            pl.sprite = IconSprite("lock"); pl.color = Paper; pl.preserveAspect = true; pl.raycastTarget = false;
+            locks[i] = badge.gameObject;
+        }
+        paintGroup.gameObject.SetActive(false);
+
+        var price = Label("Price", card, strong, "", 28, Paper, TextAlignmentOptions.Left,
+                          new Vector2(0, 1), new Vector2(48, -520), new Vector2(624, 36));
+        price.enableAutoSizing = true; price.fontSizeMin = 20; price.fontSizeMax = 28;
         var status = Label("Status", card, body, "", 24, Muted, TextAlignmentOptions.TopLeft,
-                           new Vector2(0, 1), new Vector2(48, -540), new Vector2(608, 28));   // one short line above TEST DRIVE
+                           new Vector2(0, 1), new Vector2(48, -568), new Vector2(608, 28));   // one short line above TEST DRIVE
 
         var secondary = Button("Secondary", card, "TEST DRIVE", Slate, Paper, 36,
                                new Vector2(0.5f, 0), new Vector2(0, 168), new Vector2(584, 96));
@@ -1301,6 +1320,16 @@ public static partial class MenuSetup
         so.FindProperty("tertiaryLabel").objectReferenceValue = tertiary.GetComponentInChildren<TMP_Text>();
         so.FindProperty("tertiaryButton").objectReferenceValue = tertiary;
         Fill(so.FindProperty("swatches"), swatches.Cast<Object>().ToArray());
+        Fill(so.FindProperty("rings"), rings.Cast<Object>().ToArray());
+        Fill(so.FindProperty("locks"), locks.Cast<Object>().ToArray());
+        Fill(so.FindProperty("modeBacks"), modeBacks.Cast<Object>().ToArray());
+        Fill(so.FindProperty("modeLabels"), modeLabels.Cast<Object>().ToArray());
+        so.FindProperty("statsGroup").objectReferenceValue = statsGroup.gameObject;
+        so.FindProperty("paintGroup").objectReferenceValue = paintGroup.gameObject;
+        so.FindProperty("tabOn").colorValue = Design.Ink600;
+        so.FindProperty("paper").colorValue = Paper;
+        so.FindProperty("muted").colorValue = Muted;
+        so.FindProperty("accent").colorValue = Accent;
         Fill(so.FindProperty("powerBars"), powerBars.Cast<Object>().ToArray());
         so.ApplyModifiedPropertiesWithoutUndo();
         return screen;

@@ -19,12 +19,19 @@ namespace KartCup
         [SerializeField] TMP_Text nameLabel, blurbLabel, priceLabel, statusLabel, primaryLabel, secondaryLabel, tertiaryLabel;
         [SerializeField] Button primaryButton, secondaryButton, tertiaryButton;   // tertiary: PAY in ORE, the right half of the SOL row
         [SerializeField] Image[] swatches = System.Array.Empty<Image>();   // 0 = driver colour, then Paints.All
+        [SerializeField] Image[] rings = System.Array.Empty<Image>();      // each swatch's ring: gold = worn, cream = trying on
+        [SerializeField] GameObject[] locks = System.Array.Empty<GameObject>();
+        [SerializeField] GameObject statsGroup, paintGroup;                // STATS | PAINT: the card's two views
+        [SerializeField] Image[] modeBacks = System.Array.Empty<Image>();
+        [SerializeField] TMP_Text[] modeLabels = System.Array.Empty<TMP_Text>();
+        [SerializeField] Color tabOn, paper, muted, accent;
         [SerializeField] StatBar[] powerBars = System.Array.Empty<StatBar>();   // SPEED, TURBO, GRIP, ARMOR, ATTACK
         [SerializeField] float baseYaw = 65f, spin = 24f;   // the turntable, turning visibly: a kart with nobody in it is a showroom piece
 
         GameObject current;
         int index;
         int paintFocus = -1;      // -1 = a kart is in focus; otherwise the swatch being looked at
+        bool painting;            // the PAINT view is open
         bool busy;
 
         void OnEnable()
@@ -32,7 +39,7 @@ namespace KartCup
             if (characters != null) characters.SetVisible(false);
             var def = roster != null ? roster.Selected : null;
             index = garage != null ? garage.IndexOf(string.IsNullOrEmpty(KartDatabase.SelectedId) ? (def != null ? def.kartId : "oodi") : KartDatabase.SelectedId) : 0;
-            paintFocus = -1;
+            paintFocus = -1; painting = false;
             if (statusLabel != null) statusLabel.text = "";
             WalletFlow.ProfileChanged += OnProfile;
             Show();
@@ -61,7 +68,7 @@ namespace KartCup
         public void ShowInEditor(int i, int paint = -1)
         {
             if (characters != null) characters.SetVisible(false);
-            index = i; paintFocus = paint;
+            index = i; paintFocus = paint; painting = paint >= 0;
             Show();
             if (podium != null) podium.localRotation = Quaternion.Euler(0, baseYaw, 0);
         }
@@ -85,9 +92,20 @@ namespace KartCup
             Show();
         }
 
-        /// Swatch tap: 0 = the driver's own colour, 1.. = a paint. Owned paints select; unowned ones show their price.
+        /// STATS | PAINT.
+        public void Mode(int m)
+        {
+            if (painting == (m == 1)) return;
+            painting = m == 1; paintFocus = -1;
+            Haptics.Play(Haptics.Kind.Tick); AudioDirector.Instance?.Click();
+            Show();
+        }
+
+        /// Swatch tap: 0 = the driver's own colour, 1.. = a paint. Owned paints go on at once; unowned ones are tried on
+        /// the kart and show their price, or how they are won.
         public void Swatch(int i)
         {
+            if (i < rings.Length && rings[i] != null) UiMotion.Punch(rings[i].transform, 1.15f);
             paintFocus = i;
             if (i == 0) { Paints.SelectedId = ""; paintFocus = -1; }
             else
@@ -131,14 +149,14 @@ namespace KartCup
                     // Beach Buggy's 24k skin: each kart's own, earned by winning a Grand Prix in it; never sold
                     if (blurbLabel != null) blurbLabel.text = pOwned ? $"Earned with the {def.displayName}. Every kart has its own." : $"Win a Grand Prix in the {def.displayName} to earn its gold. Never sold.";
                     if (priceLabel != null) priceLabel.text = pOwned ? "EARNED" : "GRAND PRIX PRIZE";
-                    SetButton(primaryLabel, primaryButton, pOwned ? "SELECTED" : "", false); SetButton(secondaryLabel, secondaryButton, "", false);
+                    SetButton(primaryLabel, primaryButton, pOwned ? "SELECTED" : "RACE A GRAND PRIX", !pOwned); SetButton(secondaryLabel, secondaryButton, "", false); SetButton(tertiaryLabel, tertiaryButton, "", false);
                 }
                 else if (paint.boss != null && !pOwned)
                 {
                     // a Tour prize: shown, never sold
                     if (blurbLabel != null) blurbLabel.text = $"Beat {paint.boss} in KARTEL TOUR to win it.";
                     if (priceLabel != null) priceLabel.text = "TOUR PRIZE";
-                    SetButton(primaryLabel, primaryButton, "", false); SetButton(secondaryLabel, secondaryButton, "", false); SetButton(tertiaryLabel, tertiaryButton, "", false);
+                    SetButton(primaryLabel, primaryButton, "PLAY KARTEL TOUR", true); SetButton(secondaryLabel, secondaryButton, "", false); SetButton(tertiaryLabel, tertiaryButton, "", false);
                 }
                 else
                 {
@@ -153,8 +171,10 @@ namespace KartCup
             {
                 if (nameLabel != null) nameLabel.text = def.displayName.ToUpperInvariant();
                 // Said before the money leaves: powers count in solo and free rooms; a paid room races equal karts.
-                if (blurbLabel != null) blurbLabel.text = def.IsFree ? def.blurb : $"{def.blurb}   <alpha=#99>Paid rooms race equal karts.";
-                if (priceLabel != null) priceLabel.text = def.IsFree ? $"FREE  ·  {def.Tier}" : owned ? $"UNLOCKED  ·  {def.Tier}" : $"LOCKED  ·  {KartPrice(item, def)}";
+                if (blurbLabel != null) blurbLabel.text = painting ? "Tap a colour to try it on. The ones you own go on at once."
+                    : def.IsFree ? def.blurb : $"{def.blurb}   <alpha=#99>Paid rooms race equal karts.";
+                if (priceLabel != null) priceLabel.text = painting ? $"WEARING  ·  {Worn(def)?.name ?? "THE DRIVER'S OWN COLOUR"}"
+                    : def.IsFree ? $"FREE  ·  {def.Tier}" : owned ? $"UNLOCKED  ·  {def.Tier}" : $"LOCKED  ·  {KartPrice(item, def)}";
                 if (owned) SetButton(primaryLabel, primaryButton, selected ? "SELECTED" : "SELECT", !selected);
                 else SetButton(primaryLabel, primaryButton, item != null ? $"UNLOCK  ·  {Skr(item)}" : KartApi.Cfg == null ? "CONNECT TO BUY" : "…", item != null);
                 bool trial = !owned && !KartDatabase.TrialUsed(def.id);
@@ -172,15 +192,33 @@ namespace KartCup
                     powerBars[i].Note(Edge(def, i));
                 }
 
+            if (statsGroup != null) statsGroup.SetActive(!painting);
+            if (paintGroup != null) paintGroup.SetActive(painting);
+            for (int i = 0; i < modeBacks.Length && i < modeLabels.Length; i++)
+            {
+                bool on = (i == 1) == painting;
+                modeBacks[i].color = on ? tabOn : Color.clear; modeLabels[i].color = on ? paper : muted;
+            }
+            var worn = Worn(def);
             for (int i = 0; i < swatches.Length; i++)
             {
                 if (swatches[i] == null) continue;
                 var p = i == 0 ? null : Paints.All[Mathf.Clamp(i - 1, 0, Paints.All.Length - 1)];
-                swatches[i].color = i == 0 ? (character != null ? character.tint : Color.white) : (Paints.Owns(p, def.id) ? p.color : Color.Lerp(p.color, Color.black, 0.45f));
-                bool active = i == 0 ? paintFocus < 0 && string.IsNullOrEmpty(Paints.SelectedId) : paintFocus == i || (paintFocus < 0 && Paints.SelectedId == p.id);
-                swatches[i].transform.localScale = Vector3.one * (active ? 1.18f : 1f);
+                bool own = p == null || Paints.Owns(p, def.id);
+                var c = p == null ? (character != null ? character.tint : Color.white) : p.color;
+                swatches[i].color = own ? c : Color.Lerp(c, Color.black, 0.3f);   // dimmed, still its colour: the padlock says locked
+                if (i < locks.Length && locks[i] != null) locks[i].SetActive(!own);
+                bool tried = paintFocus == i && p != null, wearing = worn == p;
+                if (i < rings.Length && rings[i] != null)
+                {
+                    rings[i].color = tried ? paper : wearing ? accent : new Color(paper.r, paper.g, paper.b, 0.14f);
+                    rings[i].transform.localScale = Vector3.one * (tried || wearing ? 1.06f : 1f);
+                }
             }
         }
+
+        /// The paint this kart wears: the chosen one if it is owned for this kart, else none (the driver's colour).
+        static Paints.Def Worn(KartDef def) { var p = Paints.Find(Paints.SelectedId); return p != null && Paints.Owns(p, def.id) ? p : null; }
 
         /// The menu camera framed to this kart, closer than the shared pose (Beach Buggy's car fills its screen).
         static void Frame(GameObject kart)
@@ -221,7 +259,14 @@ namespace KartCup
         {
             var def = Kart; if (def == null || busy) return;
             var paint = FocusedPaint;
-            if (paint != null) { _ = Buy(paint.sku, "SKR", () => { Paints.SelectedId = paint.id; paintFocus = -1; }); return; }
+            if (paint != null)
+            {
+                if (Paints.Owns(paint, def.id)) return;
+                if (paint.gold) { ScreenFlow.Instance?.ShowTrack(); return; }          // won by a Grand Prix in this kart
+                if (paint.boss != null) { ScreenFlow.Instance?.ShowTour(); return; }   // won from a Tour boss
+                _ = Buy(paint.sku, "SKR", () => { Paints.SelectedId = paint.id; paintFocus = -1; });
+                return;
+            }
             if (KartDatabase.Owned(def)) { KartDatabase.SelectedId = def.id; Haptics.Play(Haptics.Kind.Tick); AudioDirector.Instance?.Confirm(); Show(); return; }
             _ = Buy(def.sku, "SKR", () => KartDatabase.SelectedId = def.id);
         }
