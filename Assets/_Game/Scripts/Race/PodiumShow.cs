@@ -446,6 +446,7 @@ namespace KartCup
             Add(CritterShot(rng));
             Add(TunnelShot());
             foreach (var s in LandmarkShots(rng)) Add(s);
+            if (RampOrPad("Roadworks", rng, ramp: true) is Shot works) picks.Add(new Shot { name = "roadworks", seconds = works.seconds, pose = works.pose });   // the series' slalom, from its run-up
             var hazards = new List<Shot>();
             if (RampOrPad("Ramps", rng, ramp: true) is Shot r) hazards.Add(r);
             if (RampOrPad("TurboPads", rng, ramp: false) is Shot t) hazards.Add(t);

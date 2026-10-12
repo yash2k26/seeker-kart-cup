@@ -92,6 +92,7 @@ namespace KartCup
                 OilSlick.Spawn(System.Environment.TickCount + 1, Tracks.At(Cup.TrackIndex).difficulty + RaceMode.Hazard);   // solo only: rooms never get them
                 Ramp.Spawn(System.Environment.TickCount + 3);                                             // Beach Buggy's jumps, on the long straights
                 Critter.Spawn(System.Environment.TickCount + 2, Cup.TrackId);                             // Beach Buggy's critters, crossing the straights
+                Roadworks.Spawn(System.Environment.TickCount + 4, RaceMode.Works);                        // the Tour's later series: slaloms of crates
                 if (RaceMode.Alone) gameObject.AddComponent<SmashUp>();                                   // after the critters: they count
                 show.Prizes(Tracks.At(Cup.TrackIndex).kicker, Tracks.At(Cup.TrackIndex).name.ToUpperInvariant(), new[] { "1ST", "2ND", "3RD" });
             }
