@@ -37,6 +37,13 @@ public final class MwaChooserHelper {
     /** createChooser + IntentSender callback = launches MWA target intent */
     public static void launchWithChooser(Activity activity, Intent target, String title) {
         sChosenPackage = null;
+        // KartCup patch (13 Oct 2026): on a Solana Mobile phone (Seeker, Saga) the Seed Vault Wallet is the system's own
+        // handler for solana-wallet:, and a chooser ignores the default and asks every time. Launch the intent itself so
+        // the default opens (nothing is cached either, so every session goes the same way).
+        if (Build.MANUFACTURER != null && Build.MANUFACTURER.toLowerCase().contains("solana")) {
+            activity.startActivityForResult(target, CHOOSER_REQUEST_CODE);
+            return;
+        }
         sChooserNonce = java.util.UUID.randomUUID().toString();
         registerReceiver(activity.getApplicationContext());
 

@@ -277,7 +277,7 @@ namespace KartCup
                 if (mint == null && !await HasSol(amount)) { Status("Not enough SOL for this stake"); return false; }
                 if (mint != null && !await HasSol(0)) { Status("Add a little SOL for the network fee"); return false; }
                 if (mint != null && !await HasToken(cfg.skrMint, amount)) { Status("Not enough SKR for this stake"); return false; }
-                var tx = await BuildTx(computeUnits: 300_000);
+                var tx = await BuildTx(computeUnits: 350_000);
                 tx.Add(Escrow.Join(program, roomKey, me, mint, amount));
                 RoomClient.Instance?.Send(new { t = "paying" });
                 holding = true;
@@ -357,7 +357,10 @@ namespace KartCup
         /// time the wallet sent it. The fee is µlamports per compute unit over a stated limit: 100,000 × 80,000 = 8,000
         /// lamports (0.000008 SOL). The SDK also refreshes the blockhash once the wallet is open (ForWallet).
         const ulong PriorityMicroLamports = 100_000;
-        async Awaitable<Transaction> BuildTx(uint computeUnits = 80_000)
+        // Compute: room over what our instructions use for what a wallet may add (Seed Vault Wallet and Solflare are
+        // reported to append instructions to SPL transfers; mobile-wallet-adapter#1459): 130k, 350k for a stake. At the
+        // 100,000 micro-lamport floor those wallets raise any lower price to, 130k costs 0.000013 SOL.
+        async Awaitable<Transaction> BuildTx(uint computeUnits = 130_000)
         {
             // Fresh every time: a blockhash lives ~60–90 s and the wallet may sit open for most of that. 12 Oct 2026: a
             // rate-limited node answered nothing, the transaction went to the wallet without one, and the wallet opened with
