@@ -7,13 +7,17 @@ import type { Env } from './index';
 // node limits the shared addresses Workers call from, so a refusal now moves on to the next node. RPC_FALLBACKS="none"
 // turns that off (scripts/stress.mjs runs on its own fake node). The real fix is a keyed RPC in HELIUS_URL.
 const FALLBACKS = ['https://api.mainnet-beta.solana.com', 'https://solana-rpc.publicnode.com'];
-const refused = (status: number, text: string) => status === 429 || status >= 500 || /"code":\s*-32005|rate limit/i.test(text);
+// api.mainnet-beta answers Cloudflare with 403 "Your IP or provider is blocked": a refusal too, never an answer to pass on
+const refused = (status: number, text: string) => status === 429 || status === 403 || status >= 500 || /"code":\s*(-32005|403|429)\b|rate limit|blocked/i.test(text);
+const pause = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 /** POSTs a JSON-RPC body (one call or a batch) to the first node that does not refuse it. */
 export async function rpcPost(env: Env, body: string): Promise<{ status: number; text: string }> {
   const urls = [env.HELIUS_URL, ...(env.RPC_FALLBACKS === 'none' ? [] : FALLBACKS.filter(u => u !== env.HELIUS_URL))];
   let last = { status: 502, text: '{"jsonrpc":"2.0","error":{"code":-32000,"message":"no Solana node answered"},"id":null}' };
-  for (const url of urls) {
+  // the first node three times (its limit is per moment: a short wait usually gets through), the others once
+  for (const [i, url] of urls.entries()) for (let attempt = 0; attempt < (i === 0 ? 3 : 1); attempt++) {
+    if (attempt > 0) await pause(250 * attempt);
     try {
       const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body });
       last = { status: r.status, text: await r.text() };

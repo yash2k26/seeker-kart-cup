@@ -10,7 +10,7 @@ public static class RpcCheck
     public static async void Run()
     {
         var rpc = ClientFactory.GetClient("https://kartcup.bharadwaj465.workers.dev/rpc");
-        const string me = "uP7ZfsuXEcUq7LM9jSPeMDnhbS8Fqq4FHbhwSoVWXhQz";
+        const string me = "uP7ZfsuXEcUq7LM9jSPeEZi74YJeaGuy3cbodknXhQz";
         var bh = await rpc.GetLatestBlockHashAsync(Commitment.Confirmed);
         Debug.Log($"[rpc] getLatestBlockhash ok={bh.WasSuccessful} hash={bh.Result?.Value?.Blockhash} reason={bh.Reason} raw={bh.RawRpcResponse}");
         var bal = await rpc.GetBalanceAsync(me, Commitment.Confirmed);

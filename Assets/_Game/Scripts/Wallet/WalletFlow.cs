@@ -298,10 +298,23 @@ namespace KartCup
         }
 
         // ---- helpers ----
+        /// Enough SOL for `extra` plus the fees? 12 Oct 2026: a balance the node would not give was read as 0, and a wallet
+        /// holding 16 SOL was told "Not enough SOL" for 0.05. Asked three times; never read, the wallet judges (it shows the
+        /// real balance and refuses an unaffordable send), so a lookup failure is never "not enough".
         async Awaitable<bool> HasSol(ulong extra)
         {
-            var bal = await Web3.Rpc.GetBalanceAsync(Web3.Wallet.Account.PublicKey, Commitment.Confirmed);
-            return (long)(bal.Result?.Value ?? 0) >= minLamportsForTx + (long)extra;
+            for (int i = 0; i < 3; i++)
+            {
+                if (i > 0) await Awaitable.WaitForSecondsAsync(0.5f * i);
+                try
+                {
+                    var bal = await Web3.Rpc.GetBalanceAsync(Web3.Wallet.Account.PublicKey, Commitment.Confirmed);
+                    if (bal != null && bal.WasSuccessful && bal.Result != null) return (long)bal.Result.Value >= minLamportsForTx + (long)extra;
+                    Debug.LogWarning("[wallet] balance: " + bal?.Reason);
+                }
+                catch (Exception e) { Debug.LogWarning("[wallet] balance: " + e.Message); }
+            }
+            return true;
         }
 
         async Awaitable<bool> HasToken(string mint, ulong amount)
@@ -309,6 +322,7 @@ namespace KartCup
             try
             {
                 var accs = await Web3.Rpc.GetTokenAccountsByOwnerAsync(Web3.Wallet.Account.PublicKey.Key, mint, null, Commitment.Confirmed);
+                if (accs == null || !accs.WasSuccessful) { Debug.LogWarning("[wallet] token balance: " + accs?.Reason); return true; }   // unread is not "not enough"
                 ulong total = 0;
                 if (accs.Result?.Value != null)
                     foreach (var a in accs.Result.Value) total += a.Account?.Data?.Parsed?.Info?.TokenAmount?.AmountUlong ?? 0;
