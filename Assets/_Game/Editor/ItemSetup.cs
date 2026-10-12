@@ -21,19 +21,17 @@ public static class ItemSetup
         // kart and hitting three spins hard. Both rockets are the film's (Rocketize).
         var rocket = Variant("HomingItem", "Rocket", p => { p.homingAccuracy = 0f; p.startSpeed = 48f; p.targetSpeed = 96f; p.accel = 46f; p.kartSpinCount = 2; Rocketize(p, Red); });
         var homing = Variant("HomingItem", "Homing", p => { p.startSpeed = Mathf.Max(p.startSpeed, 26f); Rocketize(p, Blue); });
+        // 13 Oct 2026, the user: "bomb should look like a bomb" and the bouncer had no good look: a cartoon bomb (glossy
+        // black ball, steel neck, rope fuse spitting sparks) and a beach ball, both from tools/blender/export_weapons.py,
+        // at the sizes the old spheres were drawn (1.3 m and 1 m radius): the hit areas do not change
         var bomb = Variant("StaticItem", "Bomb", p =>
         {
             p.kartSpinCount = 3;
-            foreach (var r in p.GetComponentsInChildren<Renderer>())
-            {
-                r.transform.localScale *= 1.3f;
-                var m = new Material(Shader.Find("Universal Render Pipeline/Simple Lit")) { name = "Bomb" };
-                m.SetColor("_BaseColor", new Color(0.08f, 0.08f, 0.09f));
-                AssetDatabase.CreateAsset(m, Out + "Bomb.mat");
-                r.sharedMaterial = m;
-            }
+            var model = Restyle(p, "Bomb", 1.25f / 0.30f, BombBody, BombCap, BombFuse, BombTip, BombShine);
+            FuseSparks(model);
             p.gameObject.AddComponent<KartCup.BurstOnDestroy>().fx = HitFx("BombHit", 6f, "bomb_explode");
         });
+        var bouncer = Variant("BounceItem", "Bouncer", p => Restyle(p, "BeachBall", 1f / 0.30f, BallRed, BallWhite, BallYellow, BallBlue));
 
         var sun = SunBomb();
         Mount();
@@ -47,6 +45,7 @@ public static class ItemSetup
         go.name = "Items";
         // the homing item Powerslide ships fires its own grey missile: point it at ours
         foreach (var item in go.GetComponentsInChildren<ProjectileItem>()) if (item.itemName == "Homing Item") { item.itemPrefab = homing; item.spawnOffset = new Vector3(0, 1.5f, 1.2f); }
+        foreach (var item in go.GetComponentsInChildren<ProjectileItem>()) if (item.itemName == "Bouncer") item.itemPrefab = bouncer;   // the beach ball
         // the trap is let go behind the kart, like the bomb (Powerslide drops it at the kart's own centre)
         foreach (var item in go.GetComponentsInChildren<ProjectileItem>()) if (item.itemName == "Trap") item.spawnOffset = new Vector3(0, 0.5f, -2.6f);
         // (the kart's ItemMount moves a fired shot to the pod's tubes; this offset is only where it starts without one)
@@ -579,17 +578,50 @@ public static class ItemSetup
         // "gold crawls across the paint": the bomb lights the flank it rides on
         var warm = new GameObject("Warm").AddComponent<Light>(); warm.transform.SetParent(sun, false); warm.transform.localPosition = new Vector3(0, 0.1f, -0.5f);
         warm.color = new Color(1f, 0.72f, 0.2f); warm.intensity = 5f; warm.range = 3.5f;
-        var bomb = GameObject.CreatePrimitive(PrimitiveType.Sphere); bomb.name = "Bomb"; Object.DestroyImmediate(bomb.GetComponent<Collider>());
-        bomb.transform.SetParent(cradle, false); bomb.transform.localScale = Vector3.one * (0.46f * s);
-        bomb.GetComponent<MeshRenderer>().sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(Out + "Bomb.mat") ?? Dark;
-        var cap = GameObject.CreatePrimitive(PrimitiveType.Cylinder); cap.name = "Cap"; Object.DestroyImmediate(cap.GetComponent<Collider>());
-        cap.transform.SetParent(bomb.transform, false); cap.transform.localPosition = new Vector3(0, 0.5f, 0); cap.transform.localScale = new Vector3(0.28f, 0.08f, 0.28f);
-        cap.GetComponent<MeshRenderer>().sharedMaterial = Red;
+        // the bomb as it rides: the thrown one's model, as big as the old sphere was
+        var bomb = Model("Bomb", cradle, "Bomb", 0.46f * s / 0.60f, BombBody, BombCap, BombFuse, BombTip, BombShine).gameObject;
 
         mount.pod = pod; mount.strut = strut; mount.muzzle = muzzle; mount.cradle = cradle; mount.flash = flash; mount.flashLight = fl;
         mount.sunBomb = sun.gameObject; mount.bomb = bomb;
         PrefabUtility.SaveAsPrefabAsset(root, "Assets/_Game/Resources/ItemMount.prefab");
         Object.DestroyImmediate(root);
+    }
+
+    static Material BombBody => Lit("Bomb_Body", new Color(0.09f, 0.09f, 0.13f), 0.3f, 0.92f, new Color(0.02f, 0.02f, 0.05f));   // glossy navy-black: it must not vanish at night
+    static Material BombShine => Lit("Bomb_Shine", Color.white, 0f, 0.9f, new Color(0.9f, 0.9f, 1f) * 1.2f);
+    static Material BombCap => Lit("Bomb_Cap", new Color(0.62f, 0.64f, 0.7f), 0.9f, 0.65f, Color.black);
+    static Material BombFuse => Lit("Bomb_Fuse", new Color(0.72f, 0.55f, 0.32f), 0f, 0.2f, new Color(0.1f, 0.07f, 0.03f));
+    static Material BombTip => Lit("Bomb_Tip", new Color(1f, 0.55f, 0.12f), 0f, 0.5f, new Color(1f, 0.45f, 0.05f) * 5f);
+    static Material BallRed => Lit("Ball_Red", new Color(0.9f, 0.1f, 0.08f), 0f, 0.75f, new Color(0.9f, 0.1f, 0.08f) * 0.25f);   // lit a little: it reads at night
+    static Material BallWhite => Lit("Ball_White", new Color(0.92f, 0.92f, 0.9f), 0f, 0.75f, new Color(0.9f, 0.9f, 0.88f) * 0.18f);
+    static Material BallYellow => Lit("Ball_Yellow", new Color(1f, 0.78f, 0.08f), 0f, 0.75f, new Color(1f, 0.78f, 0.08f) * 0.25f);
+    static Material BallBlue => Lit("Ball_Blue", new Color(0.08f, 0.35f, 0.95f), 0f, 0.75f, new Color(0.08f, 0.35f, 0.95f) * 0.3f);
+
+    /// A spawned projectile wearing one of our models instead of Powerslide's sphere: its children and its own renderer go,
+    /// its collider and scripts stay. Returns the model's root.
+    static Transform Restyle(SpawnedProjectileItem p, string fbx, float scale, params Material[] slots)
+    {
+        var go = p.gameObject;
+        for (int i = go.transform.childCount - 1; i >= 0; i--) Object.DestroyImmediate(go.transform.GetChild(i).gameObject);
+        foreach (var r in go.GetComponents<Renderer>()) Object.DestroyImmediate(r);
+        foreach (var f in go.GetComponents<MeshFilter>()) Object.DestroyImmediate(f);
+        return Model(fbx, go.transform, "Model", scale, slots);
+    }
+
+    /// Sparks off the bomb's fuse tip (the model's fourth part), as the films light it.
+    static void FuseSparks(Transform model)
+    {
+        var mf = model.GetComponentInChildren<MeshFilter>();
+        if (mf == null || mf.sharedMesh == null || mf.sharedMesh.subMeshCount < 4) { Debug.LogError("[items] Bomb.fbx: no fuse tip"); return; }
+        var tip = model.InverseTransformPoint(mf.transform.TransformPoint(mf.sharedMesh.GetSubMesh(3).bounds.center));
+        var dot = Additive("FX_FuseDot", Tex("dot"), new Color(1f, 0.62f, 0.15f) * 4f);
+        var ps = Particles("Sparks", model, dot, tip);
+        var m = ps.main; m.loop = true; m.startLifetime = new ParticleSystem.MinMaxCurve(0.15f, 0.4f); m.startSpeed = new ParticleSystem.MinMaxCurve(0.3f, 0.9f);
+        m.startSize = new ParticleSystem.MinMaxCurve(0.025f, 0.06f); m.maxParticles = 40; m.gravityModifier = 0.15f; m.simulationSpace = ParticleSystemSimulationSpace.Local;
+        var e = ps.emission; e.rateOverTime = 45f;
+        var sh = ps.shape; sh.enabled = true; sh.shapeType = ParticleSystemShapeType.Sphere; sh.radius = 0.01f;
+        var sz = ps.sizeOverLifetime; sz.enabled = true; sz.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
+        Fade(ps, new Color(1f, 0.95f, 0.7f), new Color(1f, 0.35f, 0.05f));
     }
 
     /// A copy of one of Powerslide's spawned-projectile prefabs, retuned.

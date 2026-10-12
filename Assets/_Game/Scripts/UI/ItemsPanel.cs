@@ -12,7 +12,7 @@ namespace KartCup
     {
         [SerializeField] Button[] rows = System.Array.Empty<Button>();
         [SerializeField] TMP_Text[] rowLabels = System.Array.Empty<TMP_Text>(), rowPrices = System.Array.Empty<TMP_Text>();
-        [SerializeField] TMP_Text blurbLabel, loadoutLabel, primaryLabel, secondaryLabel, tertiaryLabel;
+        [SerializeField] TMP_Text blurbLabel, nameLabel, ownedLabel, loadoutLabel, primaryLabel, secondaryLabel, tertiaryLabel;
         [SerializeField] Button primaryButton, secondaryButton, tertiaryButton;   // tertiary: PAY in ORE, the right half of the SOL row
         [SerializeField] Color rowIdle = new(0.13f, 0.17f, 0.22f), rowFocus = new(0.2f, 0.26f, 0.33f);
         // the stage (13 Oct 2026, the user: "why not showing rockets, bombs and etc"): the karts tab turns its kart on the
@@ -94,6 +94,10 @@ namespace KartCup
             if (isActiveAndEnabled) Show();
         }
 
+        /// The arrows: the next pack and the one before, round and round.
+        public void Next() => Focus((focus + 1) % Inventory.Packs.Length);
+        public void Previous() => Focus((focus - 1 + Inventory.Packs.Length) % Inventory.Packs.Length);
+
         public void Focus(int i)
         {
             focus = Mathf.Clamp(i, 0, Inventory.Packs.Length - 1); message = null;
@@ -142,15 +146,19 @@ namespace KartCup
             for (int i = 0; i < rows.Length && i < packs.Length; i++)
             {
                 var p = packs[i]; int owned = Inventory.Count(p.id);
-                if (rowLabels.Length > i && rowLabels[i] != null) rowLabels[i].text = owned > 0 ? $"{p.name.ToUpperInvariant()}   <alpha=#99>{owned} OWNED" : p.name.ToUpperInvariant();
+                if (rowLabels.Length > i && rowLabels[i] != null) rowLabels[i].text = owned > 0 ? owned.ToString() : "";
                 var item = KartApi.Cfg?.Item(p.sku);
                 if (rowPrices.Length > i && rowPrices[i] != null) rowPrices[i].text = item != null ? Skr(item) : $"{p.sol:0.###} SOL";
                 var img = rows[i] != null ? rows[i].GetComponent<Image>() : null;
                 if (img != null) img.color = i == focus ? rowFocus : rowIdle;
+                if (rows[i] != null) rows[i].transform.localScale = Vector3.one * (i == focus ? 1.12f : 1f);
             }
             Stage(Mathf.Clamp(focus, 0, packs.Length - 1));
             var f = packs[Mathf.Clamp(focus, 0, packs.Length - 1)];
             var fi = KartApi.Cfg?.Item(f.sku);
+            int have = Inventory.Count(f.id);
+            if (nameLabel != null) nameLabel.text = f.name.ToUpperInvariant();
+            if (ownedLabel != null) ownedLabel.text = have > 0 ? $"{have} IN YOUR GARAGE" : "NONE YET";
             if (blurbLabel != null)
                 blurbLabel.text = message ?? (fi != null ? $"{f.blurb}   ·   {Skr(fi)}  or  {Sol(fi)}"
                                             : KartApi.Cfg == null ? $"{f.blurb}   ·   {f.sol:0.###} SOL" : f.blurb);

@@ -1312,28 +1312,36 @@ public static partial class MenuSetup
         card.offsetMin = new Vector2(64, 64); card.offsetMax = new Vector2(744, -172);
         Design.AsCard(card, Panel);
 
-        Label("Name", card, display, "ITEMS", 88, Paper, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(48, -36), new Vector2(624, 92));
-        var blurb = Label("Blurb", card, body, "", 26, Muted, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(48, -130), new Vector2(608, 56));
-        blurb.textWrappingMode = TextWrappingModes.Normal;
-        var loadout = Chip("Loadout", card, "START WITH:  NOTHING", new Vector2(0, -192), out var loadoutLabel);
+        // 13 Oct 2026 (the user: "rather than clicking on the list, I should be having left and right button"): one pack
+        // at a time, big, paged with the arrows the karts use; the six as a strip of icons to show where you are
+        var kicker = Label("Kicker", card, strong, "ITEMS", 28, Muted, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(48, -34), new Vector2(608, 36));
+        kicker.characterSpacing = 10f;
+        var nameLabel = Label("Name", card, display, "ROCKETS X3", 76, Paper, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(48, -70), new Vector2(608, 88));
+        nameLabel.enableAutoSizing = true; nameLabel.fontSizeMin = 48; nameLabel.fontSizeMax = 76;
+        var owned = Label("Owned", card, strong, "", 30, Accent, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(48, -160), new Vector2(608, 40));
+        var blurb = Label("Blurb", card, body, "", 26, Muted, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(48, -206), new Vector2(608, 70));
+        blurb.textWrappingMode = TextWrappingModes.Normal; blurb.enableAutoSizing = true; blurb.fontSizeMin = 20; blurb.fontSizeMax = 26;
+        var loadout = Chip("Loadout", card, "START WITH:  NOTHING", new Vector2(0, -288), out var loadoutLabel);
         UnityEditor.Events.UnityEventTools.AddPersistentListener(loadout.onClick, panel.CycleLoadout);
 
         var packs = Inventory.Packs;
-        var rows = new Button[packs.Length]; var rowLabels = new TMP_Text[packs.Length]; var rowPrices = new TMP_Text[packs.Length];
+        var rows = new Button[packs.Length]; var rowLabels = new TMP_Text[packs.Length]; var rowPrices = new TMP_Text[0];
         for (int i = 0; i < packs.Length; i++)
         {
-            var rt = Rect("Row" + i, card, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -302 - i * 44), new Vector2(600, 40));   // six packs clear the PAY button
-            rt.pivot = new Vector2(0, 1);
+            var rt = Rect("Pip" + i, card, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2((i - (packs.Length - 1) / 2f) * 96f, -440), new Vector2(84, 84));
             Design.AsRow(rt, Design.Ink700);
             rows[i] = rt.gameObject.AddComponent<Button>();
             rt.gameObject.AddComponent<PressFeel>();
             UnityEditor.Events.UnityEventTools.AddIntPersistentListener(rows[i].onClick, panel.Focus, i);
-            var glyph = Rect("Glyph", rt, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(34, 0), new Vector2(32, 32));
+            var glyph = Rect("Glyph", rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 4), new Vector2(46, 46));
             var glyphImg = glyph.gameObject.AddComponent<Image>();
             glyphImg.sprite = Design.Icon(Design.ItemGlyph(packs[i].item) ?? "trap"); glyphImg.color = Paper; glyphImg.preserveAspect = true; glyphImg.raycastTarget = false;
-            rowLabels[i] = Label("Label", rt, strong, packs[i].name.ToUpperInvariant(), 26, Paper, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(64, 0), new Vector2(380, 40));
-            rowPrices[i] = Label("Price", rt, body, "", 24, Muted, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-20, 0), new Vector2(180, 40));
+            rowLabels[i] = Label("Count", rt, strong, "", 20, Paper, TextAlignmentOptions.Right, new Vector2(1, 0), new Vector2(-6, 2), new Vector2(60, 26));
         }
+        var prevArrow = IconButton("Prev", screen.transform, "back", new Vector2(1, 0), new Vector2(-336, 72), new Vector2(144, 144));
+        var nextArrow = IconButton("Next", screen.transform, "next", new Vector2(1, 0), new Vector2(-128, 72), new Vector2(144, 144));
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(prevArrow.onClick, panel.Previous);
+        UnityEditor.Events.UnityEventTools.AddPersistentListener(nextArrow.onClick, panel.Next);
 
         var secondary = Button("Secondary", card, "PAY", Slate, Paper, 36, new Vector2(0.5f, 0), new Vector2(0, 168), new Vector2(584, 96));
         UnityEditor.Events.UnityEventTools.AddPersistentListener(secondary.onClick, panel.Secondary);
@@ -1349,6 +1357,8 @@ public static partial class MenuSetup
         Fill(so.FindProperty("rowLabels"), rowLabels.Cast<Object>().ToArray());
         Fill(so.FindProperty("rowPrices"), rowPrices.Cast<Object>().ToArray());
         so.FindProperty("blurbLabel").objectReferenceValue = blurb;
+        so.FindProperty("nameLabel").objectReferenceValue = nameLabel;
+        so.FindProperty("ownedLabel").objectReferenceValue = owned;
         so.FindProperty("loadoutLabel").objectReferenceValue = loadoutLabel;
         so.FindProperty("primaryLabel").objectReferenceValue = primary.GetComponentInChildren<TMP_Text>();
         so.FindProperty("secondaryLabel").objectReferenceValue = secondary.GetComponentInChildren<TMP_Text>();
@@ -1357,14 +1367,14 @@ public static partial class MenuSetup
         so.FindProperty("tertiaryLabel").objectReferenceValue = tertiary.GetComponentInChildren<TMP_Text>();
         so.FindProperty("tertiaryButton").objectReferenceValue = tertiary;
         so.FindProperty("rowIdle").colorValue = Design.Ink700;
-        so.FindProperty("rowFocus").colorValue = Design.Ink600;
+        so.FindProperty("rowFocus").colorValue = Accent;
         so.FindProperty("podium").objectReferenceValue = podium;
         // one model per pack, in Inventory.Packs order (rocket, homing, bomb, nitro, bouncer, sun bomb)
         var modelPaths = new System.Collections.Generic.Dictionary<string, string>
         {
             ["rocket"] = "Assets/_Game/Prefabs/Items/Rocket.prefab", ["homing"] = "Assets/_Game/Prefabs/Items/Homing.prefab",
             ["bomb"] = "Assets/_Game/Prefabs/Items/Bomb.prefab", ["nitro"] = "Assets/_Game/Art/Models/Props/Survival/bottle-large.fbx",
-            ["bouncer"] = "Assets/ThirdParty/PowerslideKartPhysics/Prefabs/Items/BounceItem.prefab", ["sunbomb"] = "Assets/_Game/Prefabs/Items/SunBomb.prefab",
+            ["bouncer"] = "Assets/_Game/Prefabs/Items/Bouncer.prefab", ["sunbomb"] = "Assets/_Game/Prefabs/Items/SunBomb.prefab",
         };
         Fill(so.FindProperty("models"), packs.Select(p => (Object)(modelPaths.TryGetValue(p.id, out var path) ? AssetDatabase.LoadAssetAtPath<GameObject>(path) : null)).ToArray());
         so.FindProperty("nitroMaterial").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Game/Art/Materials/Survival.mat");

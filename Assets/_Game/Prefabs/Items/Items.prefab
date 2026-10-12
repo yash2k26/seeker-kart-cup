@@ -426,5 +426,5 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   itemName: Bouncer
-  itemPrefab: {fileID: 5462182083005470935, guid: 2163ca85c19f7f44e8da7aafff9b7eb3, type: 3}
+  itemPrefab: {fileID: 5937695087240159605, guid: 8aad9ef3d29bf45548eb3ccd290bff4a, type: 3}
   spawnOffset: {x: 0, y: 0.5, z: 0}
