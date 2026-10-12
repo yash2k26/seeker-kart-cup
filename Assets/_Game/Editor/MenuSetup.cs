@@ -480,7 +480,11 @@ public static partial class MenuSetup
         // the lockup, small, where Beach Buggy keeps BACK: the brand, not a headline
         var lockup = UiSprite(Art + "Textures/UI/kartel_lockup.png");
         if (lockup == null) Debug.LogWarning("[menu] no kartel_lockup.png: run tools/brand/make_lockup.py");
-        var logo = Rect("Logo", plate, new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, -14), new Vector2(380, 139));
+        // BACK to the front door first (13 Oct 2026, the user: "there's no back button in the dashboard screen to come to
+        // the welcome screen"; only Android's back did it), the lockup beside it, a little smaller
+        var home = IconButton("Back", plate, "back", new Vector2(0, 1), new Vector2(40, -28), new Vector2(108, 108));
+        Wire(home, nameof(ScreenFlow.ShowFront));
+        var logo = Rect("Logo", plate, new Vector2(0, 1), new Vector2(0, 1), new Vector2(168, -30), new Vector2(270, 99));
         logo.pivot = new Vector2(0, 1);
         var mark = logo.gameObject.AddComponent<Image>();
         mark.sprite = lockup; mark.preserveAspect = true; mark.raycastTarget = false;
