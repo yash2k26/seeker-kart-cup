@@ -46,7 +46,7 @@ namespace KartCup
             // cup knows which track is actually loaded. Without this every later race scored on the beach board, and
             // an online race's drive was judged against another circuit and refused.
             if (RoomClient.InRaceRoom && RoomClient.Instance.Room is { } room && room.raceIndex >= 0 && room.raceIndex < room.tracks.Count) trackId = room.tracks[room.raceIndex];
-            else if (Cup.Active) trackId = Cup.TrackId;
+            else if (Cup.Active) trackId = Cup.TrackId + (RaceMode.Long ? "-long" : "");   // a long layout is its own track to the Worker
             lapMs.Clear(); checkpointMs.Clear(); path.Clear(); Finished = false; PbMemo = null; LastSubmit = null;
             raceStart = lapStart = Time.time;
             nextSample = 0f; recording = true; player = null;

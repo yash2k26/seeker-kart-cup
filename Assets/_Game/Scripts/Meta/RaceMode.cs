@@ -32,6 +32,8 @@ namespace KartCup
         public static int Laps = 1;
         /// The circuit driven the other way round (TrackDirection), and in thick mist.
         public static bool Reverse, Mist;
+        /// The circuit's long layout (Race{n}L): Kartel Tour's later series.
+        public static bool Long;
         /// The Tour or Daily event being driven ("" for a free race): the results card scores it.
         public static string EventId = "";
 
@@ -47,12 +49,12 @@ namespace KartCup
         public static void Clear()
         {
             Current = Kind.Race; Rival = -1; Difficulty = 1f; Fire = 1f; BossCharge = 1f;
-            Rule = Items.Normal; Laps = 1; Reverse = Mist = false; EventId = ""; Hazard = 0; Works = 0;
+            Rule = Items.Normal; Laps = 1; Reverse = Mist = Long = false; EventId = ""; Hazard = 0; Works = 0;
         }
 
         /// The personal best this race is kept under: the circuit's own for an ordinary race, its own row otherwise.
-        public static string BestKey(string trackId) => BestKey(trackId, Reverse, Laps, Rule);
-        public static string BestKey(string trackId, bool reverse, int laps, Items rule) => trackId + (reverse ? ".rev" : "") + (laps > 1 ? $".l{laps}" : "")
+        public static string BestKey(string trackId) => BestKey(trackId, Reverse, Laps, Rule, Long);
+        public static string BestKey(string trackId, bool reverse, int laps, Items rule, bool @long = false) => trackId + (@long ? ".long" : "") + (reverse ? ".rev" : "") + (laps > 1 ? $".l{laps}" : "")
             + (rule is Items.Nitro or Items.Rockets ? "." + rule.ToString().ToLowerInvariant() : "");
 
         public static string Name(Kind k) => k switch { Kind.Elimination => "ELIMINATION", Kind.Duel => "DUEL", Kind.Smash => "SMASH-UP", _ => "RACE" };

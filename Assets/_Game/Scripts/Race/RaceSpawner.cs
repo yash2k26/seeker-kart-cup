@@ -26,6 +26,7 @@ namespace KartCup
             if (roster == null || roster.characters.Length == 0) { Debug.LogError("[race] no roster"); return; }
             Chests.ClearLast(); Tour.ClearLast(); Daily.LastPaid = false;
             gameObject.AddComponent<PerfLog>();   // frame times to the log, every race
+            gameObject.AddComponent<LightBudget>();   // the night maps' lamps: only the nearest dozen on
             RaceCamera.Apply(raceCamera != null ? raceCamera.GetComponent<Camera>() : Camera.main);   // trackside clutter not drawn far off
             if (RoomClient.InRaceRoom) { RaceMode.Clear(); SpawnOnline(); return; }   // a room is always the ordinary race
 
@@ -33,7 +34,9 @@ namespace KartCup
             if (!Cup.Active)
             {
                 // The scene's own track, so a directly loaded Race3 records its best as forest and RACE AGAIN reloads Race3.
-                int.TryParse(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Replace("Race", ""), out int n);
+                var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;   // "Race3", or "Race3L" for its long layout
+                int.TryParse(scene.Replace("Race", "").TrimEnd('L'), out int n);
+                if (scene.EndsWith("L")) RaceMode.Long = true;
                 Cup.Begin(CharacterDatabase.SelectedIndex, roster.characters.Length, new[] { Mathf.Clamp(n - 1, 0, Tracks.Count - 1) });
                 if (RaceMode.InEvent) Cup.StartAtBack();   // (the playtest's -event)
             }

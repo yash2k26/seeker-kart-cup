@@ -32,7 +32,7 @@ namespace KartCup
         public static int TrackIndex => tracks.Count == 0 ? 0 : tracks[Mathf.Clamp(RaceIndex, 0, tracks.Count - 1)];
         public static string TrackId => Tracks.At(TrackIndex).id;
         public static string TrackName => Tracks.At(TrackIndex).name;
-        public static string SceneName => Tracks.SceneOf(TrackIndex);
+        public static string SceneName => Tracks.SceneOf(TrackIndex) + (RaceMode.Long ? "L" : "");   // a Tour event on the long layout
         public static IReadOnlyList<int> Grid => grid;
         public static IReadOnlyList<int> TrackList => tracks;
 

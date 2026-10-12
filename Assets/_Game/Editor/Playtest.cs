@@ -119,7 +119,8 @@ public static class Playtest
             sweep = args[i + 1].Split(';').Select(v => v.Split(',').Select(x => float.Parse(x, System.Globalization.CultureInfo.InvariantCulture)).ToArray()).ToArray();
         prevQuality = QualitySettings.GetQualityLevel();
         if (mobile) QualitySettings.SetQualityLevel(0, true);
-        EditorSceneManager.OpenScene($"Assets/_Game/Scenes/Race{track}.unity", OpenSceneMode.Single);
+        if (args.Contains("-long")) KartCup.RaceMode.Long = true;   // -long: the circuit's long layout (an -event sets it too)
+        EditorSceneManager.OpenScene($"Assets/_Game/Scenes/Race{track}{(KartCup.RaceMode.Long ? "L" : "")}.unity", OpenSceneMode.Single);
         start = EditorApplication.timeSinceStartup;
         shot = 0; introShot = 0;
         EditorApplication.update += Tick;

@@ -24,8 +24,12 @@ public static partial class TrackSetup
     // 95th-percentile corner 3.6/6.4/20.5/4.8 deg per sample — so they differ in character, not just in dressing.
     static Theme V;                                          // the circuit currently being generated
     static int Index;                                        // its index in Tracks / Themes
-    static string ScenePath => $"Assets/_Game/Scenes/{Tracks.SceneOf(Index)}.unity";
-    static string MeshDir => Art + $"Models/Track/{Tracks.SceneOf(Index)}";
+    static bool Long;                                        // building its long layout (LongLayouts): Race{n}L
+    static string Scene => Tracks.SceneOf(Index) + (Long ? "L" : "");
+    static string ScenePath => $"Assets/_Game/Scenes/{Scene}.unity";
+    static string MeshDir => Art + $"Models/Track/{Scene}";
+    /// What the Worker and the art files know this layout by: "beach", or "beach-long".
+    static string Tag => Long ? V.id + "-long" : V.id;
     const string Art = "Assets/_Game/Art/";
     const string Prefabs = "Assets/_Game/Prefabs/";
     const string PKP = "Assets/ThirdParty/PowerslideKartPhysics/";
@@ -52,6 +56,7 @@ public static partial class TrackSetup
             var theme = System.Array.Find(Themes, t => t.id == Tracks.At(i).id);
             if (theme == null) { Debug.LogError($"[track] no theme for track '{Tracks.At(i).id}'"); continue; }
             BuildOne(theme, i);
+            if (LongLayouts.TryGetValue(theme.id, out var longer)) { Long = true; try { BuildOne(theme.With(longer), i); } finally { Long = false; } }
         }
         WriteGeometry();
         Debug.Log($"[track] built {Tracks.Count} circuits");
@@ -66,8 +71,9 @@ public static partial class TrackSetup
         for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-track") int.TryParse(args[i + 1], out track);
         int index = Mathf.Clamp(track - 1, 0, Tracks.Count - 1);
         var theme = System.Array.Find(Themes, t => t.id == Tracks.At(index).id);
-        BuildOne(theme, index);
-        Debug.Log($"[track] built {Tracks.At(index).name} only");
+        Long = args.Contains("-long") && LongLayouts.ContainsKey(theme.id);   // -long: its long layout, Race{n}L
+        try { BuildOne(Long ? theme.With(LongLayouts[theme.id]) : theme, index); } finally { Long = false; }
+        Debug.Log($"[track] built {Tracks.At(index).name}{(args.Contains("-long") ? " (long)" : "")} only");
         if (Application.isBatchMode) EditorApplication.Exit(0);
     }
 
@@ -88,7 +94,7 @@ public static partial class TrackSetup
         var waypoints = Waypoints();
         var checkpoints = Checkpoints();
         BuildShortcut();                                  // after the circuit's waypoints (it joins them), before the dressing (which keeps off it)
-        Geometry[V.id] = GeometryJson(checkpoints);
+        Geometry[Tag] = GeometryJson(checkpoints);
         var grid = StartGrid();
         Barriers();
         Dressing();
@@ -131,7 +137,7 @@ public static partial class TrackSetup
         volume.sharedProfile = PostProfile();
 
         var session = new GameObject("RaceSession").AddComponent<RaceSession>();   // lap/checkpoint times for the Worker; nothing reached the leaderboard without it
-        new SerializedObject(session).Do(s => s.FindProperty("trackId").stringValue = Tracks.At(Index).id);   // what the Worker keys the leaderboard on
+        new SerializedObject(session).Do(s => s.FindProperty("trackId").stringValue = Tag);   // what the Worker keys the leaderboard on (a long layout is its own)
         var race = new GameObject("RaceManager").AddComponent<RaceManager>();
         race.totalLaps = 1;   // one lap a race (10 Oct 2026, the user); the referee's contract below says the same
         race.checkpoints = checkpoints;
@@ -222,7 +228,7 @@ public static partial class TrackSetup
 
         const string dir = Art + "Textures/UI/Tracks";
         Directory.CreateDirectory(dir);
-        string path = $"{dir}/{V.id}.png";
+        string path = $"{dir}/{Tag}.png";
         File.WriteAllBytes(path, tex.EncodeToPNG());
         Object.DestroyImmediate(tex); rt.Release(); Object.DestroyImmediate(rt);
         AssetDatabase.ImportAsset(path);      // the UI folder rule makes it a sprite
@@ -268,7 +274,7 @@ public static partial class TrackSetup
         tex.SetPixels32(px); tex.Apply();
         const string dir = Art + "Textures/UI/Tracks";
         Directory.CreateDirectory(dir);
-        string path = $"{dir}/{V.id}_map.png";
+        string path = $"{dir}/{Tag}_map.png";
         File.WriteAllBytes(path, tex.EncodeToPNG());
         Object.DestroyImmediate(tex);
         AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);

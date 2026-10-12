@@ -10,6 +10,8 @@ public static partial class TrackSetup
     sealed class Theme
     {
         public string id;
+        /// The same circuit's look on another layout (its long one).
+        public Theme With(Vector2[] other) { var t = (Theme)MemberwiseClone(); t.layout = other; return t; }
         // the circuit: control points in metres, a closed loop run in their order, point 0 the start line on a straight
         // (tools/layouts/design.py lays them out, measures them and draws them before a scene is built)
         public Vector2[] layout;
@@ -243,6 +245,31 @@ public static partial class TrackSetup
 
     /// Normalised elliptical distance round the oval (about 1 at its turns), for the bank and the dark outfield.
     static float Ellipse(float x, float z) => Mathf.Sqrt((x - 47f) * (x - 47f) / (310f * 310f) + z * z / (175f * 175f));
+
+    // The long layouts (13 Oct 2026, the user: "the tracks should get difficult or long when the user reaches higher
+    // level"): each circuit's own start straight and look, with a new stretch where its layout left room (a hairpin
+    // through Palm Bay's lagoon, a trombone under Frost Peak's switchback, a loop through Pine Ridge's middle, a hill loop
+    // behind the Speedway, lobes either side of Mount Ember and a dip below it). Race{n}L.unity; Kartel Tour's later
+    // series race them. Laid out and measured with tools/layouts/design.py (layouts.json "<id>_long"): 2.3-3.0 km,
+    // no corner tighter than the short circuit's, no two parts of the lap nearer than 57 m.
+    static readonly System.Collections.Generic.Dictionary<string, Vector2[]> LongLayouts = new()
+    {
+        ["beach"] = L(-112,-265, 0,-265, 102,-265, 195,-242, 260,-177, 279,-93, 251,-19, 186,19, 120,-50, 40,-130, -40,-150, -75,-85, -30,-20, 40,30,
+                  95,85, 158,84, 205,149, 270,186, 279,251, 214,288, 140,260, 84,186, 19,158, -56,205, -130,270, -223,260, -279,186, -270,93,
+                  -205,37, -140,-28, -186,-102, -242,-167, -205,-242),
+        ["alpine"] = L(0,-240, 110,-242, 185,-240, 228,-222, 226,-192, 180,-180, 100,-180, 20,-178, -50,-176, -108,-162, -125,-130, -80,-110, 10,-112, 100,-116,
+                  180,-118, 258,-90, 232,-48, 175,-35, 110,-55, 40,-30, -40,-10, -100,0, -130,25, -118,55, -70,68, 10,60, 90,85, 160,95,
+                  200,120, 190,152, 140,165, 60,160, -20,185, -110,200, -200,215, -255,170, -270,90, -250,10, -275,-70, -250,-160, -180,-225, -90,-242),
+        ["forest"] = L(0,-230, 90,-232, 160,-222, 198,-210, 192,-180, 150,-166, 70,-166, -10,-160, -75,-140, -112,-95, -98,-42, -35,-28, 40,-48, 105,-68,
+                  150,-62, 180,-40, 215,10, 235,70, 205,125, 140,135, 90,105, 55,50, 15,40, -5,85, -30,150, -100,195, -170,185, -215,140,
+                  -205,85, -150,55, -165,0, -225,-40, -250,-110, -215,-180, -140,-222, -70,-232),
+        ["speedway"] = L(0,-160, 130,-160, 240,-150, 320,-100, 345,0, 320,100, 240,150, 240,240, 225,330, 150,385, 40,390, -45,345, -70,270, -60,215,
+                  -120,160, -210,150, -245,110, -235,60, -180,30, -110,45, -45,20, 20,40, 85,15, 125,-25, 95,-70, 25,-72, -50,-58, -115,-88,
+                  -190,-88, -240,-100, -250,-140, -205,-162, -110,-162),
+        ["volcano"] = L(-61,258, -46,324, 0,374, 46,324, 61,258, 61,182, 125,205, 205,175, 242,98, 220,20, 245,-45, 284,-76, 279,-110,
+                  300,-173, 235,-187, 194,-182, 127,-143, 110,-205, 90,-285, 30,-330, -30,-330, -90,-285, -110,-205, -127,-143, -194,-182, -213,-158, -272,-157,
+                  -244,-106, -254,-77, -220,20, -242,98, -205,175, -125,205, -61,182),
+    };
 
     /// A layout as flat (x, z) pairs.
     static Vector2[] L(params float[] xz)

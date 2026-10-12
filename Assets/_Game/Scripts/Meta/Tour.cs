@@ -22,6 +22,7 @@ namespace KartCup
         {
             public string id, title; public int track; public RaceMode.Kind mode; public int rival = -1;
             public RaceMode.Items items; public int laps = 1; public bool reverse, mist;
+            public bool @long;   // the circuit's long layout (Race{n}L)
         }
         public sealed class CupDef
         {
@@ -54,29 +55,29 @@ namespace KartCup
             } },
             new() { name = "PRO SERIES", kicker = "CUP 3", pace = 1.03f, fire = 1.05f, works = 2, boss = 6, bossPaint = "boss.chase", bossSku = "driver.chase", events = new[]
             {
-                new Event { id = "c3e1", title = "Pine Run", track = 2, mode = Race, laps = 2 },
-                new Event { id = "c3e2", title = "Summit Reverse", track = 1, mode = Race, reverse = true, laps = 2 },
+                new Event { id = "c3e1", title = "Pine Run", track = 2, mode = Race, @long = true },
+                new Event { id = "c3e2", title = "Summit Reverse", track = 1, mode = Race, reverse = true, @long = true },
                 new Event { id = "c3e3", title = "Smash-Up", track = 2, mode = Smash },
                 new Event { id = "c3e4", title = "Backstretch", track = 3, mode = Race, reverse = true, laps = 2 },
-                new Event { id = "c3b", title = "BOSS: CHASE", track = 2, mode = Duel, rival = 6, laps = 2 },
+                new Event { id = "c3b", title = "BOSS: CHASE", track = 2, mode = Duel, rival = 6, @long = true },
             } },
             new() { name = "LEGENDS", kicker = "CUP 4", pace = 1.08f, fire = 1.2f, works = 3, boss = 0, bossPaint = "boss.toly", bossSku = "driver.toly", events = new[]
             {
-                new Event { id = "c4e1", title = "Midnight Grand", track = 0, mode = Race, laps = 3 },
-                new Event { id = "c4e2", title = "Back Through the Pines", track = 2, mode = Race, reverse = true, laps = 2 },
-                new Event { id = "c4e3", title = "Rocket Rumble", track = 4, mode = Race, items = Rockets, laps = 2 },     // Mount Ember's first
-                new Event { id = "c4e4", title = "Fog Bank", track = 3, mode = Race, mist = true, laps = 3 },
-                new Event { id = "c4b", title = "BOSS: TOLY", track = 3, mode = Duel, rival = 0, laps = 2 },
+                new Event { id = "c4e1", title = "Midnight Grand", track = 0, mode = Race, laps = 2, @long = true },
+                new Event { id = "c4e2", title = "Back Through the Pines", track = 2, mode = Race, reverse = true, laps = 2, @long = true },
+                new Event { id = "c4e3", title = "Rocket Rumble", track = 4, mode = Race, items = Rockets, laps = 2, @long = true },     // Mount Ember's first
+                new Event { id = "c4e4", title = "Fog Bank", track = 3, mode = Race, mist = true, laps = 2, @long = true },
+                new Event { id = "c4b", title = "BOSS: TOLY", track = 3, mode = Duel, rival = 0, laps = 2, @long = true },
             } },
             // 10 Oct 2026 (the user: "multiple series, tasks and races to clear each"): a fifth, the hardest field, Beeman
             // its boss. A judge too (11 Oct, the user: "beeman is also a judge"): beat him and he joins your roster.
             new() { name = "GRAND TOUR", kicker = "CUP 5", pace = 1.12f, fire = 1.35f, works = 4, boss = 7, bossPaint = "boss.beeman", bossSku = "driver.beeman", events = new[]
             {
-                new Event { id = "c5e1", title = "Coast to Coast", track = 0, mode = Race, reverse = true, laps = 3 },
-                new Event { id = "c5e2", title = "Whiteout", track = 1, mode = Race, mist = true, reverse = true, laps = 3 },
-                new Event { id = "c5e3", title = "Clean Sweep", track = 4, mode = Race, items = Clean, laps = 3 },
-                new Event { id = "c5e4", title = "Twilight Triple", track = 3, mode = Race, laps = 3 },
-                new Event { id = "c5b", title = "BOSS: BEEMAN", track = 4, mode = Duel, rival = 7, laps = 3 },   // the last wall, on the lava
+                new Event { id = "c5e1", title = "Coast to Coast", track = 0, mode = Race, reverse = true, laps = 2, @long = true },
+                new Event { id = "c5e2", title = "Whiteout", track = 1, mode = Race, mist = true, reverse = true, laps = 2, @long = true },
+                new Event { id = "c5e3", title = "Clean Sweep", track = 4, mode = Race, items = Clean, laps = 2, @long = true },
+                new Event { id = "c5e4", title = "Twilight Double", track = 3, mode = Race, laps = 2, @long = true },
+                new Event { id = "c5b", title = "BOSS: BEEMAN", track = 4, mode = Duel, rival = 7, laps = 2, @long = true },   // the last wall, on the lava
             } },
         };
         /// A boss's special charges this much faster than the player's (the card says so). 11 Oct 2026, the user: "every
@@ -146,11 +147,11 @@ namespace KartCup
         }
         public static string ModeName(Event e) => RaceMode.Name(e.mode, e.items);
         /// The personal best an event's card shows: the one its own way of running the circuit keeps.
-        public static string BestKey(Event e) => RaceMode.BestKey(Tracks.At(e.track).id, e.reverse, e.laps, e.items);
+        public static string BestKey(Event e) => RaceMode.BestKey(Tracks.At(e.track).id, e.reverse, e.laps, e.items, e.@long);
         /// The circuit's name, then what is different about this run of it.
         public static string Where(Event e) { var v = Variant(e); return Tracks.At(e.track).name.ToUpperInvariant() + (v.Length > 0 ? "  ·  " + v : ""); }
         /// What is different about this run of the circuit, after its name: "REVERSE  ·  MIST  ·  2 LAPS".
-        public static string Variant(Event e) => string.Join("  ·  ", new[] { e.reverse ? "REVERSE" : null, e.mist ? "MIST" : null, e.laps > 1 ? $"{e.laps} LAPS" : null, Find(e.id).cup?.works > 0 ? "ROADWORKS" : null }.Where(x => x != null));
+        public static string Variant(Event e) => string.Join("  ·  ", new[] { e.@long ? "LONG" : null, e.reverse ? "REVERSE" : null, e.mist ? "MIST" : null, e.laps > 1 ? $"{e.laps} LAPS" : null, Find(e.id).cup?.works > 0 ? "ROADWORKS" : null }.Where(x => x != null));
         public static string Goal(Event e) => e.mode switch
         {
             RaceMode.Kind.Duel => "WIN", RaceMode.Kind.Smash => "2 IN 5", _ => "1ST",   // (Elimination's "LAST ONE IN" ran into "3RD" on the results card)
@@ -170,6 +171,7 @@ namespace KartCup
                     _ => "Race the other drivers to the finish line.",
                 },
             };
+            if (e.@long) rule += " The long layout: a whole new stretch of road.";
             if (e.reverse) rule += " The circuit runs the other way round.";
             if (e.mist) rule += " In thick mist.";
             if (e.laps > 1) rule += $" {e.laps} laps.";
@@ -200,7 +202,7 @@ namespace KartCup
             RaceMode.Hazard = index;                                                          // the later cups lay more oil and more crossings
             RaceMode.Works = c.works;                                                         // ...and roadworks on the straights
             RaceMode.BossCharge = e.mode == RaceMode.Kind.Duel ? BossCharge : 1f;          // ...and charges faster: a stated rule, never unlimited
-            RaceMode.Rule = e.items; RaceMode.Laps = Mathf.Max(1, e.laps); RaceMode.Reverse = e.reverse; RaceMode.Mist = e.mist;
+            RaceMode.Rule = e.items; RaceMode.Laps = Mathf.Max(1, e.laps); RaceMode.Reverse = e.reverse; RaceMode.Mist = e.mist; RaceMode.Long = e.@long;
         }
 
         /// The race is over: keep the best stars, open what they open, pay a beaten boss.

@@ -15,17 +15,32 @@ EditorBuildSettings:
     path: Assets/_Game/Scenes/Race1.unity
     guid: fc446021ff5044a6bb64c7eb0c403fcf
   - enabled: 1
+    path: Assets/_Game/Scenes/Race1L.unity
+    guid: 060dbefba6773467d85fa8502f452d70
+  - enabled: 1
     path: Assets/_Game/Scenes/Race2.unity
     guid: 2813e3113729a421ab30a7702db809ac
+  - enabled: 1
+    path: Assets/_Game/Scenes/Race2L.unity
+    guid: 20f55b5325a494da996f2909f8fe5757
   - enabled: 1
     path: Assets/_Game/Scenes/Race3.unity
     guid: 1d04f1a00c120467e8934d38a82cfc52
   - enabled: 1
+    path: Assets/_Game/Scenes/Race3L.unity
+    guid: 7b5f6899303774acb859dd8305b28846
+  - enabled: 1
     path: Assets/_Game/Scenes/Race4.unity
     guid: c4e3a4856027c45b1b7eb5a8b04ced03
   - enabled: 1
+    path: Assets/_Game/Scenes/Race4L.unity
+    guid: e664d0ae07e08481191c45e9740e2626
+  - enabled: 1
     path: Assets/_Game/Scenes/Race5.unity
     guid: 5ad36ed8076de456fab932e9ee40ea10
+  - enabled: 1
+    path: Assets/_Game/Scenes/Race5L.unity
+    guid: bddfdbbc093134623a5910aaff67e131
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0
