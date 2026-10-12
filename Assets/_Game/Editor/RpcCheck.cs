@@ -1,5 +1,10 @@
+using System.Collections.Generic;
+using System.Linq;
+using Solana.Unity.Programs;
 using Solana.Unity.Rpc;
+using Solana.Unity.Rpc.Models;
 using Solana.Unity.Rpc.Types;
+using Solana.Unity.Wallet;
 using UnityEditor;
 using UnityEngine;
 
@@ -15,6 +20,22 @@ public static class RpcCheck
         Debug.Log($"[rpc] getLatestBlockhash ok={bh.WasSuccessful} hash={bh.Result?.Value?.Blockhash} reason={bh.Reason} raw={bh.RawRpcResponse}");
         var bal = await rpc.GetBalanceAsync(me, Commitment.Confirmed);
         Debug.Log($"[rpc] getBalance ok={bal.WasSuccessful} lamports={bal.Result?.Value} reason={bal.Reason}");
+        // what a wallet receives: one zeroed signature slot per required signer (Phantom refused a transaction with none)
+        var payer = new PublicKey(me);
+        var tx = new Transaction { RecentBlockHash = bh.Result?.Value?.Blockhash ?? "11111111111111111111111111111111", FeePayer = payer,
+                                   Instructions = new List<TransactionInstruction>(), Signatures = new List<SignaturePubKeyPair>() };
+        tx.Add(ComputeBudgetProgram.SetComputeUnitLimit(80_000)); tx.Add(ComputeBudgetProgram.SetComputeUnitPrice(100_000));   // as WalletFlow.BuildTx
+        tx.Add(SystemProgram.Transfer(payer, payer, 50_000_000)); tx.Add(MemoProgram.NewMemoV2("kc:buy:kart.van:test", payer));
+        var forWallet = (byte[])typeof(Solana.Unity.SDK.SolanaMobileWalletAdapter).GetMethod("ForWallet", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static).Invoke(null, new object[] { tx });
+        var back = Transaction.Deserialize(forWallet);
+        bool ok = back.Signatures.Count == 1 && back.Signatures[0].PublicKey.Key == me && back.Signatures[0].Signature.All(b => b == 0);
+        Debug.Log($"[rpc] wallet payload: {forWallet.Length} bytes, {back.Signatures.Count} signature slot(s), payer first and zeroed: {ok}");
+        var msg = Message.Deserialize(tx.CompileMessage());
+        Debug.Log($"[rpc] message: {msg.Header.RequiredSignatures} signer(s), keys {string.Join(", ", msg.AccountKeys.Select(k => k.Key[..6]))}");
+        // the exact bytes a wallet gets, simulated on mainnet (no signature check): what Phantom's own check would say
+        var direct = ClientFactory.GetClient("https://solana-rpc.publicnode.com");
+        var sim = await direct.SimulateTransactionAsync(forWallet, sigVerify: false, commitment: Commitment.Confirmed, replaceRecentBlockhash: true);
+        Debug.Log($"[rpc] simulate: ok={sim.WasSuccessful} err={(sim.Result?.Value?.Error == null ? "none" : sim.Result.Value.Error.Type.ToString())} reason={sim.Reason} logs={string.Join(" | ", sim.Result?.Value?.Logs ?? new string[0])}");
         if (Application.isBatchMode) EditorApplication.Exit(0);
     }
 }

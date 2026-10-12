@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using Solana.Unity.Rpc.Models;
+using Solana.Unity.Rpc.Types;
 using Solana.Unity.SDK;
 using Solana.Unity.Wallet;
 using UnityEngine;
@@ -409,7 +410,7 @@ namespace Solana.Unity.SDK
             await RunPrivileged(async client =>
             {
                 res = await client.SignTransactions(
-                    transactions.Select(t => t.Serialize()).ToList());
+                    transactions.Select(ForWallet).ToList());
             }, "SignAllTransactions");
 
             if (res == null)
@@ -429,6 +430,47 @@ namespace Solana.Unity.SDK
         /// outcomes here (user declined, partial submit, invalid payloads, not supported) are
         /// expected and carry data — pattern-match on the result case.
         /// </summary>
+        /// <summary>
+        /// A transaction as a wallet expects one to sign: a signature slot for every required signer, in the message's
+        /// signer order, zeros where it is not signed yet. Transaction.Serialize writes only the signatures already
+        /// present, so an unsigned transaction went out with none and Phantom refused it ("Expected signatures length to
+        /// be equal to the number of required signatures", Kartel, 12 Oct 2026).
+        /// </summary>
+        /// <summary>
+        /// A fresh blockhash (and min_context_slot) once the wallet is open and authorized, right before the transactions
+        /// go to it: the reauthorize can wait on a fingerprint, and a blockhash taken before that was 40 s old when Phantom
+        /// sent the payment, which never landed (Kartel, 12 Oct 2026). Only for transactions nobody has signed yet; on
+        /// any failure the blockhash they came with stands.
+        /// </summary>
+        private async Task RefreshBlockhash(Transaction[] transactions, SignAndSendTransactionsOptions options)
+        {
+            if (transactions.Any(t => t.Signatures != null && t.Signatures.Any(p => p.Signature != null && p.Signature.Any(b => b != 0)))) return;
+            try
+            {
+                var r = await ActiveRpcClient.GetLatestBlockHashAsync(Commitment.Confirmed);
+                var hash = r?.Result?.Value?.Blockhash;
+                if (string.IsNullOrEmpty(hash)) { Debug.LogWarning("[MWA] fresh blockhash unavailable: " + r?.Reason); return; }
+                foreach (var t in transactions) t.RecentBlockHash = hash;
+                if (options != null) options.MinContextSlot = r.Result.Context.Slot;
+            }
+            catch (Exception e) { Debug.LogWarning("[MWA] fresh blockhash failed: " + e.Message); }
+        }
+
+        private static byte[] ForWallet(Transaction t)
+        {
+            var msg = Message.Deserialize(t.CompileMessage());
+            int need = msg.Header.RequiredSignatures;
+            var slots = new List<SignaturePubKeyPair>(need);
+            for (int i = 0; i < need; i++)
+            {
+                var key = msg.AccountKeys[i];
+                var have = t.Signatures?.FirstOrDefault(p => p.PublicKey != null && p.PublicKey.Key == key.Key);
+                slots.Add(have ?? new SignaturePubKeyPair { PublicKey = key, Signature = new byte[64] });
+            }
+            t.Signatures = slots;
+            return t.Serialize();
+        }
+
         public Task<SignAndSendTxResult> SignAndSendTransactions(
             Transaction[] transactions, SignAndSendTransactionsOptions options = null)
             => RunExclusive("SignAndSendTransactions", () => SignAndSendTransactionsImpl(transactions, options));
@@ -441,8 +483,9 @@ namespace Solana.Unity.SDK
             {
                 await RunPrivileged(async client =>
                 {
+                    await RefreshBlockhash(transactions, options);
                     res = await client.SignAndSendTransactions(
-                        transactions.Select(t => t.Serialize()).ToList(), options);
+                        transactions.Select(ForWallet).ToList(), options);
                 }, "SignAndSendTransactions");
             }
             catch (MwaRpcException e)

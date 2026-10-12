@@ -277,7 +277,7 @@ namespace KartCup
                 if (mint == null && !await HasSol(amount)) { Status("Not enough SOL for this stake"); return false; }
                 if (mint != null && !await HasSol(0)) { Status("Add a little SOL for the network fee"); return false; }
                 if (mint != null && !await HasToken(cfg.skrMint, amount)) { Status("Not enough SKR for this stake"); return false; }
-                var tx = await BuildTx();
+                var tx = await BuildTx(computeUnits: 300_000);
                 tx.Add(Escrow.Join(program, roomKey, me, mint, amount));
                 RoomClient.Instance?.Send(new { t = "paying" });
                 holding = true;
@@ -352,7 +352,12 @@ namespace KartCup
         const string SolanaBusy = "Solana is busy right now. Nothing was charged: try again in a moment.";
         ulong contextSlot;   // the slot the blockhash was read at: sign_and_send's min_context_slot
 
-        async Awaitable<Transaction> BuildTx()
+        /// A transaction with a fresh blockhash and a priority fee. 12 Oct 2026: a shop payment Phantom signed and sent
+        /// never landed ("Solana transaction confirmation failed"): no priority fee, and a blockhash already 40 s old by the
+        /// time the wallet sent it. The fee is µlamports per compute unit over a stated limit: 100,000 × 80,000 = 8,000
+        /// lamports (0.000008 SOL). The SDK also refreshes the blockhash once the wallet is open (ForWallet).
+        const ulong PriorityMicroLamports = 100_000;
+        async Awaitable<Transaction> BuildTx(uint computeUnits = 80_000)
         {
             // Fresh every time: a blockhash lives ~60–90 s and the wallet may sit open for most of that. 12 Oct 2026: a
             // rate-limited node answered nothing, the transaction went to the wallet without one, and the wallet opened with
@@ -375,7 +380,11 @@ namespace KartCup
             {
                 RecentBlockHash = hash,
                 FeePayer = Web3.Wallet.Account.PublicKey,
-                Instructions = new List<TransactionInstruction>(),
+                Instructions = new List<TransactionInstruction>
+                {
+                    ComputeBudgetProgram.SetComputeUnitLimit(computeUnits),
+                    ComputeBudgetProgram.SetComputeUnitPrice(PriorityMicroLamports),
+                },
                 Signatures = new List<SignaturePubKeyPair>(),
             };
         }
