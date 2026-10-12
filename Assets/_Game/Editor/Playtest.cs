@@ -473,6 +473,9 @@ public static class Playtest
 
     static void Capture(string name)
     {
+        MenuPreview.Overflows(name);   // the race's words checked as the menu's are
+        Directory.CreateDirectory("Builds");
+        File.WriteAllLines("Builds/overflow-race.txt", MenuPreview.overflow.Select(kv => kv.Value + "  " + kv.Key));
         // the podium films on its own camera with the race camera off, and it is not the MainCamera: take whichever is live
         var cam = Camera.main ?? Object.FindObjectsByType<Camera>(FindObjectsSortMode.None).Where(c => c.isActiveAndEnabled && c.targetTexture == null).OrderByDescending(c => c.depth).FirstOrDefault();
         if (cam == null) return;

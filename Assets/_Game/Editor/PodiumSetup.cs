@@ -263,7 +263,7 @@ public static class PodiumSetup
         title.characterSpacing = 14f;
         // as wide as the leaderboard under it: wider, a winner's name ran into the Kartel sign over the podium
         var subtitle = Words("Big", canvasGo.transform, Design.Hero, "", 168, goldC, new Vector2(0, 1), new Vector2(112, -158), new Vector2(960, 220));
-        subtitle.enableAutoSizing = true; subtitle.fontSizeMin = 84; subtitle.fontSizeMax = 168;   // "0.54 SOL" at full size, "YOU TAKE THE CUP!" as wide as the frame allows
+        subtitle.enableAutoSizing = true; subtitle.fontSizeMin = 56; subtitle.fontSizeMax = 168;   // 84 left "AND THE WINNER IS..." 250 px past its box (12 Oct 2026)   // "0.54 SOL" at full size, "YOU TAKE THE CUP!" as wide as the frame allows
         var hint = Words("Hint", canvasGo.transform, Design.Strong, "TAP TO SKIP", 28, Design.Muted, new Vector2(1, 0), new Vector2(-110, 64), new Vector2(500, 40));
         hint.alignment = TextAlignmentOptions.Right; hint.characterSpacing = 10f;
 

@@ -25,8 +25,8 @@ public static partial class MenuSetup
         if (plate.Find("Sub") is Transform sub) Object.DestroyImmediate(sub.gameObject);
         var (dailyCard, dailyButton, dailyHead, dailyLine) = EventCard("Daily", plate, new Vector2(64, -300), "flag");   // the left edge, clear of the hero
         var daily = plate.gameObject.AddComponent<DailyCard>();
-        var doneTick = Rect("Done", dailyCard, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-16, -14), new Vector2(40, 40));
-        doneTick.pivot = new Vector2(1, 1);
+        // the done star sits on the flag's corner: at the card's corner it covered the end of the circuit's name (12 Oct 2026)
+        var doneTick = Rect("Done", dailyCard, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(74, 22), new Vector2(34, 34));
         var dt = doneTick.gameObject.AddComponent<Image>(); dt.sprite = IconSprite("star"); dt.color = Accent; dt.raycastTarget = false;
         new SerializedObject(daily).Do(s =>
         {
@@ -134,7 +134,7 @@ public static partial class MenuSetup
         var gi = glyph.gameObject.AddComponent<Image>();
         gi.sprite = IconSprite(icon); gi.color = Accent; gi.preserveAspect = true; gi.raycastTarget = false;
         var head = Label("Head", face, strong, "", 24, Accent, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(92, -14), new Vector2(340, 36));
-        head.characterSpacing = 4f; head.enableAutoSizing = true; head.fontSizeMin = 18; head.fontSizeMax = 24;
+        head.characterSpacing = 2f; head.enableAutoSizing = true; head.fontSizeMin = 16; head.fontSizeMax = 24;
         var line = Label("Line", face, body, "", 26, Paper, TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(92, 14), new Vector2(340, 44));
         line.enableAutoSizing = true; line.fontSizeMin = 18; line.fontSizeMax = 26;
         feel.Configure(Design.TileDown, face, lip * (Design.TileLip - 3f) / Design.TileLip);
@@ -149,9 +149,10 @@ public static partial class MenuSetup
         dim.gameObject.AddComponent<Image>().color = new Color(Deep.r, Deep.g, Deep.b, 0.72f);
         var bar = Header(screen.transform, "CHOOSE SERIES", nameof(ScreenFlow.TourBack));
         var panel = screen.AddComponent<TourPanel>();
-        var starIcon = Rect("Star", bar, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-330, 0), new Vector2(56, 56));
+        // "14 / 75 ★" read from the right edge; the total used to start under the fuel chip (12 Oct 2026)
+        var starIcon = Rect("Star", bar, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-100, 0), new Vector2(56, 56));
         var si = starIcon.gameObject.AddComponent<Image>(); si.sprite = IconSprite("star"); si.color = Accent; si.raycastTarget = false;
-        var total = Label("Total", bar, display, "0 / 60", 48, Paper, TextAlignmentOptions.Left, new Vector2(1, 0.5f), new Vector2(-290, 0), new Vector2(240, 64));
+        var total = Label("Total", bar, display, "0 / 60", 48, Paper, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-140, 0), new Vector2(240, 64));
         FuelChip(bar, new Vector2(1, 0.5f), new Vector2(-420, 0), new Vector2(250, 96));   // every event takes a can
 
         // Beach Buggy's Choose Series: a row of cards, one a series. The name on top, a picture of its first circuit, a

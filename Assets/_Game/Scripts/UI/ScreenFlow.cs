@@ -90,6 +90,7 @@ namespace KartCup
             // The race scene carries a ScreenFlow too (for the results buttons) with no panels — it must ignore Back
             // and leave it to PauseMenu, so the panel check comes first.
             if (!IsMenu || Keyboard.current == null || !Keyboard.current.escapeKey.wasPressedThisFrame) return;
+            if (PurchaseSheet.Instance != null && PurchaseSheet.Instance.Showing) { AudioDirector.Instance?.Back(); PurchaseSheet.Instance.Close(); return; }
             if (current == Lobby) { AudioDirector.Instance?.Back(); LeaveRoom(); Show(Rooms, silent: false); }        // back out of a lobby = leave it
             else if (current == Connect) { AudioDirector.Instance?.Back(); FindFirstObjectByType<ConnectPanel>()?.Guest(); }   // back here is "play as guest"
             else if (current == Front) Application.Quit();

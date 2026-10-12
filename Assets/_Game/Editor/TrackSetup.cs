@@ -912,7 +912,7 @@ public static partial class TrackSetup
         // Readouts sit on dark plates: paper on sky and sand failed contrast on the device shots.
         var deep = new Color(Design.Ink900.r, Design.Ink900.g, Design.Ink900.b, 0.66f);
         Plate("PositionPlate", safe.transform, new Vector2(0, 1), new Vector2(32, -20), new Vector2(340, 196), deep);
-        Plate("LapPlate", safe.transform, new Vector2(1, 1), new Vector2(-32, -20), new Vector2(342, 156), deep);
+        Plate("LapPlate", safe.transform, new Vector2(1, 1), new Vector2(-32, -20), new Vector2(342, 170), deep);   // the timer's foot sat on its edge
         var position = Text("Position", safe.transform, display, "1st", 130, paper, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(56, -24), new Vector2(420, 150));
         var lap = Text("Lap", safe.transform, body, "LAP 1/2", 52, paper, TextAlignmentOptions.TopRight, new Vector2(1, 1), new Vector2(-56, -38), new Vector2(520, 70));
         var time = Text("Time", safe.transform, body, "0:00.00", 46, sand, TextAlignmentOptions.TopRight, new Vector2(1, 1), new Vector2(-56, -108), new Vector2(520, 70));
@@ -930,7 +930,7 @@ public static partial class TrackSetup
         // Pause: top centre, out of both thumbs' way. Back on Android does the same thing.
         // Pause: beside the position plate (the top centre is the race bar's now). Back on Android does the same thing.
         var pauseBtn = IconButton("Pause", safe.transform, "icon_pause", new Vector2(0, 1), new Vector2(396, -28), new Vector2(104, 104));
-        var big = Text("Big", safe.transform, display, "3", 240, paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 90), new Vector2(1400, 300));
+        var big = Text("Big", safe.transform, display, "3", 240, paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 50), new Vector2(1400, 300));   // clear of the race bar
         big.enabled = false;
         // the start boost: a line over the countdown on a plate of its own (StartBoost shows it only while 3-2-1 runs).
         // Under the digit it lay across the player's kart and could not be read (10 Oct 2026).

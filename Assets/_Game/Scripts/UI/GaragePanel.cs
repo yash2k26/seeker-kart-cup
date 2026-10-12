@@ -244,7 +244,11 @@ namespace KartCup
             if (WalletFlow.Instance == null) { Say("Wallet not ready"); return; }
             busy = true;
             Say("Opening wallet…");
-            bool ok = await WalletFlow.Instance.Buy(sku, currency);
+            var kart = Kart;
+            var paint = sku.StartsWith("paint.") ? System.Array.Find(Paints.All, p => p.sku == sku) : null;
+            string what = paint != null ? $"{paint.name} paint" : kart != null ? kart.displayName : "kart";
+            bool ok = await PurchaseSheet.Pay(what, kart != null ? "kart:" + kart.id : "", sku, currency,
+                                              paint != null ? "Yours for this kart, on every phone you sign in to." : "Yours to race, on every phone you sign in to.");
             busy = false;
             Say(WalletFlow.Instance.LastStatus);
             if (ok) { onDone?.Invoke(); Haptics.Play(Haptics.Kind.Win); AudioDirector.Instance?.Confirm(); }

@@ -6,6 +6,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.UI;
 using KartCup;
+using TMPro;
 
 // Renders frames of a scene to PNGs without a device (batchmode WITH graphics: no -nographics).
 // Run: Unity -batchmode -projectPath . -executeMethod Preview.Capture -quit   -> Builds/preview-*.png
@@ -337,6 +338,27 @@ public static class MenuPreview
             reveal.GetComponent<CanvasGroup>().alpha = 0f;
         }
 
+        // The purchase sheet over the garage: a kart on its way through the wallet, stamped, refused, still confirming;
+        // a gem pack and a recruited judge stamped
+        var sheet = Object.FindObjectsByType<PurchaseSheet>(FindObjectsInactive.Include, FindObjectsSortMode.None).FirstOrDefault();
+        if (sheet != null)
+        {
+            for (int j = 0; j < panels.arraySize; j++) ((GameObject)panels.GetArrayElementAtIndex(j).objectReferenceValue).SetActive(j == 7);
+            var sc = sheet.GetComponent<Canvas>();
+            sc.renderMode = RenderMode.ScreenSpaceCamera; sc.worldCamera = cam; sc.planeDistance = 0.4f;
+            var kart = KartSetup.Karts[^1];
+            var judge = AssetDatabase.LoadAssetAtPath<CharacterDatabase>("Assets/_Game/Data/Characters.asset").characters.First(c => c != null && !string.IsNullOrEmpty(c.sku));
+            void Buy(string name, string what, string key, string price, int state, string why = "", string done = "Yours to race, on every phone you sign in to.")
+            { sheet.PreviewInEditor(what, key, price, state, why, done); Canvas.ForceUpdateCanvases(); Shot(cam, name); }
+            Buy("buy-working", "Hatchback Sports", "kart:" + kart, "0.05 SOL", 0);
+            Buy("buy-done", "Hatchback Sports", "kart:" + kart, "0.05 SOL", 1);
+            Buy("buy-failed", "Hatchback Sports", "kart:" + kart, "0.05 SOL", 2, "Not enough SOL for this");
+            Buy("buy-pending", "Hatchback Sports", "kart:" + kart, "0.05 SOL", 3);
+            Buy("buy-gems", "BAG of 550 gems", "gems", "120 SKR", 1, "", "550 gems added to your balance.");
+            Buy("buy-driver", judge.displayName, "driver:" + judge.driverId, "300 GEMS", 1, "", "Joins your roster, on every phone you sign in to.");
+            sheet.GetComponent<CanvasGroup>().alpha = 0f;
+        }
+
         // The title's street without the UI over it: the whole set, then each driver close, heads turned to the lens
         // as MeetActor would have them (it never runs in edit mode).
         canvas.gameObject.SetActive(false);
@@ -356,12 +378,60 @@ public static class MenuPreview
             Shot(cam, $"meet-{i}");
         }
         Preview.Batcher(true);
-        Debug.Log("[preview] wrote Builds/menu*.png, Builds/meet*.png");
+        File.WriteAllLines("Builds/overflow.txt", overflow.Select(kv => kv.Value + "  " + kv.Key));
+        Debug.Log($"[preview] wrote Builds/menu*.png, Builds/meet*.png; {overflow.Count} text problems in Builds/overflow.txt");
         if (Application.isBatchMode) EditorApplication.Exit(0);
+    }
+
+    internal static readonly SortedDictionary<string, string> overflow = new();
+
+    /// Every visible text whose words leave its box, or run under an icon beside it, in this shot (12 Oct 2026, the
+    /// user: "there are multiple places where text is overflowing"). Collected across shots into Builds/overflow.txt.
+    internal static void Overflows(string shot)
+    {
+        var corners = new Vector3[4];
+        foreach (var t in Object.FindObjectsByType<TextMeshProUGUI>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+        {
+            if (!t.isActiveAndEnabled || string.IsNullOrWhiteSpace(t.text) || t.color.a < 0.05f || t.canvas == null || !t.canvas.isActiveAndEnabled) continue;
+            if (t.GetComponentsInParent<CanvasGroup>().Any(g => g.alpha < 0.05f)) continue;
+            t.ForceMeshUpdate();
+            var r = t.rectTransform.rect; var tb = t.textBounds;
+            float dx = tb.size.x - r.width, dy = tb.size.y - r.height;
+            string path = string.Join("/", t.GetComponentsInParent<Transform>().Reverse().Skip(1).Select(x => x.name));
+            string what = t.text.Length > 48 ? t.text[..48] + "…" : t.text;
+            if (dx > 4f || dy > 4f)
+                overflow.TryAdd($"{path} | {what.Replace("\n", " / ")}", $"{shot}: over its box by {Mathf.Max(0, dx):0} x {Mathf.Max(0, dy):0} px");
+            // an icon beside the text, under the same parent, that the words run into (a background holds the whole text: not counted)
+            var tMin = t.rectTransform.TransformPoint(tb.min); var tMax = t.rectTransform.TransformPoint(tb.max);
+            var textRect = Rect.MinMaxRect(Mathf.Min(tMin.x, tMax.x), Mathf.Min(tMin.y, tMax.y), Mathf.Max(tMin.x, tMax.x), Mathf.Max(tMin.y, tMax.y));
+            if (t.transform.parent == null) continue;
+            foreach (Transform sib in t.transform.parent)
+            {
+                if (sib == t.transform || !sib.gameObject.activeInHierarchy) continue;
+                var img = sib.GetComponent<Image>();
+                if (img == null || img.sprite == null || img.color.a < 0.1f || !img.enabled) continue;
+                var sn = img.sprite.name.ToLowerInvariant();
+                if (sn.Contains("glow") || sn.Contains("edge") || sn.Contains("rays") || sn.Contains("shine")) continue;   // light and outlines, not icons
+                ((RectTransform)sib).GetWorldCorners(corners);
+                var ir = Rect.MinMaxRect(corners[0].x, corners[0].y, corners[2].x, corners[2].y);
+                if (img.preserveAspect)   // only where the picture draws inside its box
+                {
+                    float sa = img.sprite.rect.width / img.sprite.rect.height, ra = ir.width / ir.height;
+                    ir = sa > ra ? new Rect(ir.x, ir.center.y - ir.width / sa / 2f, ir.width, ir.width / sa) : new Rect(ir.center.x - ir.height * sa / 2f, ir.y, ir.height * sa, ir.height);
+                }
+                if (ir.Contains(textRect.min) && ir.Contains(textRect.max)) continue;                 // a background
+                float ox = Mathf.Min(ir.xMax, textRect.xMax) - Mathf.Max(ir.xMin, textRect.xMin);
+                float oy = Mathf.Min(ir.yMax, textRect.yMax) - Mathf.Max(ir.yMin, textRect.yMin);
+                float px = t.canvas.transform.lossyScale.x;                                            // world units to canvas pixels
+                if (ox > 3f * px && oy > 3f * px)
+                    overflow.TryAdd($"{path} | {what.Replace("\n", " / ")} | under {sib.name}", $"{shot}: runs into {sib.name} by {ox / px:0} px");
+            }
+        }
     }
 
     static void Shot(Camera cam, string name)
     {
+        Overflows(name);
         int w = 2400, h = 1080;
         var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 };
         cam.targetTexture = rt; cam.Render();

@@ -141,7 +141,8 @@ namespace KartCup
             Unlocks.Earn(def.sku);
             CharacterDatabase.SelectedIndex = index;
             message = $"<color=#FFB126>{def.displayName.ToUpperInvariant()} JOINS YOUR ROSTER</color>";
-            Haptics.Play(Haptics.Kind.Win); AudioDirector.Instance?.Confirm(); Greet(0.2f);
+            Greet(0.2f);
+            PurchaseSheet.Bought(def.displayName, "driver:" + def.driverId, $"{price} GEMS", "Joins your roster, on every phone you sign in to.");
             KartApi.Event("recruit", new { driver = def.displayName, price });
             Show();
         }

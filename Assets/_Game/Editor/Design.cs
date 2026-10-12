@@ -292,6 +292,9 @@ public static class Design
                                  Seg(x, y, 38, 92, 24, 112, 11)),
             "download" => (x, y) => Mathf.Min(Mathf.Min(Seg(x, y, 64, 108, 64, 46, 13), Mathf.Min(Seg(x, y, 38, 70, 64, 44, 13), Seg(x, y, 90, 70, 64, 44, 13))),
                                          Box(x, y, 64, 20, 46, 7, 4)),
+            "gem" => (x, y) => Mathf.Min(Mathf.Min(Tri(x, y, new Vector2(40, 102), new Vector2(88, 102), new Vector2(110, 78)),    // the crown...
+                                                    Tri(x, y, new Vector2(40, 102), new Vector2(110, 78), new Vector2(18, 78))),
+                                         Tri(x, y, new Vector2(18, 74), new Vector2(110, 74), new Vector2(64, 16))),                    // ...a cut, the point
             _ => null,
         };
         if (sdf == null) { Debug.LogError("[design] no icon " + name); return null; }

@@ -59,7 +59,7 @@ namespace KartCup
             var pack = Inventory.Packs[Mathf.Clamp(focus, 0, Inventory.Packs.Length - 1)];
             if (WalletFlow.Instance == null) { message = "Wallet not ready"; Show(); return; }
             busy = true; message = "Opening wallet…"; Show();
-            bool ok = await WalletFlow.Instance.Buy(pack.sku, currency);
+            bool ok = await PurchaseSheet.Pay(pack.name, "item:" + pack.id, pack.sku, currency, $"{pack.qty} added to your items.");
             busy = false;
             message = WalletFlow.Instance.LastStatus;
             if (ok)

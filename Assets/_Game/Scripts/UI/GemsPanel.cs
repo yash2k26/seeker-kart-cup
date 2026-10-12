@@ -33,7 +33,7 @@ namespace KartCup
             var pack = Packs[focus];
             if (WalletFlow.Instance == null) { message = "Wallet not ready"; Show(); return; }
             busy = true; message = "Opening wallet…"; Show();
-            bool ok = await WalletFlow.Instance.Buy(pack.sku, currency);
+            bool ok = await PurchaseSheet.Pay($"{pack.name} of {pack.gems} gems", "gems", pack.sku, currency, $"{pack.gems} gems added to your balance.");
             busy = false; message = WalletFlow.Instance.LastStatus;
             if (ok) { Haptics.Play(Haptics.Kind.Win); AudioDirector.Instance?.Confirm(); KartApi.Event("gems_pack", new { pack = pack.sku, currency }); }
             Show();

@@ -69,7 +69,7 @@ public static partial class MenuSetup
         reward.pivot = new Vector2(1, 0.5f);
         var chestRt = Rect("Chest", reward, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(48, 4), new Vector2(96, 96));
         var chestImg = chestRt.gameObject.AddComponent<Image>(); chestImg.preserveAspect = true; chestImg.raycastTarget = false;
-        var starRt = Rect("Star", reward, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-62, 0), new Vector2(36, 36));
+        var starRt = Rect("Star", reward, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-78, 0), new Vector2(36, 36));
         var starImg = starRt.gameObject.AddComponent<Image>(); starImg.sprite = IconSprite("star"); starImg.color = Accent; starImg.preserveAspect = true; starImg.raycastTarget = false;
         var stars = Label("Stars", reward, display, "+2", 34, Paper, TextAlignmentOptions.Left, new Vector2(1, 0.5f), new Vector2(-6, 0), new Vector2(50, 44));
         stars.rectTransform.pivot = new Vector2(1, 0.5f);

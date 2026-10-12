@@ -106,6 +106,7 @@ public static partial class MenuSetup
 
         Curtain();
         ChestOverlay();
+        PurchaseOverlay();
         new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
         var boot = new GameObject("Boot");
         boot.AddComponent<GameBoot>();
@@ -503,8 +504,8 @@ public static partial class MenuSetup
         {
             var icon = actions.Find($"{door}/{door}Face/{door}Icon")?.GetComponent<Image>();
             if (icon == null) return null;
-            icon.rectTransform.sizeDelta = new Vector2(140, 140); icon.rectTransform.anchoredPosition = new Vector2(0, -10);
-            var badge = Rect("Swap", icon.rectTransform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(8, 4), new Vector2(54, 54));
+            icon.rectTransform.sizeDelta = new Vector2(118, 118); icon.rectTransform.anchoredPosition = new Vector2(0, -14);   // clear of the label under it
+            var badge = Rect("Swap", icon.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(6, -6), new Vector2(54, 54));   // the top corner: at the bottom it crowded the label
             Design.AsPill(badge, Deep).raycastTarget = false;
             var glyph = Rect("Glyph", badge, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(38, 38));
             var gi = glyph.gameObject.AddComponent<Image>(); gi.sprite = IconSprite("swap"); gi.color = Accent; gi.preserveAspect = true; gi.raycastTarget = false;

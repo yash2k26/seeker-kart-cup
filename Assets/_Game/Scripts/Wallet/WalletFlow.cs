@@ -162,7 +162,7 @@ namespace KartCup
         /// Returns the signature, or null when nothing was sent (declined, no funds, offline). Signs the player in first if needed.
         public async Awaitable<string> Pay(string memo, ulong amount, string currency, string what)
         {
-            if (Busy) return null;
+            if (Busy) { Status("Your wallet is busy with something else. Try again in a moment."); return null; }
             Busy = true;
             try
             {
@@ -170,6 +170,7 @@ namespace KartCup
                 if (cfg == null || !cfg.CanPay) { Status("Payments are offline right now"); return null; }
                 if (!SignedIn && !await LoginAsync()) return null;
                 var me = Web3.Wallet.Account.PublicKey;
+                Status("Checking your balance…");
                 var tx = await BuildTx();
                 if (currency == "SOL")
                 {
@@ -203,8 +204,13 @@ namespace KartCup
         /// Shop: pay the catalog price, then let the Worker verify it landed and grant it. The signature is written down
         /// before the first ask (PendingPurchases), so a payment the Worker has not seen yet keeps being asked about: for
         /// a few minutes now, then at every launch and sign-in, until it is granted.
+        /// The last Buy paid but the network had not confirmed it yet: it unlocks by itself (PendingPurchases).
+        public bool LastPending { get; private set; }
+
         public async Awaitable<bool> Buy(string sku, string currency)
         {
+            LastPending = false;
+            Status("Getting today's price…");
             var cfg = await KartApi.Config(maxAgeSeconds: 300);   // the Worker accepts 90% of today's SKR price, not the session's
             if (cfg == null) { Status("Couldn't load today's prices. Check your connection."); return false; }
             var item = cfg.Item(sku);
@@ -215,7 +221,7 @@ namespace KartCup
             if (sig == null) return false;
             var paid = new PendingPurchases.Entry { sig = sig, sku = sku, orderId = orderId, currency = currency, wallet = KartApi.SessionWallet };
             PendingPurchases.Add(paid);
-            Status("Verifying…");
+            Status("Confirming your payment on Solana…");
             var outcome = PendingPurchases.Outcome.Pending;
             for (int i = 0; i < 10 && outcome == PendingPurchases.Outcome.Pending; i++)
             {
@@ -226,6 +232,7 @@ namespace KartCup
             if (outcome == PendingPurchases.Outcome.Pending)
             {
                 Status("Paid. Still confirming: it unlocks by itself once the network confirms.");
+                LastPending = true;
                 _ = SettlePurchases(rounds: 12);
                 return false;
             }
